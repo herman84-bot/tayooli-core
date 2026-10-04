@@ -75,6 +75,9 @@ func Run(ctx context.Context, db *sql.DB) error {
 
 		if _, err := db.ExecContext(ctx, upSQL); err != nil {
 			errStr := err.Error()
+			// Always rollback any aborted transaction before handling/continuing
+			_, _ = db.ExecContext(ctx, "ROLLBACK;")
+
 			// If error is because objects/keys already exist, record and continue (idempotent recovery)
 			if strings.Contains(errStr, "already exists") ||
 				strings.Contains(errStr, "duplicate key") ||
