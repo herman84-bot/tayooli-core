@@ -32,6 +32,21 @@ END $$;
 -- 0.1 PREREQUISITE TABLES (Guarantees fresh standalone migration consistency)
 -- ============================================================================
 
+-- Defense-in-depth: this migration's FKs reference products(id, tenant_id).
+-- Ensure that composite UNIQUE constraint exists regardless of which earlier
+-- "products" migration variant ran (011_products_inventory.sql creates
+-- products WITHOUT this constraint; 012_products_inventory.sql's CREATE
+-- TABLE IF NOT EXISTS is then a no-op and never adds it). Idempotent.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='products')
+       AND NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'products_id_tenant_id_key'
+    ) THEN
+        ALTER TABLE products ADD CONSTRAINT products_id_tenant_id_key UNIQUE (id, tenant_id);
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS customers (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,

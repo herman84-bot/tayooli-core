@@ -85,7 +85,7 @@ func Run(ctx context.Context, db *sql.DB) error {
 				strings.Contains(errStr, "42710") ||
 				strings.Contains(errStr, "42701") ||
 				strings.Contains(errStr, "23505") {
-				log.Warn().Str("migration", filename).Msg("objects or keys already exist; marking migration as applied and continuing")
+				log.Warn().Str("migration", filename).Err(err).Msg("objects or keys already exist; marking migration as applied and continuing")
 			} else {
 				return fmt.Errorf("migrations.Run: execute %s: %w", filename, err)
 			}
