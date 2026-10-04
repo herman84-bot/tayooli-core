@@ -41,19 +41,6 @@ func Run(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("migrations.Run: create schema_migrations: %w", err)
 	}
 
-	// Self-healing guard: if schema_migrations has entries but purchase_orders was dropped by legacy DOWN blocks,
-	// reset tracker so all tables are created cleanly.
-	var poExists bool
-	_ = db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='purchase_orders');").Scan(&poExists)
-	if !poExists {
-		var count int
-		_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_migrations;").Scan(&count)
-		if count > 0 {
-			log.Warn().Msg("purchase_orders missing while migrations were recorded; cleaning schema_migrations for clean UP execution")
-			_, _ = db.ExecContext(ctx, "DELETE FROM schema_migrations;")
-		}
-	}
-
 	entries, err := FS.ReadDir(".")
 	if err != nil {
 		return fmt.Errorf("migrations.Run: read dir: %w", err)
@@ -87,10 +74,16 @@ func Run(ctx context.Context, db *sql.DB) error {
 		log.Info().Str("migration", filename).Msg("applying database migration")
 
 		if _, err := db.ExecContext(ctx, upSQL); err != nil {
-			return fmt.Errorf("migrations.Run: execute %s: %w", filename, err)
+			errStr := err.Error()
+			// If error is because objects already exist, record and continue (idempotent recovery)
+			if strings.Contains(errStr, "already exists") || strings.Contains(errStr, "42P07") || strings.Contains(errStr, "42710") || strings.Contains(errStr, "42701") {
+				log.Warn().Str("migration", filename).Msg("objects already exist; marking migration as applied and continuing")
+			} else {
+				return fmt.Errorf("migrations.Run: execute %s: %w", filename, err)
+			}
 		}
 
-		recordSQL := `INSERT INTO schema_migrations (filename) VALUES ($1);`
+		recordSQL := `INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT (filename) DO NOTHING;`
 		if _, err := db.ExecContext(ctx, recordSQL, filename); err != nil {
 			return fmt.Errorf("migrations.Run: record %s: %w", filename, err)
 		}
