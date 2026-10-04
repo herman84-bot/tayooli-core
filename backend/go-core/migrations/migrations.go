@@ -75,9 +75,14 @@ func Run(ctx context.Context, db *sql.DB) error {
 
 		if _, err := db.ExecContext(ctx, upSQL); err != nil {
 			errStr := err.Error()
-			// If error is because objects already exist, record and continue (idempotent recovery)
-			if strings.Contains(errStr, "already exists") || strings.Contains(errStr, "42P07") || strings.Contains(errStr, "42710") || strings.Contains(errStr, "42701") {
-				log.Warn().Str("migration", filename).Msg("objects already exist; marking migration as applied and continuing")
+			// If error is because objects/keys already exist, record and continue (idempotent recovery)
+			if strings.Contains(errStr, "already exists") ||
+				strings.Contains(errStr, "duplicate key") ||
+				strings.Contains(errStr, "42P07") ||
+				strings.Contains(errStr, "42710") ||
+				strings.Contains(errStr, "42701") ||
+				strings.Contains(errStr, "23505") {
+				log.Warn().Str("migration", filename).Msg("objects or keys already exist; marking migration as applied and continuing")
 			} else {
 				return fmt.Errorf("migrations.Run: execute %s: %w", filename, err)
 			}
