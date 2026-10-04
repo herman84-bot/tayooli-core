@@ -10,7 +10,7 @@ RUN go mod download
 
 COPY . .
 # CGO_ENABLED=0 → fully static binary; -ldflags keeps the image lean.
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN CGO_ENABLED=0 go build \
     -trimpath \
     -ldflags="-s -w" \
     -o /out/api ./cmd/api
