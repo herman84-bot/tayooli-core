@@ -35,4 +35,9 @@ CREATE POLICY tenant_isolation ON approval_requests
 
 ALTER TABLE approval_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE approval_requests FORCE ROW LEVEL SECURITY;
-GRANT ALL ON approval_requests TO tayooli;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tayooli') THEN
+        GRANT ALL ON approval_requests TO tayooli;
+    END IF;
+END $$;
