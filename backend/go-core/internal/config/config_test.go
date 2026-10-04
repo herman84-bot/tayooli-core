@@ -114,18 +114,51 @@ func TestLoad_BrevoConfig(t *testing.T) {
 
 func TestLoad_KafkaBrokersOptional(t *testing.T) {
 	validSecret := strings.Repeat("s", 32)
+	setRequiredEnv(t, validSecret)
+	t.Setenv("KAFKA_BROKERS", "")
 
-	t.Run("succeeds when KAFKA_BROKERS is empty", func(t *testing.T) {
-		setRequiredEnv(t, validSecret)
-		t.Setenv("KAFKA_BROKERS", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("expected Load() to succeed without KAFKA_BROKERS, got: %v", err)
+	}
 
-		cfg, err := Load()
-		if err != nil {
-			t.Fatalf("expected no error when KAFKA_BROKERS is empty, got: %v", err)
-		}
-		if cfg.KafkaBrokers != "" {
-			t.Errorf("KafkaBrokers = %q, want empty string", cfg.KafkaBrokers)
-		}
-	})
+	if cfg.KafkaBrokers != "" {
+		t.Errorf("KafkaBrokers = %q, want empty", cfg.KafkaBrokers)
+	}
+}
+
+func TestLoad_DatabaseURLFallback(t *testing.T) {
+	validSecret := strings.Repeat("s", 32)
+	t.Setenv("JWT_SECRET", validSecret)
+	t.Setenv("DB_HOST", "")
+	t.Setenv("DB_PORT", "")
+	t.Setenv("DB_USER", "")
+	t.Setenv("DB_PASSWORD", "")
+	t.Setenv("DB_NAME", "")
+	t.Setenv("DATABASE_URL", "postgres://zeabur_user:zeabur_pass@zeabur-db.internal:5432/zeabur_db?sslmode=disable")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.DBHost != "zeabur-db.internal" {
+		t.Errorf("DBHost = %q, want %q", cfg.DBHost, "zeabur-db.internal")
+	}
+	if cfg.DBPort != "5432" {
+		t.Errorf("DBPort = %q, want %q", cfg.DBPort, "5432")
+	}
+	if cfg.DBUser != "zeabur_user" {
+		t.Errorf("DBUser = %q, want %q", cfg.DBUser, "zeabur_user")
+	}
+	if cfg.DBPassword != "zeabur_pass" {
+		t.Errorf("DBPassword = %q, want %q", cfg.DBPassword, "zeabur_pass")
+	}
+	if cfg.DBName != "zeabur_db" {
+		t.Errorf("DBName = %q, want %q", cfg.DBName, "zeabur_db")
+	}
+	if cfg.DBSSLMode != "disable" {
+		t.Errorf("DBSSLMode = %q, want %q", cfg.DBSSLMode, "disable")
+	}
 }
 

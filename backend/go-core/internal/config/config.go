@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"strings"
 )
 
 // MinJWTSecretLength is the minimum length enforced for JWT_SECRET (HS256
@@ -85,6 +87,10 @@ func Load() (*Config, error) {
 	if cfg.ServerPort == "" {
 		cfg.ServerPort = "8081"
 	}
+	// Cloud PaaS (Zeabur / Railway / Cloud Run) injects PORT
+	if port := os.Getenv("PORT"); port != "" && cfg.ServerPort == "8081" {
+		cfg.ServerPort = port
+	}
 	if cfg.AppEnv == "" {
 		cfg.AppEnv = "production"
 	}
@@ -102,6 +108,56 @@ func Load() (*Config, error) {
 	}
 	if cfg.BrevoSenderName == "" {
 		cfg.BrevoSenderName = "Tayooli ERP"
+	}
+
+	// Cloud PaaS database fallback (Zeabur / Railway / Supabase)
+	// 1. Connection string DATABASE_URL / POSTGRES_URL
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		dbURL = os.Getenv("POSTGRES_URL")
+	}
+	if dbURL == "" {
+		dbURL = os.Getenv("POSTGRESQL_URL")
+	}
+	if dbURL != "" && cfg.DBHost == "" {
+		if u, err := url.Parse(dbURL); err == nil {
+			cfg.DBHost = u.Hostname()
+			cfg.DBPort = u.Port()
+			if cfg.DBPort == "" {
+				cfg.DBPort = "5432"
+			}
+			if u.User != nil {
+				cfg.DBUser = u.User.Username()
+				cfg.DBPassword, _ = u.User.Password()
+			}
+			cfg.DBName = strings.TrimPrefix(u.Path, "/")
+			if q := u.Query().Get("sslmode"); q != "" {
+				cfg.DBSSLMode = q
+			}
+		}
+	}
+
+	// 2. Zeabur auto-injected POSTGRES_* environment variables
+	if cfg.DBHost == "" {
+		cfg.DBHost = os.Getenv("POSTGRES_HOST")
+	}
+	if cfg.DBPort == "" {
+		cfg.DBPort = os.Getenv("POSTGRES_PORT")
+	}
+	if cfg.DBUser == "" {
+		cfg.DBUser = os.Getenv("POSTGRES_USER")
+		if cfg.DBUser == "" {
+			cfg.DBUser = os.Getenv("POSTGRES_USERNAME")
+		}
+	}
+	if cfg.DBPassword == "" {
+		cfg.DBPassword = os.Getenv("POSTGRES_PASSWORD")
+	}
+	if cfg.DBName == "" {
+		cfg.DBName = os.Getenv("POSTGRES_DATABASE")
+		if cfg.DBName == "" {
+			cfg.DBName = os.Getenv("POSTGRES_DB")
+		}
 	}
 
 	// Validate required env vars

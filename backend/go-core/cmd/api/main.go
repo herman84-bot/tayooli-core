@@ -28,6 +28,7 @@ import (
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/infra/mailer"
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/infra/postgres"
 	tenantMiddleware "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/middleware"
+	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/migrations"
 	approvalUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/approval"
 	authUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/auth"
 	customerUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/customer"
@@ -107,6 +108,13 @@ func main() {
 	db.SetConnMaxIdleTime(5 * time.Minute)
 
 	log.Info().Msg("connected to PostgreSQL")
+
+	// Auto-run embedded migrations on startup
+	log.Info().Msg("running database migrations...")
+	if err := migrations.Run(context.Background(), db); err != nil {
+		log.Fatal().Err(err).Msg("database migrations failed")
+	}
+	log.Info().Msg("database migrations completed successfully")
 
 	// Kafka Producer: Decoupled with graceful fallback to no-op producer
 	var producer kafka.Producer
