@@ -1,0 +1,1816 @@
+package wms
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/domain"
+	"github.com/shopspring/decimal"
+)
+
+type Usecase struct {
+	repo domain.WMSRepository
+}
+
+func New(repo domain.WMSRepository) *Usecase {
+	return &Usecase{repo: repo}
+}
+
+// -----------------------------------------------------------------------------
+// Warehouse Scoping & Access Control
+// -----------------------------------------------------------------------------
+
+// ValidateWarehouseReadAccess checks whether the given user has permission to read warehouse data.
+// Rules:
+// 1. admin, owner, and auditor roles have tenant-wide read access across all warehouses.
+// 2. warehouse role (staf gudang) only has access to warehouses assigned in user_warehouses.
+// 3. regional_manager role has access to all warehouses belonging to the regional of their assigned warehouses.
+func (u *Usecase) ValidateWarehouseReadAccess(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID) error {
+	// 0. Verify warehouse exists and belongs to this tenant
+	if _, err := u.repo.GetWarehouseByID(ctx, tenantID, warehouseID); err != nil {
+		return err
+	}
+
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	if normalizedRole == "admin" || normalizedRole == "owner" || normalizedRole == "auditor" {
+		return nil
+	}
+
+	assignedWHs, err := u.repo.GetUserWarehouseIDs(ctx, tenantID, userID)
+	if err != nil {
+		return fmt.Errorf("ValidateWarehouseReadAccess: get user warehouses: %w", err)
+	}
+
+	// 1. Check explicit assignment
+	for _, whID := range assignedWHs {
+		if whID == warehouseID {
+			return nil
+		}
+	}
+
+	// 2. Check regional manager scope
+	if normalizedRole == "regional_manager" {
+		targetWH, err := u.repo.GetWarehouseByID(ctx, tenantID, warehouseID)
+		if err != nil {
+			return domain.ErrWarehouseNotFound
+		}
+		if targetWH.RegionalID != nil && len(assignedWHs) > 0 {
+			userWHs, err := u.repo.ListWarehousesByIDs(ctx, tenantID, assignedWHs)
+			if err == nil {
+				for _, uwh := range userWHs {
+					if uwh.RegionalID != nil && *uwh.RegionalID == *targetWH.RegionalID {
+						return nil
+					}
+				}
+			}
+		}
+	}
+
+	return domain.ErrUnauthorizedWarehouse
+}
+
+// ValidateWarehouseWriteAccess checks whether the user has permission to perform write/dispatch operations.
+// Rules:
+// 1. auditor role is strictly read-only and is rejected with domain.ErrForbidden.
+// 2. admin and owner roles have tenant-wide write access across all warehouses.
+// 3. warehouse role (staf gudang) has write access only to assigned warehouses.
+// 4. regional_manager role has write access to warehouses within their assigned regional.
+func (u *Usecase) ValidateWarehouseWriteAccess(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID) error {
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	if normalizedRole == "auditor" {
+		return domain.ErrForbidden
+	}
+	if normalizedRole != "admin" && normalizedRole != "owner" && normalizedRole != "warehouse" && normalizedRole != "regional_manager" {
+		return domain.ErrForbidden
+	}
+	return u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, warehouseID)
+}
+
+// ValidateWarehouseAccess maintains backward compatibility, aliasing to ValidateWarehouseReadAccess.
+func (u *Usecase) ValidateWarehouseAccess(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID) error {
+	return u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, warehouseID)
+}
+
+// validateLocationWarehouse verifies that a location exists and belongs to the expected warehouse.
+func (u *Usecase) validateLocationWarehouse(ctx context.Context, tenantID, locationID, expectedWarehouseID uuid.UUID) error {
+	loc, err := u.repo.GetLocationByID(ctx, tenantID, locationID)
+	if err != nil {
+		return err
+	}
+	if loc.WarehouseID == nil || *loc.WarehouseID != expectedWarehouseID {
+		return domain.ErrUnauthorizedWarehouse
+	}
+	return nil
+}
+
+// FilterAccessibleWarehouses returns the list of warehouses accessible to the user based on role scoping.
+func (u *Usecase) FilterAccessibleWarehouses(ctx context.Context, tenantID, userID uuid.UUID, role string) ([]domain.Warehouse, error) {
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	allWarehouses, err := u.repo.ListWarehouses(ctx, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("FilterAccessibleWarehouses: list all: %w", err)
+	}
+
+	if normalizedRole == "admin" || normalizedRole == "owner" || normalizedRole == "auditor" {
+		return allWarehouses, nil
+	}
+
+	assignedWHs, err := u.repo.GetUserWarehouseIDs(ctx, tenantID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("FilterAccessibleWarehouses: get user warehouses: %w", err)
+	}
+
+	if normalizedRole == "regional_manager" {
+		// Collect all regional IDs associated with the user's assigned warehouses
+		userWHs, err := u.repo.ListWarehousesByIDs(ctx, tenantID, assignedWHs)
+		if err != nil {
+			return nil, fmt.Errorf("FilterAccessibleWarehouses: get assigned wh details: %w", err)
+		}
+		regionalSet := make(map[uuid.UUID]bool)
+		for _, w := range userWHs {
+			if w.RegionalID != nil {
+				regionalSet[*w.RegionalID] = true
+			}
+		}
+
+		var filtered []domain.Warehouse
+		for _, w := range allWarehouses {
+			if w.RegionalID != nil && regionalSet[*w.RegionalID] {
+				filtered = append(filtered, w)
+			}
+		}
+		return filtered, nil
+	}
+
+	// Default warehouse staff: only directly assigned warehouses
+	assignedSet := make(map[uuid.UUID]bool)
+	for _, id := range assignedWHs {
+		assignedSet[id] = true
+	}
+	var filtered []domain.Warehouse
+	for _, w := range allWarehouses {
+		if assignedSet[w.ID] {
+			filtered = append(filtered, w)
+		}
+	}
+	return filtered, nil
+}
+
+// -----------------------------------------------------------------------------
+// Warehouse CRUD
+// -----------------------------------------------------------------------------
+
+type CreateWarehouseRequest struct {
+	Code       string     `json:"code"`
+	Name       string     `json:"name"`
+	RegionalID *uuid.UUID `json:"regional_id,omitempty"`
+	Address    *string    `json:"address,omitempty"`
+	IsActive   *bool      `json:"is_active,omitempty"`
+}
+
+func (u *Usecase) CreateWarehouse(ctx context.Context, tenantID, userID uuid.UUID, role string, req CreateWarehouseRequest) (*domain.Warehouse, error) {
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	if normalizedRole != "admin" && normalizedRole != "owner" {
+		return nil, domain.ErrForbidden
+	}
+	if strings.TrimSpace(req.Code) == "" || strings.TrimSpace(req.Name) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	wh := &domain.Warehouse{
+		ID:         uuid.New(),
+		TenantID:   tenantID,
+		RegionalID: req.RegionalID,
+		Code:       strings.ToUpper(strings.TrimSpace(req.Code)),
+		Name:       strings.TrimSpace(req.Name),
+		Address:    req.Address,
+		IsActive:   isActive,
+		CreatedAt:  time.Now().UTC(),
+		UpdatedAt:  time.Now().UTC(),
+	}
+
+	if err := u.repo.CreateWarehouse(ctx, wh); err != nil {
+		return nil, err
+	}
+	return wh, nil
+}
+
+func (u *Usecase) GetWarehouse(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.Warehouse, error) {
+	if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, id); err != nil {
+		return nil, err
+	}
+	return u.repo.GetWarehouseByID(ctx, tenantID, id)
+}
+
+func (u *Usecase) ListWarehouses(ctx context.Context, tenantID, userID uuid.UUID, role string) ([]domain.Warehouse, error) {
+	return u.FilterAccessibleWarehouses(ctx, tenantID, userID, role)
+}
+
+func (u *Usecase) AssignUserWarehouse(ctx context.Context, tenantID, userID uuid.UUID, role string, targetUserID, warehouseID uuid.UUID) error {
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	if normalizedRole != "admin" && normalizedRole != "owner" {
+		return domain.ErrForbidden
+	}
+	uw := &domain.UserWarehouse{
+		UserID:      targetUserID,
+		WarehouseID: warehouseID,
+		TenantID:    tenantID,
+		AssignedAt:  time.Now().UTC(),
+	}
+	return u.repo.AssignUserWarehouse(ctx, uw)
+}
+
+// -----------------------------------------------------------------------------
+// Locations CRUD
+// -----------------------------------------------------------------------------
+
+type CreateLocationRequest struct {
+	WarehouseID  *uuid.UUID           `json:"warehouse_id,omitempty"`
+	ParentID     *uuid.UUID           `json:"parent_id,omitempty"`
+	Code         string               `json:"code"`
+	Barcode      *string              `json:"barcode,omitempty"`
+	Name         string               `json:"name"`
+	Type         *domain.LocationType `json:"type,omitempty"`
+	IsPallet     bool                 `json:"is_pallet"`
+	PalletNumber *string              `json:"pallet_number,omitempty"`
+	MaxCapacity  *decimal.Decimal     `json:"max_capacity,omitempty"`
+}
+
+func (u *Usecase) CreateLocation(ctx context.Context, tenantID, userID uuid.UUID, role string, req CreateLocationRequest) (*domain.WarehouseLocation, error) {
+	if req.WarehouseID != nil {
+		if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, *req.WarehouseID); err != nil {
+			return nil, err
+		}
+	} else {
+		// Non-warehouse (system/virtual) locations require admin/owner
+		normalizedRole := strings.ToLower(strings.TrimSpace(role))
+		if normalizedRole != "admin" && normalizedRole != "owner" {
+			return nil, domain.ErrForbidden
+		}
+	}
+
+	if strings.TrimSpace(req.Code) == "" || strings.TrimSpace(req.Name) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	locType := domain.LocationTypeInternal
+	if req.Type != nil {
+		locType = *req.Type
+	}
+
+	loc := &domain.WarehouseLocation{
+		ID:           uuid.New(),
+		TenantID:     tenantID,
+		WarehouseID:  req.WarehouseID,
+		ParentID:     req.ParentID,
+		Code:         strings.TrimSpace(req.Code),
+		Barcode:      req.Barcode,
+		Name:         strings.TrimSpace(req.Name),
+		Type:         locType,
+		IsPallet:     req.IsPallet,
+		PalletNumber: req.PalletNumber,
+		MaxCapacity:  req.MaxCapacity,
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	}
+
+	if err := u.repo.CreateLocation(ctx, loc); err != nil {
+		return nil, err
+	}
+	return loc, nil
+}
+
+func (u *Usecase) ListLocations(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.WarehouseLocation, error) {
+	if warehouseID != nil {
+		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
+			return nil, err
+		}
+		return u.repo.ListLocations(ctx, tenantID, warehouseID)
+	}
+
+	// If no warehouse specified, return locations for warehouses user has access to
+	accessibleWHs, err := u.FilterAccessibleWarehouses(ctx, tenantID, userID, role)
+	if err != nil {
+		return nil, fmt.Errorf("Usecase.ListLocations: %w", err)
+	}
+
+	allLocs, err := u.repo.ListLocations(ctx, tenantID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("Usecase.ListLocations: %w", err)
+	}
+
+	whSet := make(map[uuid.UUID]struct{}, len(accessibleWHs))
+	for _, wh := range accessibleWHs {
+		whSet[wh.ID] = struct{}{}
+	}
+
+	filtered := make([]domain.WarehouseLocation, 0, len(allLocs))
+	for _, loc := range allLocs {
+		if loc.WarehouseID != nil {
+			if _, ok := whSet[*loc.WarehouseID]; ok {
+				filtered = append(filtered, loc)
+			}
+		} else {
+			filtered = append(filtered, loc)
+		}
+	}
+	return filtered, nil
+}
+
+// -----------------------------------------------------------------------------
+// Barcode & SKU Resolution
+// -----------------------------------------------------------------------------
+
+func (u *Usecase) ResolveBarcode(ctx context.Context, tenantID uuid.UUID, code string) (*domain.ResolvedProduct, error) {
+	cleanCode := strings.TrimSpace(code)
+	if cleanCode == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	return u.repo.ResolveBarcode(ctx, tenantID, cleanCode)
+}
+
+type CreateBarcodeRequest struct {
+	ProductID        uuid.UUID        `json:"product_id"`
+	Barcode          string           `json:"barcode"`
+	BarcodeSymbology string           `json:"barcode_symbology"`
+	UOMName          string           `json:"uom_name"`
+	Multiplier       *decimal.Decimal `json:"multiplier,omitempty"`
+}
+
+func (u *Usecase) CreateBarcode(ctx context.Context, tenantID uuid.UUID, req CreateBarcodeRequest) (*domain.ProductBarcode, error) {
+	if req.ProductID == uuid.Nil || strings.TrimSpace(req.Barcode) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	mult := decimal.NewFromInt(1)
+	if req.Multiplier != nil && req.Multiplier.GreaterThan(decimal.Zero) {
+		mult = *req.Multiplier
+	}
+	b := &domain.ProductBarcode{
+		ID:               uuid.New(),
+		TenantID:         tenantID,
+		ProductID:        req.ProductID,
+		Barcode:          strings.TrimSpace(req.Barcode),
+		BarcodeSymbology: req.BarcodeSymbology,
+		UOMName:          req.UOMName,
+		Multiplier:       mult,
+		CreatedAt:        time.Now().UTC(),
+	}
+	if err := u.repo.CreateBarcode(ctx, b); err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+type CreateSKUMappingRequest struct {
+	ProductID    uuid.UUID              `json:"product_id"`
+	MappingType  domain.SKUMappingType  `json:"mapping_type"`
+	ChannelName  string                 `json:"channel_name"`
+	ExternalSKU  string                 `json:"external_sku"`
+	ExternalName *string                `json:"external_name,omitempty"`
+	Multiplier   *decimal.Decimal       `json:"multiplier,omitempty"`
+}
+
+func (u *Usecase) CreateSKUMapping(ctx context.Context, tenantID uuid.UUID, req CreateSKUMappingRequest) (*domain.ProductSKUMapping, error) {
+	if req.ProductID == uuid.Nil || strings.TrimSpace(req.ExternalSKU) == "" || strings.TrimSpace(req.ChannelName) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	mult := decimal.NewFromInt(1)
+	if req.Multiplier != nil && req.Multiplier.GreaterThan(decimal.Zero) {
+		mult = *req.Multiplier
+	}
+	m := &domain.ProductSKUMapping{
+		ID:           uuid.New(),
+		TenantID:     tenantID,
+		ProductID:    req.ProductID,
+		MappingType:  req.MappingType,
+		ChannelName:  strings.TrimSpace(req.ChannelName),
+		ExternalSKU:  strings.TrimSpace(req.ExternalSKU),
+		ExternalName: req.ExternalName,
+		Multiplier:   mult,
+		CreatedAt:    time.Now().UTC(),
+		UpdatedAt:    time.Now().UTC(),
+	}
+	if err := u.repo.CreateSKUMapping(ctx, m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// -----------------------------------------------------------------------------
+// Stock Transfers
+// -----------------------------------------------------------------------------
+
+type CreateTransferItemRequest struct {
+	ProductID        uuid.UUID        `json:"product_id"`
+	RequestedQty     decimal.Decimal  `json:"requested_qty"`
+	SourceLocationID *uuid.UUID       `json:"source_location_id,omitempty"`
+	DestLocationID   *uuid.UUID       `json:"dest_location_id,omitempty"`
+}
+
+type CreateTransferRequest struct {
+	FromWarehouseID uuid.UUID                   `json:"from_warehouse_id"`
+	ToWarehouseID   uuid.UUID                   `json:"to_warehouse_id"`
+	TransferNumber  string                      `json:"transfer_number"`
+	VehiclePlate    *string                     `json:"vehicle_plate,omitempty"`
+	DriverName      *string                     `json:"driver_name,omitempty"`
+	Notes           *string                     `json:"notes,omitempty"`
+	Items           []CreateTransferItemRequest `json:"items"`
+}
+
+func (u *Usecase) CreateTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, req CreateTransferRequest) (*domain.StockTransfer, error) {
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.FromWarehouseID); err != nil {
+		return nil, err
+	}
+	if _, err := u.repo.GetWarehouseByID(ctx, tenantID, req.ToWarehouseID); err != nil {
+		return nil, err
+	}
+	if len(req.Items) == 0 {
+		return nil, domain.ErrInvalidInput
+	}
+
+	transferNumber := strings.TrimSpace(req.TransferNumber)
+	if transferNumber == "" {
+		transferNumber = fmt.Sprintf("TR-%d", time.Now().UnixNano()/1e6)
+	}
+
+	t := &domain.StockTransfer{
+		ID:              uuid.New(),
+		TenantID:        tenantID,
+		TransferNumber:  transferNumber,
+		FromWarehouseID: req.FromWarehouseID,
+		ToWarehouseID:   req.ToWarehouseID,
+		Status:          domain.TransferStatusDraft,
+		RequestedBy:     userID,
+		VehiclePlate:    req.VehiclePlate,
+		DriverName:      req.DriverName,
+		Notes:           req.Notes,
+		CreatedAt:       time.Now().UTC(),
+		UpdatedAt:       time.Now().UTC(),
+	}
+
+	var items []domain.StockTransferItem
+	for _, itemReq := range req.Items {
+		if itemReq.ProductID == uuid.Nil || itemReq.RequestedQty.LessThanOrEqual(decimal.Zero) {
+			return nil, domain.ErrInvalidInput
+		}
+		if itemReq.SourceLocationID != nil {
+			if err := u.validateLocationWarehouse(ctx, tenantID, *itemReq.SourceLocationID, req.FromWarehouseID); err != nil {
+				return nil, err
+			}
+		}
+		if itemReq.DestLocationID != nil {
+			if err := u.validateLocationWarehouse(ctx, tenantID, *itemReq.DestLocationID, req.ToWarehouseID); err != nil {
+				return nil, err
+			}
+		}
+		items = append(items, domain.StockTransferItem{
+			ID:               uuid.New(),
+			TenantID:         tenantID,
+			TransferID:       t.ID,
+			ProductID:        itemReq.ProductID,
+			RequestedQty:     itemReq.RequestedQty,
+			SentQty:          decimal.Zero,
+			ReceivedQty:      decimal.Zero,
+			SourceLocationID: itemReq.SourceLocationID,
+			DestLocationID:   itemReq.DestLocationID,
+			CreatedAt:        time.Now().UTC(),
+		})
+	}
+
+	if err := u.repo.CreateTransfer(ctx, t, items); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// isTransferApproverRole reports whether role is allowed to approve/reject
+// stock transfers. Only tenant-wide (admin/owner) or regional (regional_manager)
+// supervisory roles may act as approver — warehouse staff who request a
+// transfer cannot approve their own or anyone else's transfer.
+func isTransferApproverRole(role string) bool {
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	return normalizedRole == "admin" || normalizedRole == "owner" || normalizedRole == "regional_manager"
+}
+
+// SubmitTransfer moves a DRAFT transfer into PENDING_APPROVAL, signaling that
+// it is ready for a supervisor/manager to review. Any role with write access
+// to the source warehouse (the requester themself, or another staff member of
+// the same warehouse) may submit it.
+func (u *Usecase) SubmitTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {
+	t, _, err := u.repo.GetTransferByID(ctx, tenantID, transferID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, t.FromWarehouseID); err != nil {
+		return nil, err
+	}
+
+	if t.Status != domain.TransferStatusDraft {
+		return nil, domain.ErrInvalidTransferStatus
+	}
+
+	newStatus := domain.TransferStatusPendingApproval
+	if err := u.repo.UpdateTransferStatus(ctx, tenantID, t.ID, newStatus, nil, nil, nil, nil); err != nil {
+		return nil, fmt.Errorf("SubmitTransfer: update status: %w", err)
+	}
+
+	t.Status = newStatus
+	return t, nil
+}
+
+// ApproveTransfer moves a PENDING_APPROVAL transfer into APPROVED, unlocking
+// DispatchTransfer. Only admin/owner/regional_manager roles with read access
+// to the source warehouse may approve, and the requester may never approve
+// their own submitted transfer (segregation of duties).
+func (u *Usecase) ApproveTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {
+	t, _, err := u.repo.GetTransferByID(ctx, tenantID, transferID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isTransferApproverRole(role) {
+		return nil, domain.ErrForbidden
+	}
+	if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, t.FromWarehouseID); err != nil {
+		return nil, err
+	}
+	if t.RequestedBy == userID {
+		return nil, domain.ErrSelfApprovalForbidden
+	}
+
+	if t.Status != domain.TransferStatusPendingApproval {
+		return nil, domain.ErrInvalidTransferStatus
+	}
+
+	newStatus := domain.TransferStatusApproved
+	if err := u.repo.UpdateTransferStatus(ctx, tenantID, t.ID, newStatus, nil, nil, &userID, nil); err != nil {
+		return nil, fmt.Errorf("ApproveTransfer: update status: %w", err)
+	}
+
+	t.Status = newStatus
+	t.ApprovedBy = &userID
+	return t, nil
+}
+
+// RejectTransfer moves a PENDING_APPROVAL transfer into REJECTED with a
+// mandatory reason, stopping the transfer lifecycle. Same approver rules as
+// ApproveTransfer apply, including the self-approval/self-rejection guard.
+func (u *Usecase) RejectTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID, reason string) (*domain.StockTransfer, error) {
+	trimmedReason := strings.TrimSpace(reason)
+	if trimmedReason == "" {
+		return nil, domain.ErrRejectionReasonRequired
+	}
+
+	t, _, err := u.repo.GetTransferByID(ctx, tenantID, transferID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isTransferApproverRole(role) {
+		return nil, domain.ErrForbidden
+	}
+	if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, t.FromWarehouseID); err != nil {
+		return nil, err
+	}
+	if t.RequestedBy == userID {
+		return nil, domain.ErrSelfApprovalForbidden
+	}
+
+	if t.Status != domain.TransferStatusPendingApproval {
+		return nil, domain.ErrInvalidTransferStatus
+	}
+
+	newStatus := domain.TransferStatusRejected
+	if err := u.repo.UpdateTransferStatus(ctx, tenantID, t.ID, newStatus, nil, nil, &userID, &trimmedReason); err != nil {
+		return nil, fmt.Errorf("RejectTransfer: update status: %w", err)
+	}
+
+	t.Status = newStatus
+	t.ApprovedBy = &userID
+	t.RejectionReason = &trimmedReason
+	return t, nil
+}
+
+// DispatchTransfer validates source stock and dispatches goods to transit location.
+// Moves stock: Source Location -> @TRANSIT.
+func (u *Usecase) DispatchTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {
+	t, items, err := u.repo.GetTransferByID(ctx, tenantID, transferID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, t.FromWarehouseID); err != nil {
+		return nil, err
+	}
+
+	// Only an APPROVED transfer may be dispatched. DRAFT and PENDING_APPROVAL
+	// transfers must go through SubmitTransfer -> ApproveTransfer first.
+	if t.Status != domain.TransferStatusApproved {
+		return nil, domain.ErrInvalidTransferStatus
+	}
+
+	transitLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeTransit)
+	if err != nil {
+		return nil, fmt.Errorf("DispatchTransfer: get transit loc: %w", err)
+	}
+
+	// 1. Validate locations scoping & source location presence
+	for _, item := range items {
+		if item.SourceLocationID == nil {
+			return nil, fmt.Errorf("%w: source location not specified for product %s", domain.ErrLocationNotFound, item.ProductID)
+		}
+		if err := u.validateLocationWarehouse(ctx, tenantID, *item.SourceLocationID, t.FromWarehouseID); err != nil {
+			return nil, err
+		}
+		if item.DestLocationID != nil {
+			if err := u.validateLocationWarehouse(ctx, tenantID, *item.DestLocationID, t.ToWarehouseID); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// 2. Execute atomic stock deduction using advisory lock and movement creation
+	now := time.Now().UTC()
+	for i, item := range items {
+		mov := &domain.StockMovement{
+			ID:               uuid.New(),
+			TenantID:         tenantID,
+			MovementNumber:   fmt.Sprintf("TR-DISP-%s-%d", t.TransferNumber, i+1),
+			ProductID:        item.ProductID,
+			SourceLocationID: *item.SourceLocationID,
+			DestLocationID:   transitLoc.ID,
+			Quantity:         item.RequestedQty,
+			UnitCost:         decimal.Zero,
+			Status:           domain.StockMovementStatusDone,
+			ReferenceType:    domain.StockRefTransfer,
+			ReferenceID:      t.ID,
+			ExecutedBy:       &userID,
+			CreatedAt:        now,
+		}
+		if err := u.repo.DeductLocationStock(ctx, tenantID, *item.SourceLocationID, item.ProductID, item.RequestedQty, mov); err != nil {
+			return nil, err
+		}
+	}
+
+	// 3. Update transfer status
+	newStatus := domain.TransferStatusInTransit
+	if err := u.repo.UpdateTransferStatus(ctx, tenantID, t.ID, newStatus, &now, nil, nil, nil); err != nil {
+		return nil, fmt.Errorf("DispatchTransfer: update status: %w", err)
+	}
+
+	t.Status = newStatus
+	t.DispatchedAt = &now
+	return t, nil
+}
+
+// ReceiveTransfer confirms receipt at destination warehouse.
+// Moves stock: @TRANSIT -> Target Location.
+func (u *Usecase) ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {
+	t, items, err := u.repo.GetTransferByID(ctx, tenantID, transferID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, t.ToWarehouseID); err != nil {
+		return nil, err
+	}
+
+	if t.Status != domain.TransferStatusInTransit && t.Status != domain.TransferStatusDispatched {
+		return nil, domain.ErrInvalidTransferStatus
+	}
+
+	transitLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeTransit)
+	if err != nil {
+		return nil, fmt.Errorf("ReceiveTransfer: get transit loc: %w", err)
+	}
+
+	// Pre-fetch default location if any item has no DestLocationID
+	var defaultTargetLocID *uuid.UUID
+	for _, item := range items {
+		if item.DestLocationID != nil {
+			if err := u.validateLocationWarehouse(ctx, tenantID, *item.DestLocationID, t.ToWarehouseID); err != nil {
+				return nil, err
+			}
+		} else if defaultTargetLocID == nil {
+			locs, err := u.repo.ListLocations(ctx, tenantID, &t.ToWarehouseID)
+			if err != nil || len(locs) == 0 {
+				return nil, fmt.Errorf("%w: destination warehouse has no locations configured", domain.ErrLocationNotFound)
+			}
+			defaultTargetLocID = &locs[0].ID
+		}
+	}
+
+	now := time.Now().UTC()
+	for i, item := range items {
+		targetLocID := item.DestLocationID
+		if targetLocID == nil {
+			targetLocID = defaultTargetLocID
+		}
+
+		qty := item.SentQty
+		if qty.IsZero() {
+			qty = item.RequestedQty
+		}
+
+		mov := &domain.StockMovement{
+			ID:               uuid.New(),
+			TenantID:         tenantID,
+			MovementNumber:   fmt.Sprintf("TR-RECV-%s-%d", t.TransferNumber, i+1),
+			ProductID:        item.ProductID,
+			SourceLocationID: transitLoc.ID,
+			DestLocationID:   *targetLocID,
+			Quantity:         qty,
+			UnitCost:         decimal.Zero,
+			Status:           domain.StockMovementStatusDone,
+			ReferenceType:    domain.StockRefTransfer,
+			ReferenceID:      t.ID,
+			ExecutedBy:       &userID,
+			CreatedAt:        now,
+		}
+		if err := u.repo.CreateStockMovement(ctx, mov); err != nil {
+			return nil, fmt.Errorf("ReceiveTransfer: create stock movement: %w", err)
+		}
+	}
+
+	newStatus := domain.TransferStatusReceived
+	if err := u.repo.UpdateTransferStatus(ctx, tenantID, t.ID, newStatus, nil, &now, nil, nil); err != nil {
+		return nil, fmt.Errorf("ReceiveTransfer: update status: %w", err)
+	}
+
+	t.Status = newStatus
+	t.ReceivedAt = &now
+	return t, nil
+}
+
+func (u *Usecase) GetTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, []domain.StockTransferItem, error) {
+	t, items, err := u.repo.GetTransferByID(ctx, tenantID, transferID)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Check access to either source or destination warehouse
+	errFrom := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, t.FromWarehouseID)
+	errTo := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, t.ToWarehouseID)
+	if errFrom != nil && errTo != nil {
+		return nil, nil, domain.ErrUnauthorizedWarehouse
+	}
+	return t, items, nil
+}
+
+func (u *Usecase) ListTransfers(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockTransfer, error) {
+	if warehouseID != nil {
+		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
+			return nil, err
+		}
+		return u.repo.ListTransfers(ctx, tenantID, warehouseID)
+	}
+
+	// Filter by accessible warehouses
+	accessibleWHs, err := u.FilterAccessibleWarehouses(ctx, tenantID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+	whSet := make(map[uuid.UUID]bool)
+	for _, w := range accessibleWHs {
+		whSet[w.ID] = true
+	}
+
+	allTransfers, err := u.repo.ListTransfers(ctx, tenantID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []domain.StockTransfer
+	for _, t := range allTransfers {
+		if whSet[t.FromWarehouseID] || whSet[t.ToWarehouseID] {
+			result = append(result, t)
+		}
+	}
+	return result, nil
+}
+
+// -----------------------------------------------------------------------------
+// Delivery Orders (Surat Jalan)
+// -----------------------------------------------------------------------------
+
+type CreateDeliveryOrderItemRequest struct {
+	ProductID  uuid.UUID       `json:"product_id"`
+	Quantity   decimal.Decimal `json:"quantity"`
+	LocationID uuid.UUID       `json:"location_id"`
+}
+
+type CreateDeliveryOrderRequest struct {
+	SalesOrderID   uuid.UUID                        `json:"sales_order_id"`
+	WarehouseID    uuid.UUID                        `json:"warehouse_id"`
+	DONumber       string                           `json:"do_number"`
+	Status         *domain.DeliveryOrderStatus      `json:"status,omitempty"`
+	ExpeditionName *string                          `json:"expedition_name,omitempty"`
+	TrackingNumber *string                          `json:"tracking_number,omitempty"`
+	DriverName     *string                          `json:"driver_name,omitempty"`
+	VehiclePlate   *string                          `json:"vehicle_plate,omitempty"`
+	RecipientName  *string                          `json:"recipient_name,omitempty"`
+	Items          []CreateDeliveryOrderItemRequest `json:"items"`
+}
+
+func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, req CreateDeliveryOrderRequest) (*domain.DeliveryOrder, error) {
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.WarehouseID); err != nil {
+		return nil, err
+	}
+	if len(req.Items) == 0 {
+		return nil, domain.ErrInvalidInput
+	}
+
+	// Validate items and location scoping
+	for _, itemReq := range req.Items {
+		if itemReq.ProductID == uuid.Nil || itemReq.LocationID == uuid.Nil || itemReq.Quantity.LessThanOrEqual(decimal.Zero) {
+			return nil, domain.ErrInvalidInput
+		}
+		if err := u.validateLocationWarehouse(ctx, tenantID, itemReq.LocationID, req.WarehouseID); err != nil {
+			return nil, err
+		}
+	}
+
+	doNumber := strings.TrimSpace(req.DONumber)
+	if doNumber == "" {
+		doNumber = fmt.Sprintf("DO-%d", time.Now().UnixNano()/1e6)
+	}
+
+	// Force status to DRAFT on creation - do NOT accept SHIPPED or DELIVERED from request
+	status := domain.DeliveryOrderStatusDraft
+
+	do := &domain.DeliveryOrder{
+		ID:             uuid.New(),
+		TenantID:       tenantID,
+		SalesOrderID:   req.SalesOrderID,
+		WarehouseID:    req.WarehouseID,
+		DONumber:       doNumber,
+		Status:         status,
+		ExpeditionName: req.ExpeditionName,
+		TrackingNumber: req.TrackingNumber,
+		DriverName:     req.DriverName,
+		VehiclePlate:   req.VehiclePlate,
+		RecipientName:  req.RecipientName,
+		CreatedAt:      time.Now().UTC(),
+		UpdatedAt:      time.Now().UTC(),
+	}
+
+	var items []domain.DeliveryOrderItem
+	for _, itemReq := range req.Items {
+		items = append(items, domain.DeliveryOrderItem{
+			ID:              uuid.New(),
+			TenantID:        tenantID,
+			DeliveryOrderID: do.ID,
+			ProductID:       itemReq.ProductID,
+			Quantity:        itemReq.Quantity,
+			LocationID:      itemReq.LocationID,
+			CreatedAt:       time.Now().UTC(),
+		})
+	}
+
+	if err := u.repo.CreateDeliveryOrder(ctx, do, items); err != nil {
+		return nil, err
+	}
+
+	return do, nil
+}
+
+// DispatchDeliveryOrder transitions a DO to SHIPPED and deducts inventory from rack to @CUSTOMER.
+func (u *Usecase) DispatchDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error) {
+	do, items, err := u.repo.GetDeliveryOrderByID(ctx, tenantID, doID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, do.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	// Only allow dispatch if status is DRAFT, CONFIRMED, or PACKED
+	if do.Status != domain.DeliveryOrderStatusDraft &&
+		do.Status != domain.DeliveryOrderStatusConfirmed &&
+		do.Status != domain.DeliveryOrderStatusPacked {
+		return nil, domain.ErrInvalidStatus
+	}
+
+	// Verify location warehouse scoping for each item
+	for _, item := range items {
+		if err := u.validateLocationWarehouse(ctx, tenantID, item.LocationID, do.WarehouseID); err != nil {
+			return nil, err
+		}
+	}
+
+	custLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeCustomer)
+	if err != nil {
+		return nil, fmt.Errorf("DispatchDeliveryOrder: get customer loc: %w", err)
+	}
+
+	// Execute atomic stock deduction using advisory lock and movement creation
+	now := time.Now().UTC()
+	for i, item := range items {
+		mov := &domain.StockMovement{
+			ID:               uuid.New(),
+			TenantID:         tenantID,
+			MovementNumber:   fmt.Sprintf("DO-SHIP-%s-%d", do.DONumber, i+1),
+			ProductID:        item.ProductID,
+			SourceLocationID: item.LocationID,
+			DestLocationID:   custLoc.ID,
+			Quantity:         item.Quantity,
+			UnitCost:         decimal.Zero,
+			Status:           domain.StockMovementStatusDone,
+			ReferenceType:    domain.StockRefDeliveryOrder,
+			ReferenceID:      do.ID,
+			ExecutedBy:       &userID,
+			CreatedAt:        now,
+		}
+		if err := u.repo.DeductLocationStock(ctx, tenantID, item.LocationID, item.ProductID, item.Quantity, mov); err != nil {
+			return nil, err
+		}
+	}
+
+	newStatus := domain.DeliveryOrderStatusShipped
+	if err := u.repo.UpdateDeliveryOrderStatus(ctx, tenantID, do.ID, newStatus, nil); err != nil {
+		return nil, fmt.Errorf("DispatchDeliveryOrder: update status: %w", err)
+	}
+
+	do.Status = newStatus
+	return do, nil
+}
+
+func (u *Usecase) GetDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, []domain.DeliveryOrderItem, error) {
+	do, items, err := u.repo.GetDeliveryOrderByID(ctx, tenantID, doID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, do.WarehouseID); err != nil {
+		return nil, nil, err
+	}
+	return do, items, nil
+}
+
+func (u *Usecase) ListDeliveryOrders(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.DeliveryOrder, error) {
+	if warehouseID != nil {
+		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
+			return nil, err
+		}
+		return u.repo.ListDeliveryOrders(ctx, tenantID, warehouseID)
+	}
+
+	accessibleWHs, err := u.FilterAccessibleWarehouses(ctx, tenantID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+	whSet := make(map[uuid.UUID]bool)
+	for _, w := range accessibleWHs {
+		whSet[w.ID] = true
+	}
+
+	allOrders, err := u.repo.ListDeliveryOrders(ctx, tenantID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []domain.DeliveryOrder
+	for _, do := range allOrders {
+		if whSet[do.WarehouseID] {
+			result = append(result, do)
+		}
+	}
+	return result, nil
+}
+
+// -----------------------------------------------------------------------------
+// Stock Opname (Physical Inventory Counting)
+// -----------------------------------------------------------------------------
+
+type CreateStockOpnameRequest struct {
+	WarehouseID  uuid.UUID `json:"warehouse_id"`
+	OpnameNumber string    `json:"opname_number,omitempty"`
+	Notes        *string   `json:"notes,omitempty"`
+}
+
+type AddOpnameItemRequest struct {
+	ProductID   uuid.UUID       `json:"product_id"`
+	LocationID  uuid.UUID       `json:"location_id"`
+	PhysicalQty decimal.Decimal `json:"physical_qty"`
+	Notes       *string         `json:"notes,omitempty"`
+}
+
+func (u *Usecase) CreateStockOpname(ctx context.Context, tenantID, userID uuid.UUID, role string, req CreateStockOpnameRequest) (*domain.StockOpname, error) {
+	if req.WarehouseID == uuid.Nil {
+		return nil, domain.ErrInvalidInput
+	}
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	opnameNumber := strings.TrimSpace(req.OpnameNumber)
+	if opnameNumber == "" {
+		opnameNumber = fmt.Sprintf("OPN-%d", time.Now().UnixNano()/1e6)
+	}
+
+	now := time.Now().UTC()
+	op := &domain.StockOpname{
+		ID:           uuid.New(),
+		TenantID:     tenantID,
+		WarehouseID:  req.WarehouseID,
+		OpnameNumber: opnameNumber,
+		Status:       domain.StockOpnameStatusDraft,
+		ConductedBy:  userID,
+		Notes:        req.Notes,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	if err := u.repo.CreateStockOpname(ctx, op); err != nil {
+		return nil, fmt.Errorf("CreateStockOpname: %w", err)
+	}
+	return op, nil
+}
+
+func (u *Usecase) AddOpnameItem(ctx context.Context, tenantID, userID uuid.UUID, role string, opnameID uuid.UUID, req AddOpnameItemRequest) (*domain.StockOpnameItem, error) {
+	if opnameID == uuid.Nil || req.ProductID == uuid.Nil || req.LocationID == uuid.Nil {
+		return nil, domain.ErrInvalidInput
+	}
+	if req.PhysicalQty.IsNegative() {
+		return nil, domain.ErrInvalidInput
+	}
+
+	op, err := u.repo.GetStockOpnameByID(ctx, tenantID, opnameID)
+	if err != nil {
+		return nil, err
+	}
+
+	if op.Status != domain.StockOpnameStatusDraft && op.Status != domain.StockOpnameStatusInProgress {
+		return nil, domain.ErrInvalidOpnameStatus
+	}
+
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, op.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	if err := u.validateLocationWarehouse(ctx, tenantID, req.LocationID, op.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	systemQty, err := u.repo.GetStockByLocation(ctx, tenantID, req.LocationID, req.ProductID)
+	if err != nil {
+		return nil, fmt.Errorf("AddOpnameItem: get system stock: %w", err)
+	}
+
+	discrepancyQty := req.PhysicalQty.Sub(systemQty)
+	item := &domain.StockOpnameItem{
+		ID:             uuid.New(),
+		OpnameID:       opnameID,
+		TenantID:       tenantID,
+		ProductID:      req.ProductID,
+		LocationID:     req.LocationID,
+		SystemQty:      systemQty,
+		PhysicalQty:    req.PhysicalQty,
+		DiscrepancyQty: discrepancyQty,
+		Notes:          req.Notes,
+		CreatedAt:      time.Now().UTC(),
+	}
+
+	if err := u.repo.AddStockOpnameItem(ctx, item); err != nil {
+		return nil, fmt.Errorf("AddOpnameItem: persist: %w", err)
+	}
+	return item, nil
+}
+
+func (u *Usecase) CompleteStockOpname(ctx context.Context, tenantID, userID uuid.UUID, role string, opnameID uuid.UUID) (*domain.StockOpname, error) {
+	if opnameID == uuid.Nil {
+		return nil, domain.ErrInvalidInput
+	}
+
+	op, err := u.repo.GetStockOpnameByID(ctx, tenantID, opnameID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, op.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	if op.Status != domain.StockOpnameStatusDraft && op.Status != domain.StockOpnameStatusInProgress {
+		return nil, domain.ErrInvalidOpnameStatus
+	}
+
+	items, err := u.repo.ListStockOpnameItems(ctx, tenantID, opnameID)
+	if err != nil {
+		return nil, fmt.Errorf("CompleteStockOpname: list items: %w", err)
+	}
+
+	lossLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeLoss)
+	if err != nil {
+		return nil, fmt.Errorf("CompleteStockOpname: get loss location: %w", err)
+	}
+
+	now := time.Now().UTC()
+	for i, item := range items {
+		if item.DiscrepancyQty.IsZero() {
+			continue
+		}
+		if item.DiscrepancyQty.GreaterThan(decimal.Zero) {
+			// Surplus recovery: movement from @LOSS to item.LocationID
+			mov := &domain.StockMovement{
+				ID:               uuid.New(),
+				TenantID:         tenantID,
+				MovementNumber:   fmt.Sprintf("OPN-SURPLUS-%s-%d", op.OpnameNumber, i+1),
+				ProductID:        item.ProductID,
+				SourceLocationID: lossLoc.ID,
+				DestLocationID:   item.LocationID,
+				Quantity:         item.DiscrepancyQty,
+				UnitCost:         decimal.Zero,
+				Status:           domain.StockMovementStatusDone,
+				ReferenceType:    domain.StockRefOpname,
+				ReferenceID:      op.ID,
+				ExecutedBy:       &userID,
+				CreatedAt:        now,
+			}
+			if err := u.repo.CreateStockMovement(ctx, mov); err != nil {
+				return nil, fmt.Errorf("CompleteStockOpname: create surplus movement: %w", err)
+			}
+		} else {
+			// Deficit loss adjustment: movement from item.LocationID to @LOSS
+			absQty := item.DiscrepancyQty.Abs()
+			mov := &domain.StockMovement{
+				ID:               uuid.New(),
+				TenantID:         tenantID,
+				MovementNumber:   fmt.Sprintf("OPN-LOSS-%s-%d", op.OpnameNumber, i+1),
+				ProductID:        item.ProductID,
+				SourceLocationID: item.LocationID,
+				DestLocationID:   lossLoc.ID,
+				Quantity:         absQty,
+				UnitCost:         decimal.Zero,
+				Status:           domain.StockMovementStatusDone,
+				ReferenceType:    domain.StockRefOpname,
+				ReferenceID:      op.ID,
+				ExecutedBy:       &userID,
+				CreatedAt:        now,
+			}
+			if err := u.repo.CreateStockMovement(ctx, mov); err != nil {
+				return nil, fmt.Errorf("CompleteStockOpname: create loss movement: %w", err)
+			}
+		}
+	}
+
+	if err := u.repo.UpdateStockOpnameStatus(ctx, tenantID, op.ID, domain.StockOpnameStatusCompleted, &userID); err != nil {
+		return nil, fmt.Errorf("CompleteStockOpname: update status: %w", err)
+	}
+
+	op.Status = domain.StockOpnameStatusCompleted
+	op.ApprovedBy = &userID
+	op.UpdatedAt = now
+	return op, nil
+}
+
+func (u *Usecase) GetStockOpname(ctx context.Context, tenantID, userID uuid.UUID, role string, opnameID uuid.UUID) (*domain.StockOpname, []domain.StockOpnameItem, error) {
+	if opnameID == uuid.Nil {
+		return nil, nil, domain.ErrInvalidInput
+	}
+	op, err := u.repo.GetStockOpnameByID(ctx, tenantID, opnameID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, op.WarehouseID); err != nil {
+		return nil, nil, err
+	}
+	items, err := u.repo.ListStockOpnameItems(ctx, tenantID, opnameID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("GetStockOpname: list items: %w", err)
+	}
+	return op, items, nil
+}
+
+func (u *Usecase) ListStockOpnames(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockOpname, error) {
+	if warehouseID != nil {
+		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
+			return nil, err
+		}
+		return u.repo.ListStockOpnames(ctx, tenantID, warehouseID)
+	}
+
+	accessibleWHs, err := u.FilterAccessibleWarehouses(ctx, tenantID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+	whSet := make(map[uuid.UUID]bool)
+	for _, w := range accessibleWHs {
+		whSet[w.ID] = true
+	}
+
+	allOpnames, err := u.repo.ListStockOpnames(ctx, tenantID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []domain.StockOpname
+	for _, op := range allOpnames {
+		if whSet[op.WarehouseID] {
+			result = append(result, op)
+		}
+	}
+	if result == nil {
+		result = []domain.StockOpname{}
+	}
+	return result, nil
+}
+
+// -----------------------------------------------------------------------------
+// Stock Scrap (Damaged Goods & Scrap Quarantine)
+// -----------------------------------------------------------------------------
+
+type CreateStockScrapRequest struct {
+	WarehouseID      uuid.UUID       `json:"warehouse_id"`
+	ProductID        uuid.UUID       `json:"product_id"`
+	SourceLocationID uuid.UUID       `json:"source_location_id"`
+	ScrapLocationID  *uuid.UUID      `json:"scrap_location_id,omitempty"`
+	Quantity         decimal.Decimal `json:"quantity"`
+	Reason           string          `json:"reason"`
+	ScrapNumber      string          `json:"scrap_number,omitempty"`
+}
+
+func (u *Usecase) CreateStockScrap(ctx context.Context, tenantID, userID uuid.UUID, role string, req CreateStockScrapRequest) (*domain.StockScrap, error) {
+	if req.WarehouseID == uuid.Nil || req.ProductID == uuid.Nil || req.SourceLocationID == uuid.Nil {
+		return nil, domain.ErrInvalidInput
+	}
+	if req.Quantity.LessThanOrEqual(decimal.Zero) {
+		return nil, domain.ErrInvalidInput
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	if err := u.validateLocationWarehouse(ctx, tenantID, req.SourceLocationID, req.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	var scrapLocationID uuid.UUID
+	if req.ScrapLocationID == nil || *req.ScrapLocationID == uuid.Nil {
+		scrapLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeScrap)
+		if err != nil {
+			return nil, fmt.Errorf("CreateStockScrap: get virtual scrap loc: %w", err)
+		}
+		scrapLocationID = scrapLoc.ID
+	} else {
+		scrapLocationID = *req.ScrapLocationID
+		targetLoc, err := u.repo.GetLocationByID(ctx, tenantID, scrapLocationID)
+		if err != nil {
+			return nil, err
+		}
+		if targetLoc.Type != domain.LocationTypeScrap {
+			if targetLoc.WarehouseID == nil || *targetLoc.WarehouseID != req.WarehouseID {
+				return nil, domain.ErrUnauthorizedWarehouse
+			}
+		}
+	}
+
+	if req.SourceLocationID == scrapLocationID {
+		return nil, domain.ErrInvalidInput
+	}
+
+	scrapNumber := strings.TrimSpace(req.ScrapNumber)
+	if scrapNumber == "" {
+		scrapNumber = fmt.Sprintf("SCRAP-%d", time.Now().UnixNano()/1e6)
+	}
+
+	scrapID := uuid.New()
+	now := time.Now().UTC()
+	mov := &domain.StockMovement{
+		ID:               uuid.New(),
+		TenantID:         tenantID,
+		MovementNumber:   fmt.Sprintf("SCRAP-MOV-%s", scrapNumber),
+		ProductID:        req.ProductID,
+		SourceLocationID: req.SourceLocationID,
+		DestLocationID:   scrapLocationID,
+		Quantity:         req.Quantity,
+		UnitCost:         decimal.Zero,
+		Status:           domain.StockMovementStatusDone,
+		ReferenceType:    domain.StockRefScrap,
+		ReferenceID:      scrapID,
+		ExecutedBy:       &userID,
+		CreatedAt:        now,
+	}
+
+	if err := u.repo.DeductLocationStock(ctx, tenantID, req.SourceLocationID, req.ProductID, req.Quantity, mov); err != nil {
+		return nil, err
+	}
+
+	scrap := &domain.StockScrap{
+		ID:                 scrapID,
+		TenantID:           tenantID,
+		ScrapNumber:        scrapNumber,
+		WarehouseID:        req.WarehouseID,
+		ProductID:          req.ProductID,
+		SourceLocationID:   req.SourceLocationID,
+		ScrapLocationID:    scrapLocationID,
+		Quantity:           req.Quantity,
+		Reason:             reason,
+		ReportedBy:         userID,
+		CreatedAt:          now,
+	}
+
+	if err := u.repo.CreateStockScrap(ctx, scrap); err != nil {
+		return nil, fmt.Errorf("CreateStockScrap: save scrap: %w", err)
+	}
+	return scrap, nil
+}
+
+func (u *Usecase) ListStockScraps(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockScrap, error) {
+	if warehouseID != nil {
+		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
+			return nil, err
+		}
+		return u.repo.ListStockScraps(ctx, tenantID, warehouseID)
+	}
+
+	accessibleWHs, err := u.FilterAccessibleWarehouses(ctx, tenantID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+	whSet := make(map[uuid.UUID]bool)
+	for _, w := range accessibleWHs {
+		whSet[w.ID] = true
+	}
+
+	allScraps, err := u.repo.ListStockScraps(ctx, tenantID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []domain.StockScrap
+	for _, scrap := range allScraps {
+		if whSet[scrap.WarehouseID] {
+			result = append(result, scrap)
+		}
+	}
+	if result == nil {
+		result = []domain.StockScrap{}
+	}
+	return result, nil
+}
+
+// -----------------------------------------------------------------------------
+// Marketplace Sales Orders & SKU Mappings
+// -----------------------------------------------------------------------------
+
+type ImportOrderItemRequest struct {
+	ExternalSKU string          `json:"external_sku"`
+	ItemName    string          `json:"item_name"`
+	Quantity    decimal.Decimal `json:"quantity"`
+	UnitPrice   decimal.Decimal `json:"unit_price"`
+	Subtotal    decimal.Decimal `json:"subtotal"`
+}
+
+type ImportOrderRequest struct {
+	ExternalOrderID string                   `json:"external_order_id"`
+	OrderDate       time.Time                `json:"order_date"`
+	CustomerName    *string                  `json:"customer_name,omitempty"`
+	CustomerPhone   *string                  `json:"customer_phone,omitempty"`
+	ShippingAddress *string                  `json:"shipping_address,omitempty"`
+	Courier         *string                  `json:"courier,omitempty"`
+	TrackingNumber  *string                  `json:"tracking_number,omitempty"`
+	TotalAmount     decimal.Decimal          `json:"total_amount"`
+	ShippingFee     decimal.Decimal          `json:"shipping_fee"`
+	MarketplaceFee  decimal.Decimal          `json:"marketplace_fee"`
+	NetAmount       decimal.Decimal          `json:"net_amount"`
+	Items           []ImportOrderItemRequest `json:"items"`
+}
+
+type ImportMarketplaceOrdersRequest struct {
+	WarehouseID uuid.UUID                 `json:"warehouse_id"`
+	Channel     domain.MarketplaceChannel `json:"channel"`
+	FileName    string                    `json:"file_name"`
+	Orders      []ImportOrderRequest      `json:"orders"`
+}
+
+type ImportMarketplaceOrdersResponse struct {
+	Batch  *domain.MarketplaceImportBatch `json:"batch"`
+	Orders []domain.MarketplaceOrder      `json:"orders"`
+}
+
+func (u *Usecase) deductOrderStock(ctx context.Context, tenantID, userID uuid.UUID, order *domain.MarketplaceOrder, channel domain.MarketplaceChannel, multipliers map[string]decimal.Decimal) error {
+	if len(order.Items) == 0 {
+		return nil
+	}
+
+	locs, err := u.repo.ListLocations(ctx, tenantID, &order.WarehouseID)
+	var primaryLoc *domain.WarehouseLocation
+	if err == nil {
+		for i := range locs {
+			if locs[i].Type == domain.LocationTypeInternal {
+				primaryLoc = &locs[i]
+				break
+			}
+		}
+	}
+	if primaryLoc == nil {
+		defLoc, err := u.repo.GetLocationByCode(ctx, tenantID, &order.WarehouseID, "@DEFAULT")
+		if err == nil {
+			primaryLoc = defLoc
+		} else {
+			primaryLoc, err = u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeInternal)
+			if err != nil {
+				return fmt.Errorf("deductOrderStock: get primary location: %w", err)
+			}
+		}
+	}
+
+	custLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeCustomer)
+	if err != nil {
+		return fmt.Errorf("deductOrderStock: get customer location: %w", err)
+	}
+
+	for _, item := range order.Items {
+		if item.ProductID == nil {
+			return fmt.Errorf("deductOrderStock: product id is nil")
+		}
+
+		mult := decimal.Zero
+		if multipliers != nil {
+			mult = multipliers[item.ExternalSKU]
+		}
+		if mult.LessThanOrEqual(decimal.Zero) {
+			if mapping, err := u.repo.GetSKUMapping(ctx, tenantID, string(channel), item.ExternalSKU); err == nil && mapping != nil && mapping.Multiplier.GreaterThan(decimal.Zero) {
+				mult = mapping.Multiplier
+			} else {
+				mult = decimal.NewFromInt(1)
+			}
+		}
+
+		deductQty := item.Quantity.Mul(mult)
+		mov := &domain.StockMovement{
+			ID:               uuid.New(),
+			TenantID:         tenantID,
+			MovementNumber:   fmt.Sprintf("MKT-MOV-%s", uuid.New().String()[:8]),
+			ProductID:        *item.ProductID,
+			SourceLocationID: primaryLoc.ID,
+			DestLocationID:   custLoc.ID,
+			Quantity:         deductQty,
+			UnitCost:         decimal.Zero,
+			Status:           domain.StockMovementStatusDone,
+			ReferenceType:    domain.StockRefMarketplace,
+			ReferenceID:      order.ID,
+			ExecutedBy:       &userID,
+			CreatedAt:        time.Now().UTC(),
+		}
+
+		if err := u.repo.DeductLocationStock(ctx, tenantID, primaryLoc.ID, *item.ProductID, deductQty, mov); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID uuid.UUID, role string, req ImportMarketplaceOrdersRequest) (*ImportMarketplaceOrdersResponse, error) {
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	ch := domain.MarketplaceChannel(strings.ToUpper(strings.TrimSpace(string(req.Channel))))
+	if ch == "" {
+		ch = domain.MarketplaceChannelOther
+	}
+
+	batchNum := fmt.Sprintf("BATCH-MKT-%s-%d", ch, time.Now().UTC().UnixNano())
+	fileName := strings.TrimSpace(req.FileName)
+	if fileName == "" {
+		fileName = "manual_import"
+	}
+
+	batch := &domain.MarketplaceImportBatch{
+		ID:              uuid.New(),
+		TenantID:        tenantID,
+		BatchNumber:     batchNum,
+		Channel:         ch,
+		WarehouseID:     req.WarehouseID,
+		FileName:        fileName,
+		TotalOrders:     len(req.Orders),
+		ProcessedOrders: 0,
+		FailedOrders:    0,
+		UnmappedSKUs:    0,
+		Status:          domain.MarketplaceBatchStatusProcessing,
+		UploadedBy:      userID,
+		CreatedAt:       time.Now().UTC(),
+	}
+
+	if err := u.repo.CreateMarketplaceBatch(ctx, batch); err != nil {
+		return nil, fmt.Errorf("ImportMarketplaceOrders: create batch: %w", err)
+	}
+
+	createdOrders := make([]domain.MarketplaceOrder, 0, len(req.Orders))
+
+	for _, orderReq := range req.Orders {
+		extOrderID := strings.TrimSpace(orderReq.ExternalOrderID)
+		if extOrderID == "" {
+			batch.FailedOrders++
+			continue
+		}
+
+		// Idempotency check: duplicate order check
+		existing, err := u.repo.GetMarketplaceOrderByExternalID(ctx, tenantID, ch, extOrderID)
+		if err == nil && existing != nil {
+			batch.FailedOrders++
+			continue
+		}
+
+		orderID := uuid.New()
+		now := time.Now().UTC()
+		orderDate := orderReq.OrderDate
+		if orderDate.IsZero() {
+			orderDate = now
+		}
+
+		order := domain.MarketplaceOrder{
+			ID:              orderID,
+			TenantID:        tenantID,
+			BatchID:         &batch.ID,
+			WarehouseID:     req.WarehouseID,
+			Channel:         ch,
+			ExternalOrderID: extOrderID,
+			OrderDate:       orderDate,
+			CustomerName:    orderReq.CustomerName,
+			CustomerPhone:   orderReq.CustomerPhone,
+			ShippingAddress: orderReq.ShippingAddress,
+			Courier:         orderReq.Courier,
+			TrackingNumber:  orderReq.TrackingNumber,
+			TotalAmount:     orderReq.TotalAmount,
+			ShippingFee:     orderReq.ShippingFee,
+			MarketplaceFee:  orderReq.MarketplaceFee,
+			NetAmount:       orderReq.NetAmount,
+			Status:          domain.MarketplaceOrderStatusCompleted,
+			CreatedAt:       now,
+			Items:           make([]domain.MarketplaceOrderItem, 0, len(orderReq.Items)),
+		}
+
+		hasUnmapped := false
+		multipliers := make(map[string]decimal.Decimal)
+		calcSubtotal := decimal.Zero
+
+		for _, itmReq := range orderReq.Items {
+			if itmReq.Quantity.LessThanOrEqual(decimal.Zero) {
+				return nil, fmt.Errorf("%w: item %q quantity must be greater than zero", domain.ErrInvalidInput, itmReq.ItemName)
+			}
+			extSKU := strings.TrimSpace(itmReq.ExternalSKU)
+			item := domain.MarketplaceOrderItem{
+				ID:          uuid.New(),
+				TenantID:    tenantID,
+				OrderID:     orderID,
+				ExternalSKU: extSKU,
+				ItemName:    strings.TrimSpace(itmReq.ItemName),
+				Quantity:    itmReq.Quantity,
+				UnitPrice:   itmReq.UnitPrice,
+				Subtotal:    itmReq.Subtotal,
+				IsMapped:    false,
+			}
+			if item.Subtotal.IsZero() && !item.Quantity.IsZero() && !item.UnitPrice.IsZero() {
+				item.Subtotal = item.Quantity.Mul(item.UnitPrice)
+			}
+			calcSubtotal = calcSubtotal.Add(item.Subtotal)
+
+			// 1. Check SKU mapping table
+			mapping, err := u.repo.GetSKUMapping(ctx, tenantID, string(ch), extSKU)
+			if err == nil && mapping != nil {
+				item.ProductID = &mapping.ProductID
+				item.IsMapped = true
+				mult := mapping.Multiplier
+				if mult.LessThanOrEqual(decimal.Zero) {
+					mult = decimal.NewFromInt(1)
+				}
+				multipliers[extSKU] = mult
+			} else {
+				// 2. Lookup master product by SKU matching external_sku
+				prod, err := u.repo.GetProductBySKU(ctx, tenantID, extSKU)
+				if err == nil && prod != nil {
+					item.ProductID = &prod.ID
+					item.IsMapped = true
+					multipliers[extSKU] = decimal.NewFromInt(1)
+				} else {
+					// 3. Unmapped SKU
+					item.IsMapped = false
+					hasUnmapped = true
+					batch.UnmappedSKUs++
+				}
+			}
+
+			order.Items = append(order.Items, item)
+		}
+
+		if order.TotalAmount.IsZero() && !calcSubtotal.IsZero() {
+			order.TotalAmount = calcSubtotal
+		}
+		if order.NetAmount.IsZero() {
+			order.NetAmount = order.TotalAmount.Add(order.ShippingFee).Sub(order.MarketplaceFee)
+		}
+
+		if hasUnmapped {
+			order.Status = domain.MarketplaceOrderStatusUnmappedSKU
+			if err := u.repo.CreateMarketplaceOrder(ctx, &order); err != nil {
+				if errors.Is(err, domain.ErrDuplicateMarketplaceOrder) {
+					batch.FailedOrders++
+					continue
+				}
+				return nil, fmt.Errorf("ImportMarketplaceOrders: create order: %w", err)
+			}
+		} else {
+			order.Status = domain.MarketplaceOrderStatusPending
+			if err := u.repo.CreateMarketplaceOrder(ctx, &order); err != nil {
+				if errors.Is(err, domain.ErrDuplicateMarketplaceOrder) {
+					batch.FailedOrders++
+					continue
+				}
+				return nil, fmt.Errorf("ImportMarketplaceOrders: create order: %w", err)
+			}
+
+			if err := u.deductOrderStock(ctx, tenantID, userID, &order, ch, multipliers); err != nil {
+				order.Status = domain.MarketplaceOrderStatusStockInsufficient
+				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusStockInsufficient); errUpd != nil {
+					return nil, fmt.Errorf("ImportMarketplaceOrders: update order stock insufficient: %w", errUpd)
+				}
+			} else {
+				order.Status = domain.MarketplaceOrderStatusCompleted
+				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusCompleted); errUpd != nil {
+					return nil, fmt.Errorf("ImportMarketplaceOrders: update order completed: %w", errUpd)
+				}
+			}
+		}
+
+		batch.ProcessedOrders++
+		createdOrders = append(createdOrders, order)
+	}
+
+	if batch.ProcessedOrders == 0 && batch.FailedOrders > 0 {
+		batch.Status = domain.MarketplaceBatchStatusFailed
+	} else {
+		batch.Status = domain.MarketplaceBatchStatusCompleted
+	}
+
+	if err := u.repo.UpdateMarketplaceBatch(ctx, batch); err != nil {
+		return nil, fmt.Errorf("ImportMarketplaceOrders: update batch: %w", err)
+	}
+
+	return &ImportMarketplaceOrdersResponse{
+		Batch:  batch,
+		Orders: createdOrders,
+	}, nil
+}
+
+func (u *Usecase) ResolveSKUMapping(ctx context.Context, tenantID, userID uuid.UUID, role string, req CreateSKUMappingRequest) (*domain.ProductSKUMapping, error) {
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	if normalizedRole == "auditor" {
+		return nil, domain.ErrForbidden
+	}
+	if normalizedRole != "admin" && normalizedRole != "owner" && normalizedRole != "warehouse" && normalizedRole != "regional_manager" {
+		return nil, domain.ErrForbidden
+	}
+
+	if req.ProductID == uuid.Nil || strings.TrimSpace(req.ExternalSKU) == "" || strings.TrimSpace(req.ChannelName) == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	// 1. Create / update mapping
+	mapping, err := u.CreateSKUMapping(ctx, tenantID, req)
+	if err != nil {
+		return nil, err
+	}
+
+	channel := domain.MarketplaceChannel(strings.ToUpper(strings.TrimSpace(req.ChannelName)))
+	extSKU := strings.TrimSpace(req.ExternalSKU)
+
+	// 2. Update unmapped order items in DB
+	if err := u.repo.UpdateUnmappedOrderItems(ctx, tenantID, channel, extSKU, req.ProductID); err != nil {
+		return nil, fmt.Errorf("ResolveSKUMapping: update items: %w", err)
+	}
+
+	// 3. Find pending unmapped orders containing this SKU
+	pendingOrders, err := u.repo.GetPendingUnmappedOrdersBySKU(ctx, tenantID, channel, extSKU)
+	if err != nil {
+		return nil, fmt.Errorf("ResolveSKUMapping: get pending orders: %w", err)
+	}
+
+	// 4. For affected orders where all items are now mapped, deduct stock and complete order
+	for _, order := range pendingOrders {
+		allMapped := true
+		for _, itm := range order.Items {
+			if !itm.IsMapped {
+				allMapped = false
+				break
+			}
+		}
+
+		if allMapped {
+			errStock := u.deductOrderStock(ctx, tenantID, userID, &order, channel, nil)
+			if errStock == nil {
+				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusCompleted); errUpd != nil {
+					return nil, fmt.Errorf("ResolveSKUMapping: update order status completed: %w", errUpd)
+				}
+			} else {
+				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusStockInsufficient); errUpd != nil {
+					return nil, fmt.Errorf("ResolveSKUMapping: update order status stock insufficient: %w", errUpd)
+				}
+			}
+		}
+	}
+
+	return mapping, nil
+}
+
+func (u *Usecase) ListMarketplaceBatches(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.MarketplaceImportBatch, error) {
+	if warehouseID != nil {
+		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
+			return nil, err
+		}
+		return u.repo.ListMarketplaceBatches(ctx, tenantID, warehouseID)
+	}
+
+	accessibleWHs, err := u.FilterAccessibleWarehouses(ctx, tenantID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+	whSet := make(map[uuid.UUID]bool)
+	for _, w := range accessibleWHs {
+		whSet[w.ID] = true
+	}
+
+	allBatches, err := u.repo.ListMarketplaceBatches(ctx, tenantID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]domain.MarketplaceImportBatch, 0)
+	for _, b := range allBatches {
+		if whSet[b.WarehouseID] {
+			res = append(res, b)
+		}
+	}
+	return res, nil
+}
+
+func (u *Usecase) ListMarketplaceOrders(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID, batchID *uuid.UUID, status *domain.MarketplaceOrderStatus) ([]domain.MarketplaceOrder, error) {
+	if warehouseID != nil {
+		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
+			return nil, err
+		}
+		return u.repo.ListMarketplaceOrders(ctx, tenantID, warehouseID, batchID, status)
+	}
+
+	accessibleWHs, err := u.FilterAccessibleWarehouses(ctx, tenantID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+	whSet := make(map[uuid.UUID]bool)
+	for _, w := range accessibleWHs {
+		whSet[w.ID] = true
+	}
+
+	allOrders, err := u.repo.ListMarketplaceOrders(ctx, tenantID, nil, batchID, status)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]domain.MarketplaceOrder, 0)
+	for _, o := range allOrders {
+		if whSet[o.WarehouseID] {
+			res = append(res, o)
+		}
+	}
+	return res, nil
+}
+
+func (u *Usecase) GetMarketplaceOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, orderID uuid.UUID) (*domain.MarketplaceOrder, error) {
+	order, err := u.repo.GetMarketplaceOrderByID(ctx, tenantID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, order.WarehouseID); err != nil {
+		return nil, err
+	}
+	return order, nil
+}
+
+func (u *Usecase) ListSKUMappings(ctx context.Context, tenantID uuid.UUID, channelName string) ([]domain.ProductSKUMapping, error) {
+	return u.repo.ListSKUMappings(ctx, tenantID, channelName)
+}
+
+func (u *Usecase) ListStockMovements(ctx context.Context, tenantID, userID uuid.UUID, role string, productID, locationID *uuid.UUID, limit int) ([]domain.StockMovement, error) {
+	return u.repo.ListStockMovements(ctx, tenantID, productID, locationID, limit)
+}
+
+func (u *Usecase) ListStockSummary(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockSummary, error) {
+	return u.repo.ListStockSummary(ctx, tenantID, warehouseID)
+}

@@ -1,0 +1,1022 @@
+openapi: "3.1.0"
+
+info:
+  title: Tayooli ERP API
+  version: "5.0.0"
+  description: |
+    REST API for the Tayooli ERP Go backend.
+    All endpoints under `/api/v1` require a signed HS256 JWT that carries a
+    `tenant_id` claim (UUID).  The middleware extracts the claim and enforces
+    dual-layer tenant isolation: an application-level WHERE clause plus a
+    PostgreSQL `SET LOCAL app.current_tenant_id` that activates RLS policies.
+
+    **Tenant ID handling**: `tenant_id` is always derived from the JWT claim.
+    Any `tenant_id` field in a request body is silently ignored.  Never pass
+    tenant identity through the request body.
+  contact:
+    name: Tayooli Engineering
+    email: sppgcurugsukabakti@gmail.com
+
+servers:
+  - url: http://localhost:8081
+    description: Local development
+  - url: https://api.tayooli.id
+    description: Production
+
+tags:
+  - name: invoices
+    description: Invoice lifecycle management
+  - name: purchase-orders
+    description: Purchase order creation and retrieval
+  - name: goods-receipts
+    description: Goods receipt creation and retrieval
+
+# ── Security ──────────────────────────────────────────────────────────────────
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        HS256-signed JWT.  Required claims:
+        - `sub` — user UUID
+        - `tenant_id` — tenant UUID (used for all tenant isolation logic)
+        - `exp` — expiry timestamp (required; token is rejected if missing)
+
+  schemas:
+
+    # ── Invoice ────────────────────────────────────────────────────────────────
+    Invoice:
+      type: object
+      required:
+        - id
+        - tenant_id
+        - vendor_id
+        - invoice_number
+        - amount
+        - currency
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        tenant_id:
+          type: string
+          format: uuid
+          example: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+        vendor_id:
+          type: string
+          example: "VENDOR-001"
+        invoice_number:
+          type: string
+          example: "INV-2026-00042"
+        amount:
+          type: string
+          example: "1500000.0000"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "IDR"
+        status:
+          type: string
+          enum: [pending, ai_processing, ai_processed, ai_failed, approved, rejected]
+          example: "pending"
+        ai_confidence_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          nullable: true
+          description: OCR confidence score (0.0–1.0). Null until AI worker processes the document.
+          example: 0.94
+        extracted_text:
+          type: string
+          nullable: true
+          description: Raw text extracted by Tesseract OCR.
+          example: "PT Maju Bersama\nInvoice No: INV-2026-00042\nTotal: Rp 1.500.000"
+        ocr_processed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when OCR processing completed.
+          example: "2026-06-27T09:15:42Z"
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-07-31T00:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-26T08:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-06-26T08:00:00Z"
+
+    # ── Purchase Order ─────────────────────────────────────────────────────────
+    POView:
+      type: object
+      required:
+        - id
+        - tenant_id
+        - vendor_id
+        - po_number
+        - amount
+        - qty
+        - currency
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        tenant_id:
+          type: string
+          format: uuid
+          description: Derived from the JWT claim. Never sourced from the request body.
+          example: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+        vendor_id:
+          type: string
+          example: "VENDOR-001"
+        po_number:
+          type: string
+          example: "PO-2026-00017"
+        amount:
+          type: string
+          description: Decimal amount as string, max 4 decimal places.
+          example: "25000000.0000"
+        qty:
+          type: integer
+          example: 500
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "IDR"
+        status:
+          type: string
+          enum: [open, partially_received, received, closed, cancelled]
+          example: "open"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-28T07:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-06-28T07:30:00Z"
+
+    # ── Goods Receipt ──────────────────────────────────────────────────────────
+    GRView:
+      type: object
+      required:
+        - id
+        - tenant_id
+        - po_id
+        - vendor_id
+        - received_qty
+        - received_amount
+        - currency
+        - status
+        - received_at
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "c3d4e5f6-a1b2-7890-abcd-ef1234567890"
+        tenant_id:
+          type: string
+          format: uuid
+          description: Derived from the JWT claim. Never sourced from the request body.
+          example: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+        po_id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        vendor_id:
+          type: string
+          example: "VENDOR-001"
+        received_qty:
+          type: integer
+          example: 200
+        received_amount:
+          type: string
+          description: Decimal amount as string, max 4 decimal places.
+          example: "10000000.0000"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "IDR"
+        status:
+          type: string
+          enum: [pending, accepted, rejected]
+          example: "pending"
+        received_at:
+          type: string
+          format: date-time
+          example: "2026-06-28T10:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-28T10:00:00Z"
+
+    # ── Request bodies ─────────────────────────────────────────────────────────
+    CreateInvoiceRequest:
+      type: object
+      required:
+        - vendor_id
+        - invoice_number
+        - amount
+        - currency
+      properties:
+        vendor_id:
+          type: string
+          example: "VENDOR-001"
+        invoice_number:
+          type: string
+          example: "INV-2026-00042"
+        amount:
+          type: string
+          pattern: '^\d{1,16}(\.\d{1,4})?$'
+          description: 'Decimal amount as string, e.g. "12345.6789". Max 4 decimal places. Max value 9999999999999999.9999'
+          example: "1500000.0000"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          example: "IDR"
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-07-31T00:00:00Z"
+
+    CreatePORequest:
+      type: object
+      required:
+        - vendor_id
+        - po_number
+        - amount
+        - qty
+      properties:
+        vendor_id:
+          type: string
+          example: "VENDOR-001"
+        po_number:
+          type: string
+          example: "PO-2026-00017"
+        amount:
+          type: string
+          pattern: '^\d{1,16}(\.\d{1,4})?$'
+          description: |
+            Decimal amount as string. Must be positive. Max 4 decimal places.
+            Trailing zeros are accepted (e.g. "1000.5000" is valid).
+          example: "25000000.0000"
+        qty:
+          type: integer
+          minimum: 1
+          example: 500
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          default: "IDR"
+          example: "IDR"
+
+    CreateGRRequest:
+      type: object
+      required:
+        - po_id
+        - vendor_id
+        - received_qty
+        - received_amount
+      properties:
+        po_id:
+          type: string
+          format: uuid
+          description: |
+            UUID of the purchase order being received against. The PO must
+            belong to the same tenant as the authenticated user. Submitting a
+            `po_id` that belongs to another tenant returns 404 (identical to
+            "PO not found") to prevent tenant existence probing.
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        vendor_id:
+          type: string
+          example: "VENDOR-001"
+        received_qty:
+          type: integer
+          minimum: 1
+          example: 200
+        received_amount:
+          type: string
+          pattern: '^\d{1,16}(\.\d{1,4})?$'
+          description: |
+            Decimal amount as string. Must be positive. Max 4 decimal places.
+            Trailing zeros are accepted (e.g. "10000000.0000" is valid).
+          example: "10000000.0000"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          default: "IDR"
+          example: "IDR"
+
+    # ── Error ──────────────────────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: "invoice not found"
+
+# ── Global security ────────────────────────────────────────────────────────────
+
+security:
+  - BearerAuth: []
+
+# ── Paths ──────────────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── Invoices ─────────────────────────────────────────────────────────────────
+
+  /api/v1/invoices:
+
+    get:
+      operationId: listInvoices
+      summary: List invoices
+      description: |
+        Returns all invoices belonging to the authenticated tenant, ordered by
+        `created_at DESC`.  The tenant is determined exclusively from the JWT
+        `tenant_id` claim — no query parameter is accepted.
+      tags: [invoices]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Paginated list of invoices (currently returns all records).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invoice"
+              example:
+                - id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                  tenant_id: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+                  vendor_id: "VENDOR-001"
+                  invoice_number: "INV-2026-00042"
+                  amount: "1500000.0000"
+                  currency: "IDR"
+                  status: "ai_processed"
+                  ai_confidence_score: 0.94
+                  extracted_text: "PT Maju Bersama\nInvoice No: INV-2026-00042\nTotal: Rp 1.500.000"
+                  ocr_processed_at: "2026-06-27T09:15:42Z"
+                  due_date: "2026-07-31T00:00:00Z"
+                  created_at: "2026-06-27T09:00:00Z"
+                  updated_at: "2026-06-27T09:15:42Z"
+        "401":
+          description: Missing, expired, or invalid JWT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_header:
+                  value: { "error": "missing authorization header" }
+                invalid_token:
+                  value: { "error": "invalid token" }
+                missing_tenant:
+                  value: { "error": "missing tenant_id in token" }
+        "500":
+          description: Unexpected server-side error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "internal server error"
+
+    post:
+      operationId: createInvoice
+      summary: Create an invoice
+      description: |
+        Creates a new invoice in `pending` status for the authenticated tenant.
+        On success a `invoice.created` event is published to Kafka (key = invoice UUID).
+        Publishing is best-effort — a Kafka failure does NOT roll back the database write.
+
+        **Validation rules** (enforced by the use-case layer):
+        - `vendor_id` must not be empty.
+        - `invoice_number` must not be empty.
+        - `amount` must be greater than 0.
+        - `currency` must not be empty (3-letter ISO 4217 recommended).
+      tags: [invoices]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvoiceRequest"
+            example:
+              vendor_id: "VENDOR-001"
+              invoice_number: "INV-2026-00042"
+              amount: "1500000.0000"
+              currency: "IDR"
+              due_date: "2026-07-31T00:00:00Z"
+      responses:
+        "201":
+          description: Invoice created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+              example:
+                id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                tenant_id: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+                vendor_id: "VENDOR-001"
+                invoice_number: "INV-2026-00042"
+                amount: "1500000.0000"
+                currency: "IDR"
+                status: "pending"
+                ai_confidence_score: null
+                extracted_text: null
+                ocr_processed_at: null
+                due_date: "2026-07-31T00:00:00Z"
+                created_at: "2026-06-27T09:00:00Z"
+                updated_at: "2026-06-27T09:00:00Z"
+        "400":
+          description: Malformed JSON body (cannot be decoded).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "invalid request body"
+        "401":
+          description: Missing, expired, or invalid JWT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "unauthorized"
+        "422":
+          description: |
+            Request body is valid JSON but fails domain validation
+            (empty fields, non-positive amount, etc.).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "invalid invoice data"
+        "500":
+          description: Unexpected server-side error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "internal server error"
+
+  /api/v1/invoices/{id}/approve:
+
+    post:
+      operationId: approveInvoice
+      summary: Approve an invoice
+      description: |
+        Transitions an invoice from `pending` to `approved`.
+        The invoice must belong to the authenticated tenant.
+
+        - Returns **404** if the invoice does not exist within the tenant scope.
+        - Returns **409** if the invoice exists but is not in `pending` status
+          (e.g. already approved or rejected).
+
+        On success a `invoice.approved` event is published to Kafka (key = invoice UUID).
+      tags: [invoices]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID of the invoice to approve.
+          schema:
+            type: string
+            format: uuid
+          example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      responses:
+        "200":
+          description: Invoice approved successfully. Returns the updated invoice.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+              example:
+                id: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+                tenant_id: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+                vendor_id: "VENDOR-001"
+                invoice_number: "INV-2026-00042"
+                amount: "1500000.0000"
+                currency: "IDR"
+                status: "approved"
+                ai_confidence_score: 0.94
+                extracted_text: "PT Maju Bersama\nInvoice No: INV-2026-00042\nTotal: Rp 1.500.000"
+                ocr_processed_at: "2026-06-27T09:15:42Z"
+                due_date: "2026-07-31T00:00:00Z"
+                created_at: "2026-06-27T09:00:00Z"
+                updated_at: "2026-06-27T09:22:10Z"
+        "400":
+          description: Path parameter `id` is not a valid UUID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "invalid invoice id"
+        "401":
+          description: Missing, expired, or invalid JWT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "unauthorized"
+        "404":
+          description: Invoice not found within this tenant's scope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "invoice not found"
+        "409":
+          description: Invoice exists but is not in `pending` status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "invoice is not in pending state"
+        "500":
+          description: Unexpected server-side error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "internal server error"
+
+  # ── Purchase Orders ───────────────────────────────────────────────────────────
+
+  /api/v1/purchase-orders:
+
+    post:
+      operationId: createPurchaseOrder
+      summary: Create a purchase order
+      description: |
+        Creates a new purchase order in `open` status for the authenticated tenant.
+        The tenant is determined exclusively from the JWT `tenant_id` claim.
+
+        **Validation rules** (enforced by the use-case layer):
+        - `vendor_id` must not be empty.
+        - `po_number` must not be empty.
+        - `amount` must be greater than 0 and have at most 4 decimal places.
+        - `qty` must be a positive integer.
+        - `currency` defaults to `IDR` when omitted.
+      tags: [purchase-orders]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePORequest"
+            example:
+              vendor_id: "VENDOR-001"
+              po_number: "PO-2026-00017"
+              amount: "25000000.0000"
+              qty: 500
+              currency: "IDR"
+      responses:
+        "201":
+          description: Purchase order created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/POView"
+              example:
+                id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                tenant_id: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+                vendor_id: "VENDOR-001"
+                po_number: "PO-2026-00017"
+                amount: "25000000.0000"
+                qty: 500
+                currency: "IDR"
+                status: "open"
+                created_at: "2026-06-28T07:30:00Z"
+                updated_at: "2026-06-28T07:30:00Z"
+        "400":
+          description: Malformed JSON body (cannot be decoded) or `amount` is not a valid decimal string.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_body:
+                  value: { "error": "invalid request body" }
+                invalid_amount:
+                  value: { "error": "invalid amount" }
+        "401":
+          description: Missing, expired, or invalid JWT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "unauthorized"
+        "422":
+          description: |
+            Request body is valid JSON but fails domain validation
+            (empty fields, non-positive amount or qty, amount exceeds 4 decimal places, etc.).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "invalid PO data"
+        "500":
+          description: Unexpected server-side error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "internal server error"
+
+    get:
+      operationId: listPurchaseOrders
+      summary: List purchase orders
+      description: |
+        Returns all purchase orders belonging to the authenticated tenant, ordered
+        by `created_at DESC`.  The tenant is determined exclusively from the JWT
+        `tenant_id` claim — no query parameter is accepted.
+      tags: [purchase-orders]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of purchase orders for the authenticated tenant.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/POView"
+              example:
+                - id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  tenant_id: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+                  vendor_id: "VENDOR-001"
+                  po_number: "PO-2026-00017"
+                  amount: "25000000.0000"
+                  qty: 500
+                  currency: "IDR"
+                  status: "partially_received"
+                  created_at: "2026-06-28T07:30:00Z"
+                  updated_at: "2026-06-28T10:05:00Z"
+        "401":
+          description: Missing, expired, or invalid JWT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_header:
+                  value: { "error": "missing authorization header" }
+                invalid_token:
+                  value: { "error": "invalid token" }
+                missing_tenant:
+                  value: { "error": "missing tenant_id in token" }
+        "500":
+          description: Unexpected server-side error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "internal server error"
+
+  /api/v1/purchase-orders/{id}:
+
+    get:
+      operationId: getPurchaseOrder
+      summary: Get a purchase order by ID
+      description: |
+        Returns a single purchase order by UUID. The PO must belong to the
+        authenticated tenant.
+      tags: [purchase-orders]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID of the purchase order.
+          schema:
+            type: string
+            format: uuid
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        "200":
+          description: Purchase order found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/POView"
+              example:
+                id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                tenant_id: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+                vendor_id: "VENDOR-001"
+                po_number: "PO-2026-00017"
+                amount: "25000000.0000"
+                qty: 500
+                currency: "IDR"
+                status: "open"
+                created_at: "2026-06-28T07:30:00Z"
+                updated_at: "2026-06-28T07:30:00Z"
+        "400":
+          description: Path parameter `id` is not a valid UUID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "invalid purchase order id"
+        "401":
+          description: Missing, expired, or invalid JWT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "unauthorized"
+        "404":
+          description: Purchase order not found within this tenant's scope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "purchase order not found"
+        "500":
+          description: Unexpected server-side error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "internal server error"
+
+  # ── Goods Receipts ────────────────────────────────────────────────────────────
+
+  /api/v1/goods-receipts:
+
+    post:
+      operationId: createGoodsReceipt
+      summary: Create a goods receipt
+      description: |
+        Records a goods receipt against an existing purchase order. The PO
+        identified by `po_id` must belong to the same tenant as the authenticated
+        user.
+
+        **Security**: if `po_id` does not exist OR belongs to a different tenant,
+        the API returns **404** in both cases.  This is intentional — returning
+        403 for a cross-tenant PO would confirm the PO's existence to the
+        caller, enabling tenant existence probing.
+
+        **Validation rules** (enforced by the use-case layer):
+        - `po_id` must be a valid UUID referencing a PO owned by this tenant.
+        - `vendor_id` must not be empty.
+        - `received_qty` must be a positive integer.
+        - `received_amount` must be greater than 0 and have at most 4 decimal places.
+        - `currency` defaults to `IDR` when omitted.
+      tags: [goods-receipts]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGRRequest"
+            example:
+              po_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+              vendor_id: "VENDOR-001"
+              received_qty: 200
+              received_amount: "10000000.0000"
+              currency: "IDR"
+      responses:
+        "201":
+          description: Goods receipt created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GRView"
+              example:
+                id: "c3d4e5f6-a1b2-7890-abcd-ef1234567890"
+                tenant_id: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+                po_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                vendor_id: "VENDOR-001"
+                received_qty: 200
+                received_amount: "10000000.0000"
+                currency: "IDR"
+                status: "pending"
+                received_at: "2026-06-28T10:00:00Z"
+                created_at: "2026-06-28T10:00:00Z"
+        "400":
+          description: Malformed JSON body (cannot be decoded) or `received_amount` is not a valid decimal string.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_body:
+                  value: { "error": "invalid request body" }
+                invalid_amount:
+                  value: { "error": "invalid amount" }
+        "401":
+          description: Missing, expired, or invalid JWT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "unauthorized"
+        "404":
+          description: |
+            The purchase order referenced by `po_id` was not found, or it belongs
+            to a different tenant.  Both cases return identical 404 responses to
+            prevent tenant existence probing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "purchase order not found"
+        "422":
+          description: |
+            Request body is valid JSON but fails domain validation
+            (non-positive qty, amount exceeds 4 decimal places, etc.).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "invalid GR data"
+        "500":
+          description: Unexpected server-side error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "internal server error"
+
+    get:
+      operationId: listGoodsReceipts
+      summary: List goods receipts
+      description: |
+        Returns all goods receipts belonging to the authenticated tenant, ordered
+        by `created_at DESC`.  The tenant is determined exclusively from the JWT
+        `tenant_id` claim — no query parameter is accepted.
+      tags: [goods-receipts]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of goods receipts for the authenticated tenant.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GRView"
+              example:
+                - id: "c3d4e5f6-a1b2-7890-abcd-ef1234567890"
+                  tenant_id: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+                  po_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                  vendor_id: "VENDOR-001"
+                  received_qty: 200
+                  received_amount: "10000000.0000"
+                  currency: "IDR"
+                  status: "accepted"
+                  received_at: "2026-06-28T10:00:00Z"
+                  created_at: "2026-06-28T10:00:00Z"
+        "401":
+          description: Missing, expired, or invalid JWT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing_header:
+                  value: { "error": "missing authorization header" }
+                invalid_token:
+                  value: { "error": "invalid token" }
+                missing_tenant:
+                  value: { "error": "missing tenant_id in token" }
+        "500":
+          description: Unexpected server-side error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "internal server error"
+
+  /api/v1/goods-receipts/{id}:
+
+    get:
+      operationId: getGoodsReceipt
+      summary: Get a goods receipt by ID
+      description: |
+        Returns a single goods receipt by UUID. The GR must belong to the
+        authenticated tenant.
+      tags: [goods-receipts]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID of the goods receipt.
+          schema:
+            type: string
+            format: uuid
+          example: "c3d4e5f6-a1b2-7890-abcd-ef1234567890"
+      responses:
+        "200":
+          description: Goods receipt found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GRView"
+              example:
+                id: "c3d4e5f6-a1b2-7890-abcd-ef1234567890"
+                tenant_id: "b1a2c3d4-e5f6-7890-abcd-ef1234567890"
+                po_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                vendor_id: "VENDOR-001"
+                received_qty: 200
+                received_amount: "10000000.0000"
+                currency: "IDR"
+                status: "pending"
+                received_at: "2026-06-28T10:00:00Z"
+                created_at: "2026-06-28T10:00:00Z"
+        "400":
+          description: Path parameter `id` is not a valid UUID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "invalid goods receipt id"
+        "401":
+          description: Missing, expired, or invalid JWT.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "unauthorized"
+        "404":
+          description: Goods receipt not found within this tenant's scope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "goods receipt not found"
+        "500":
+          description: Unexpected server-side error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "internal server error"

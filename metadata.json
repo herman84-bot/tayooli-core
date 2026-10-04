@@ -1,0 +1,6 @@
+{
+  "name": "Tayooli ERP",
+  "description": "Multi-tenant B2B ERP: AI-driven invoice processing, approvals, and payments — ZenSpace design with Nara the AI sidekick.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

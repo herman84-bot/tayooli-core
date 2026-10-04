@@ -1,0 +1,25 @@
+# Runtime configuration for the Tayooli ERP backend.
+# Non-secret values only — secrets (DB password, JWT) live in the Secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tayooli-api-config
+  namespace: tayooli-core
+  labels:
+    app.kubernetes.io/name: tayooli-api
+    app.kubernetes.io/part-of: tayooli-erp
+    app.kubernetes.io/component: backend
+data:
+  APP_ENV: "production"
+  SERVER_PORT: "8081"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "tayooli"
+  DB_SSLMODE: "require"
+  # In-cluster service name for the Apache Kafka KRaft broker (matches the
+  # docker-compose/CI apache/kafka:3.7.0 deployment, listener PLAINTEXT:29092).
+  KAFKA_BROKERS: "kafka:29092"
+  # Optional services — uncomment when the service exists in-cluster.
+  # AI_BASE_URL: "http://ai-worker:8000"
+  # REDIS_URL: "redis://redis-master.redis.svc.cluster.local:6379/0"
+  # FRONTEND_ORIGIN: "https://app.tayooli.example.com"

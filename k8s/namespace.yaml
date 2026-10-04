@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tayooli-core
+  labels:
+    app.kubernetes.io/name: tayooli-core
+    app.kubernetes.io/part-of: tayooli-erp

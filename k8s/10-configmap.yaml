@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tayooli-config
+  namespace: tayooli-core
+data:
+  # ── go-core (finance-service) ────────────────────────────────────────────
+  APP_ENV: "production"
+  SERVER_PORT: "8081"
+  DB_SSLMODE: "require"
+  KAFKA_BROKERS: "kafka:9092"
+  AI_SERVING_URL: "http://ai-worker:8000"
+  FRONTEND_ORIGIN: "https://app.example.com"
+  MATCH_AMOUNT_TOLERANCE_PCT: "2.0"
+  # ── ai-worker ────────────────────────────────────────────────────────────
+  KAFKA_BROKERS_AI: "kafka:9092"
+  # ── frontend (tayooli-api) ───────────────────────────────────────────────
+  NODE_ENV: "production"
+  PORT: "3000"
+  HOSTNAME: "0.0.0.0"

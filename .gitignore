@@ -1,0 +1,44 @@
+node_modules/
+.next/
+coverage/
+*.snap
+tsconfig.tsbuildinfo
+.claw/sessions/
+.env*.local
+.env.local
+
+# Local preview infrastructure (run doc + logs)
+.freebuff/
+
+backend/go-core/.env
+backend/go-core/api
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Logs & binaries
+*.log
+*.exe
+*.exe~
+coverage.out
+backend/go-core/tayooli-api*
+
+# Scratch / probe output
+out/
+pw-*.json
+
+# Test artifacts
+test-results/
+.claude/worktrees/
+*.png
+
+# Merge conflict artifacts
+*.orig
+*.rej

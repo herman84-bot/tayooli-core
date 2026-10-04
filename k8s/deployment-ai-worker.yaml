@@ -1,0 +1,70 @@
+# AI Worker (OCR pipeline) deployment.
+# Requires Kafka and Postgres to be reachable in-cluster before it can start
+# consuming; no HTTP endpoints are exposed, so no Service is created.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-worker
+  namespace: tayooli-core
+  labels:
+    app.kubernetes.io/name: ai-worker
+    app.kubernetes.io/part-of: tayooli-erp
+    app.kubernetes.io/component: ai-worker
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ai-worker
+  template:
+    metadata:
+      labels:
+        app: ai-worker
+    spec:
+      containers:
+        - name: ai-worker
+          # CI replaces ${IMAGE_TAG} with ${{ github.sha }} (see .github/workflows/ci.yml build job), e.g.:
+          #   sed -i "s|\${IMAGE_TAG}|${GITHUB_SHA}|g" k8s/*.yaml
+          image: gcr.io/luminaflow-prod/ai-worker:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            capabilities:
+              drop:
+                - ALL
+          envFrom:
+            - configMapRef:
+                name: tayooli-api-config
+          # envFrom is the single source of env vars (KAFKA_BROKERS et al. come
+          # from tayooli-api-config) — do not re-declare them here.
+          # OCR worker is a long-lived consumer: the liveness probe is a cheap
+          # in-process self-check (imports main so a crash-looping app fails
+          # the probe), not a service call. Exec-based because the worker
+          # exposes no HTTP port in k8s (app.py FastAPI exists, but no
+          # Service/port is declared).
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import main"
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3

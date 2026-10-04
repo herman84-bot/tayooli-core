@@ -1,0 +1,9 @@
+# Build context (backend/go-core) — keep the image small and secrets out.
+.git
+.env
+*.log
+coverage.out
+api
+api.exe
+bin/
+tmp/

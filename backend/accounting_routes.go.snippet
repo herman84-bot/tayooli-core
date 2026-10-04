@@ -1,0 +1,18 @@
+// Snippet to be added to cmd/api/main.go or routing setup
+
+/*
+import (
+	accountingHTTP "luminaflow.erp/backend/internal/accounting/handler/http"
+	accountingPG "luminaflow.erp/backend/internal/accounting/infra/postgres"
+	accountingUC "luminaflow.erp/backend/internal/accounting/usecase"
+)
+
+// In your router setup function:
+func SetupAccountingRoutes(r chi.Router, db *sql.DB) {
+	accountRepo := accountingPG.NewAccountRepository(db)
+	accountUseCase := accountingUC.NewAccountUseCase(accountRepo)
+	accountHandler := accountingHTTP.NewAccountHandler(accountUseCase)
+	
+	accountHandler.RegisterRoutes(r)
+}
+*/
