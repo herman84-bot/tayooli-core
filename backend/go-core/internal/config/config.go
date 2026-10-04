@@ -83,13 +83,21 @@ func Load() (*Config, error) {
 		BrevoSenderName:  os.Getenv("BREVO_SENDER_NAME"),
 	}
 
-	// Defaults for optional fields
+	// Defaults for optional fields.
+	// Precedence: explicit SERVER_PORT > cloud-injected PORT > hardcoded default.
+	// SERVER_PORT is checked first and, if set by the operator, is NEVER
+	// overridden — even if it happens to equal the hardcoded default value
+	// below. A previous version of this logic compared cfg.ServerPort == "8081"
+	// to decide whether to apply PORT, which incorrectly overrode an
+	// explicitly-configured SERVER_PORT=8081 with Zeabur's auto-injected
+	// PORT=8080, causing the app to bind the wrong port and fail its
+	// container health check.
 	if cfg.ServerPort == "" {
-		cfg.ServerPort = "8081"
-	}
-	// Cloud PaaS (Zeabur / Railway / Cloud Run) injects PORT
-	if port := os.Getenv("PORT"); port != "" && cfg.ServerPort == "8081" {
-		cfg.ServerPort = port
+		if port := os.Getenv("PORT"); port != "" {
+			cfg.ServerPort = port
+		} else {
+			cfg.ServerPort = "8081"
+		}
 	}
 	if cfg.AppEnv == "" {
 		cfg.AppEnv = "production"

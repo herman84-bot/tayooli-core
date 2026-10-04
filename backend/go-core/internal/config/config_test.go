@@ -162,3 +162,69 @@ func TestLoad_DatabaseURLFallback(t *testing.T) {
 	}
 }
 
+// TestLoad_ServerPortPrecedence is a regression test for a production bug:
+// Zeabur auto-injects PORT alongside the operator-configured SERVER_PORT.
+// A previous version of Load() compared cfg.ServerPort == "8081" (the
+// hardcoded default) to decide whether PORT should override it — which
+// incorrectly overrode an explicitly-configured SERVER_PORT=8081 with
+// Zeabur's auto-injected PORT=8080, causing the app to bind the wrong port
+// and fail its container health/startup probe (observed: "server starting
+// port=8080" while the probe dialed 8081).
+func TestLoad_ServerPortPrecedence(t *testing.T) {
+	t.Run("explicit SERVER_PORT wins even when cloud PORT is also set", func(t *testing.T) {
+		setRequiredEnv(t, strings.Repeat("a", MinJWTSecretLength))
+		t.Setenv("SERVER_PORT", "8081")
+		t.Setenv("PORT", "8080")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.ServerPort != "8081" {
+			t.Errorf("ServerPort = %q, want %q (explicit SERVER_PORT must never be overridden by cloud-injected PORT)", cfg.ServerPort, "8081")
+		}
+	})
+
+	t.Run("explicit SERVER_PORT wins when it does not match the hardcoded default", func(t *testing.T) {
+		setRequiredEnv(t, strings.Repeat("a", MinJWTSecretLength))
+		t.Setenv("SERVER_PORT", "9000")
+		t.Setenv("PORT", "8080")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.ServerPort != "9000" {
+			t.Errorf("ServerPort = %q, want %q", cfg.ServerPort, "9000")
+		}
+	})
+
+	t.Run("falls back to cloud-injected PORT when SERVER_PORT is unset", func(t *testing.T) {
+		setRequiredEnv(t, strings.Repeat("a", MinJWTSecretLength))
+		t.Setenv("SERVER_PORT", "")
+		t.Setenv("PORT", "8080")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.ServerPort != "8080" {
+			t.Errorf("ServerPort = %q, want %q", cfg.ServerPort, "8080")
+		}
+	})
+
+	t.Run("falls back to hardcoded default when neither SERVER_PORT nor PORT is set", func(t *testing.T) {
+		setRequiredEnv(t, strings.Repeat("a", MinJWTSecretLength))
+		t.Setenv("SERVER_PORT", "")
+		t.Setenv("PORT", "")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.ServerPort != "8081" {
+			t.Errorf("ServerPort = %q, want %q", cfg.ServerPort, "8081")
+		}
+	})
+}
+
