@@ -27,6 +27,30 @@ CREATE TABLE IF NOT EXISTS products (
     UNIQUE (id, tenant_id)
 );
 
+-- 1b. Ensure required constraints exist even if "products" was already
+--     created by an older migration (011_products_inventory.sql) without
+--     these constraints. CREATE TABLE IF NOT EXISTS is a no-op when the
+--     table pre-exists, so the composite UNIQUE(id, tenant_id) needed for
+--     the inventory FK (and by downstream WMS migrations referencing
+--     products(id, tenant_id)) must be added defensively here.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'products_id_tenant_id_key'
+    ) THEN
+        ALTER TABLE products ADD CONSTRAINT products_id_tenant_id_key UNIQUE (id, tenant_id);
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'products_tenant_id_sku_key'
+    ) THEN
+        ALTER TABLE products ADD CONSTRAINT products_tenant_id_sku_key UNIQUE (tenant_id, sku);
+    END IF;
+END $$;
+
 -- 2. Create inventory table
 CREATE TABLE IF NOT EXISTS inventory (
     id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
