@@ -1474,6 +1474,14 @@ export function getDemoResponse(
     return DEMO_PLAN_LIMITS[planKey] || DEMO_PLAN_LIMITS.pro
   }
 
+  if (normalizedPath.startsWith("/vendors/")) {
+    const id = normalizedPath.split("/")[2]
+    return DEMO_VENDORS.find((v) => v.id === id) || DEMO_VENDORS[0]
+  }
+  if (normalizedPath.startsWith("/invoices/")) {
+    const id = normalizedPath.split("/")[2]
+    return DEMO_INVOICES.find((i) => i.id === id) || DEMO_INVOICES[0]
+  }
   if (normalizedPath.startsWith("/customers/")) {
     const id = normalizedPath.split("/")[2]
     return DEMO_CUSTOMERS.find((c) => c.id === id) || DEMO_CUSTOMERS[0]

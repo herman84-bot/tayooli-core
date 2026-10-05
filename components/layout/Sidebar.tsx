@@ -14,8 +14,6 @@ import {
   ShoppingBag,
   AlertTriangle,
   ScanLine,
-  FileText,
-  Receipt,
   MessageCircle,
   Settings,
   LogOut,
@@ -65,13 +63,6 @@ const navGroups: NavGroup[] = [
       { href: '/wms/scrap', label: 'Barang Rusak / Scrap', icon: AlertTriangle },
       { href: '/wms/scanner', label: 'Barcode Scanner', icon: ScanLine },
       { href: '/pos', label: 'Point of Sale', icon: Store },
-    ],
-  },
-  {
-    label: 'Finance',
-    items: [
-      { href: '/dashboard/invoices', label: 'Invoice Vendor', icon: FileText },
-      { href: '/sales-invoices', label: 'Faktur Penjualan', icon: Receipt },
     ],
   },
   {
