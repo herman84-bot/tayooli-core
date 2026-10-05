@@ -57,3 +57,8 @@ scripts/*
 !scripts/redeploy-service.js
 !scripts/verify-ui-dashboard-transfer.js
 !scripts/wait-for-financial-overview.js
+
+# Live deploy/migration smoke script
+!scripts/verify-cancel-deploy.js
+!scripts/cancel-transfer-draft.js
+!scripts/verify-cancel-feature.js
