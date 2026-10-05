@@ -252,8 +252,8 @@ function TeamTab() {
 function ProfileTab() {
   return (
     <div>
-      <h2 className="text-sm font-semibold text-foreground mb-1">Profil Perusahaan</h2>
-      <p className="text-xs text-muted-foreground mb-4">Informasi ini ditampilkan di invoice dan dokumen.</p>
+      <h2 className="text-sm font-semibold text-foreground mb-1">Profil Bisnis / Toko</h2>
+      <p className="text-xs text-muted-foreground mb-4">Informasi ini ditampilkan pada struk kasir, surat jalan, dan dokumen operasional.</p>
 
       <div className="space-y-3 max-w-lg">
         <div>

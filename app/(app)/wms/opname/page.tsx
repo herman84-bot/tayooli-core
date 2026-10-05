@@ -1033,8 +1033,8 @@ export default function StockOpnamePage() {
                   <div>
                     <h4 className="text-sm font-bold">Sesi Telah Selesai & Terkunci</h4>
                     <p className="text-xs text-emerald-700 mt-1">
-                      Semua selisih telah dibukukan secara permanen ke buku besar akun penyeimbang (@LOSS). Data fisik
-                      tidak dapat diubah kembali.
+                      Semua selisih telah disesuaikan dan dicatat ke riwayat mutasi stok. Data fisik
+                      hasil hitung telah terkunci.
                     </p>
                     {activeOpname.approved_by && (
                       <div className="text-[11px] text-emerald-600 mt-2 font-medium">

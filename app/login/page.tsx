@@ -27,7 +27,7 @@ export default function LoginPage() {
             Masuk ke akun Anda
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            Kelola invoice, persetujuan, dan pembayaran bisnis Anda dalam satu tempat.
+            Kelola stok multi-gudang, transaksi kasir POS, dan pengiriman barang dalam satu sistem.
           </p>
 
           <div className="mt-6">

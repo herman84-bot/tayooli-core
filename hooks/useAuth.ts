@@ -50,15 +50,13 @@ const DEMO_USERS_BY_EMAIL: Record<string, User> = {
 
 /**
  * Demo-mode fallback for `/api/v1/auth/me` failures (401/unreachable).
- * Only active when:
- *  - no real backend is configured via NEXT_PUBLIC_API_URL, AND
- *  - not in production (demo auth is off there unless AUTH_DEMO=true, which
- *    is server-only and intentionally not honored client-side), AND
- *  - the persisted user is one of the known demo accounts.
- * With a real backend configured, /me is the source of truth and a 401 keeps
- * logging the user out (no fallback).
+ * Only active when NO real backend is configured via NEXT_PUBLIC_API_URL.
+ * With a backend configured, /me is the source of truth and a 401 keeps
+ * logging the user out (no fallback) — a stale/fake local cookie must never
+ * masquerade as a live session.
  */
 function restoreDemoSession(): boolean {
+  if (process.env.NEXT_PUBLIC_API_URL) return false
   const { user } = useAuthStore.getState()
   if (!user?.email) return false
   if (process.env.NODE_ENV === "production") return false

@@ -15,18 +15,11 @@ export const dynamic = "force-dynamic"
  */
 export async function GET(request: NextRequest) {
   if (backendBaseUrl()) {
-    const proxyResult = await proxyAuth("/api/v1/auth/me", request)
-    // If proxy succeeded (not 502), relay it. Otherwise fall through to demo.
-    if (proxyResult.status !== 502) {
-      // In dev mode, if remote backend returned 401, check if we have a valid demo cookie session
-      if (process.env.NODE_ENV !== "production" && proxyResult.status === 401) {
-        const demoUser = demoUserFromRequest(request)
-        if (demoUser) {
-          return NextResponse.json({ user: demoUser })
-        }
-      }
-      return proxyResult
-    }
+    // A backend is configured → it is the source of truth. Relay the result
+    // as-is. A stale/fake local cookie is NOT accepted here: passing a demo
+    // cookie to a real backend only produces a 401 + empty data downstream,
+    // which hides the real problem (see README.md: dashboard must be real).
+    return proxyAuth("/api/v1/auth/me", request)
   }
 
   // Demo fallback (used when no backend is configured, or proxy failed).

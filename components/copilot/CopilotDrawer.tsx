@@ -350,9 +350,9 @@ export function CopilotDrawer() {
 
   const quickPrompts = [
     "Ubah nama perusahaan",
-    "Tambah vendor baru",
-    "Undang anggota tim",
-    "Buka Chart of Accounts",
+    "Cek stok produk",
+    "Buka kasir POS",
+    "Buka Stock Opname",
   ]
 
   if (!isOpen) return null
@@ -497,7 +497,7 @@ export function CopilotDrawer() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Perintahkan Copilot (e.g. ubah nama PT, tambah vendor)..."
+              placeholder="Ketik perintah (contoh: cek stok barang, buka kasir POS)..."
               disabled={isStreaming}
               className="w-full pl-3 pr-10 py-2.5 text-xs rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-primary disabled:opacity-50"
             />

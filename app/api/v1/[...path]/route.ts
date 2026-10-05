@@ -130,16 +130,22 @@ async function proxy(req: NextRequest, path: string, init?: RequestInit) {
       signal: AbortSignal.timeout(10000),
     });
   } catch {
-    // Backend unreachable — try inference demo, then generic demo data fallback.
+    // Backend unreachable. Generic demo-data fallback is ONLY allowed with
+    // explicit AUTH_DEMO=true; otherwise return an honest 502 so the UI never
+    // renders fabricated numbers as if they were real database data.
+    // (Inference stubs stay available — they simulate AI-pipeline job states
+    // for dev testing, not business metrics.)
     const method = init?.method ?? 'GET';
     const parsedBody = parseBody(init?.body);
     const inferDemo = getInferenceDemoResponse(path, method, parsedBody);
     if (inferDemo !== null) {
       return NextResponse.json(inferDemo);
     }
-    const demo = getDemoResponse(path, req.nextUrl.search, parsedBody, method);
-    if (demo !== null) {
-      return NextResponse.json(demo);
+    if (process.env.AUTH_DEMO === 'true') {
+      const demo = getDemoResponse(path, req.nextUrl.search, parsedBody, method);
+      if (demo !== null) {
+        return NextResponse.json(demo);
+      }
     }
     return NextResponse.json({ error: 'backend unreachable' }, { status: 502 });
   }
@@ -154,9 +160,11 @@ async function proxy(req: NextRequest, path: string, init?: RequestInit) {
     }
   }
 
-  // In dev mode with demo auth: if remote backend rejected demo cookie with 401,
-  // return simulated success for mutations so dev UI testing works seamlessly.
-  if (process.env.NODE_ENV !== 'production' && res.status === 401) {
+  // Demo-data fallback on 401 is ONLY allowed with explicit AUTH_DEMO=true.
+  // Without it, the real backend status (e.g. 401 session invalid) is passed
+  // through, so local never silently renders fabricated numbers that diverge
+  // from production (see README.md: dashboard must reflect real data).
+  if (process.env.AUTH_DEMO === 'true' && res.status === 401) {
     const method = init?.method ?? 'GET';
     const parsedBody = parseBody(init?.body);
     const demo = getDemoResponse(path, req.nextUrl.search, parsedBody, method);

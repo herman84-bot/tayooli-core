@@ -120,134 +120,20 @@ export const DashboardSummarySchema = z.object({
 export type DashboardSummary = z.infer<typeof DashboardSummarySchema>
 
 /**
- * DEFAULT_DASHBOARD_SUMMARY reflects the exact 5 real vendors and verified entities.
- * Used as safe, resilient fallback when the backend API is slow or offline.
+ * EMPTY_DASHBOARD_SUMMARY: all-zero placeholder used only while loading or when
+ * the backend fails. It intentionally contains NO fabricated numbers so the UI
+ * never shows data that does not exist in the database.
  */
-export const DEFAULT_DASHBOARD_SUMMARY: DashboardSummary = {
-  invoices: {
-    total: 5,
-    pending: 1,
-    approved: 2,
-    rejected: 1,
-    pending_review: 1,
-    total_amount: '157550000',
-    approved_amount: '91500000',
-  },
-  payments: {
-    total: 2,
-    paid: 1,
-    paid_amount: '24500000',
-    pending_amount: '67000000',
-  },
-  vendors: {
-    active: 5,
-  },
-  purchase_orders: {
-    total: 3,
-  },
-  goods_receipts: {
-    total: 2,
-  },
-  monthly_trend: [
-    { month: 'Mar 2026', invoice_count: 1, total_amount: '24500000' },
-    { month: 'Apr 2026', invoice_count: 1, total_amount: '12300000' },
-    { month: 'Mei 2026', invoice_count: 1, total_amount: '8750000' },
-    { month: 'Jun 2026', invoice_count: 1, total_amount: '45000000' },
-    { month: 'Jul 2026', invoice_count: 1, total_amount: '67000000' },
-    { month: 'Agu 2026', invoice_count: 5, total_amount: '157550000' },
-  ],
-  top_vendors: [
-    {
-      vendor_id: '11111111-1111-4111-8111-111111111105',
-      vendor_name: 'PT IndoLogistik',
-      invoice_count: 1,
-      total_amount: '67000000',
-    },
-    {
-      vendor_id: '11111111-1111-4111-8111-111111111101',
-      vendor_name: 'PT Nusantara Niaga',
-      invoice_count: 1,
-      total_amount: '45000000',
-    },
-    {
-      vendor_id: '11111111-1111-4111-8111-111111111103',
-      vendor_name: 'PT Maju Jaya',
-      invoice_count: 1,
-      total_amount: '24500000',
-    },
-    {
-      vendor_id: '11111111-1111-4111-8111-111111111104',
-      vendor_name: 'Toko Berkah',
-      invoice_count: 1,
-      total_amount: '12300000',
-    },
-    {
-      vendor_id: '11111111-1111-4111-8111-111111111102',
-      vendor_name: 'CV Karya Mandiri',
-      invoice_count: 1,
-      total_amount: '8750000',
-    },
-  ],
-  pos: {
-    today_revenue: '4250000',
-    today_orders_count: 14,
-    total_revenue: '185600000',
-    total_orders_count: 520,
-    recent_orders: [
-      {
-        order_number: 'POS-2026-0042',
-        customer_name: 'Budi Santoso',
-        total_amount: '450000',
-        payment_method: 'QRIS',
-        status: 'completed',
-        created_at: '2026-10-05T08:30:00Z',
-      },
-      {
-        order_number: 'POS-2026-0041',
-        customer_name: 'Pelanggan Tunai',
-        total_amount: '125000',
-        payment_method: 'CASH',
-        status: 'completed',
-        created_at: '2026-10-05T08:15:00Z',
-      },
-      {
-        order_number: 'POS-2026-0040',
-        customer_name: 'Siti Rahma',
-        total_amount: '890000',
-        payment_method: 'DEBIT',
-        status: 'completed',
-        created_at: '2026-10-05T07:45:00Z',
-      },
-    ],
-  },
-  wms: {
-    total_skus: 5,
-    total_physical_units: '1240',
-    total_warehouses: 3,
-    total_locations: 6,
-    today_movements: 7,
-    low_stock_items: [
-      {
-        sku: 'MAS-KOP-001',
-        name: 'Kopi Susu Gula Aren Botol 250ml',
-        current_stock: '3',
-        min_threshold: '10',
-      },
-      {
-        sku: 'MAS-OIL-002',
-        name: 'Minyak Goreng Sawit 2 Liter',
-        current_stock: '4',
-        min_threshold: '15',
-      },
-    ],
-  },
-  customers: {
-    active: 3,
-  },
-  sales_invoices: {
-    total_invoiced: '20250000',
-    paid_amount: '15500000',
-    accounts_receivable: '4750000',
-    total_count: 2,
-  },
+export const EMPTY_DASHBOARD_SUMMARY: DashboardSummary = {
+  invoices: { total: 0, pending: 0, approved: 0, rejected: 0, pending_review: 0, total_amount: '0', approved_amount: '0' },
+  payments: { total: 0, paid: 0, paid_amount: '0', pending_amount: '0' },
+  vendors: { active: 0 },
+  purchase_orders: { total: 0 },
+  goods_receipts: { total: 0 },
+  monthly_trend: [],
+  top_vendors: [],
+  pos: { today_revenue: '0', today_orders_count: 0, total_revenue: '0', total_orders_count: 0, recent_orders: [] },
+  wms: { total_skus: 0, total_physical_units: '0', total_warehouses: 0, total_locations: 0, today_movements: 0, low_stock_items: [] },
+  customers: { active: 0 },
+  sales_invoices: { total_invoiced: '0', paid_amount: '0', accounts_receivable: '0', total_count: 0 },
 }

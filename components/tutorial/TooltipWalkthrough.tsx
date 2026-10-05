@@ -12,28 +12,23 @@ interface TooltipStep {
 const STEPS: TooltipStep[] = [
   {
     target: '[data-tutorial="dashboard-header"]',
-    title: 'Dashboard',
-    description: 'Ringkasan keuangan bisnis Anda. Semua data ada di sini.',
+    title: 'Dashboard Operasional',
+    description: 'Ringkasan performa omzet kasir POS harian dan saldo fisik stok gudang.',
   },
   {
-    target: '[data-tutorial="create-invoice"]',
-    title: 'Upload Invoice',
-    description: 'Klik untuk mulai mengelola invoice. OCR membaca data otomatis.',
+    target: '[data-tutorial="pos-button"]',
+    title: 'Kasir POS',
+    description: 'Buka mesin kasir untuk transaksi langsung, scan barcode, dan cetak struk belanja.',
   },
   {
     target: '[data-tutorial="sidebar"]',
-    title: 'Navigasi',
-    description: 'Akses invoice, vendor, purchase order, dan fitur lainnya.',
-  },
-  {
-    target: '[data-tutorial="billing"]',
-    title: 'Langganan',
-    description: 'Kelola paket dan lihat tagihan langganan.',
+    title: 'Menu Navigasi',
+    description: 'Kelola master produk, stok multi-gudang, surat jalan, transfer, hingga opname.',
   },
   {
     target: '[data-tutorial="help-support"]',
-    title: 'Bantuan',
-    description: 'Butuh bantuan? Buka Help & Support untuk chat AI.',
+    title: 'Pusat Bantuan',
+    description: 'Butuh panduan operasional? Tanya asisten AI atau kirim tiket kendala teknis.',
   },
 ]
 

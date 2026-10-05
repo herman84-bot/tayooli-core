@@ -288,7 +288,7 @@ export function matchRuleBasedAction(message: string): {
     normalized.includes("selamat malam")
   ) {
     return {
-      reply: "Halo! Senang bisa menyapa Anda. Ada yang bisa saya bantu untuk operasional workspace Anda hari ini? Anda bisa meminta saya mengelola profil perusahaan, mengundang tim, mendaftarkan vendor atau produk, hingga membuka modul transaksi.",
+      reply: "Halo! Senang bisa menyapa Anda. Ada yang bisa saya bantu untuk operasional toko dan gudang Anda hari ini? Anda bisa meminta saya mengelola profil bisnis, memeriksa katalog produk, memantau stok, hingga membuka kasir POS.",
       actions: [],
     }
   }
@@ -308,7 +308,7 @@ export function matchRuleBasedAction(message: string): {
     normalized.includes("bantuan apa")
   ) {
     return {
-      reply: "Saya Tayooli Copilot, asisten yang siap membantu Anda mengelola pengaturan dan data di Tayooli ERP. Anda cukup memerintahkan saya dengan bahasa sehari-hari, misalnya: 'ubah nama perusahaan', 'tambah vendor baru', 'undang anggota tim', atau 'buka modul akuntansi'.",
+      reply: "Saya Tayooli Copilot, asisten yang siap membantu Anda mengelola operasional di Tayooli ERP. Anda cukup memerintahkan saya dengan bahasa sehari-hari, misalnya: 'ubah nama toko', 'cek stok barang', 'buka kasir POS', atau 'buka stock opname'.",
       actions: [],
     }
   }
@@ -881,7 +881,7 @@ export function matchRuleBasedAction(message: string): {
 
   // Default fallback guidance
   return {
-    reply: "Saya siap membantu Anda di workspace ini. Anda dapat meminta saya untuk mengelola profil perusahaan, mengundang rekan tim, mendaftarkan vendor atau pelanggan baru, hingga membuka menu transaksi. Apa yang ingin Anda kerjakan saat ini?",
+    reply: "Saya siap membantu Anda di workspace ini. Anda dapat meminta saya untuk mengelola profil toko, mengundang rekan tim, memeriksa stok gudang, hingga membuka kasir POS. Apa yang ingin Anda kerjakan saat ini?",
     actions: [],
   }
 }

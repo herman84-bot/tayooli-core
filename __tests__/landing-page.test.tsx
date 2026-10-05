@@ -104,7 +104,7 @@ describe('LandingPage bypass / disabled redirect', () => {
     expect(mockRedirect).not.toHaveBeenCalled()
     expect(screen.getByTestId('site-nav')).toBeInTheDocument()
     expect(
-      screen.getByText('Tagihan beres, pembayaran lancar, laporan akurat.')
+      screen.getByText('Stok gudang rapi, kasir cepat, pengiriman terkontrol.')
     ).toBeInTheDocument()
   })
 })

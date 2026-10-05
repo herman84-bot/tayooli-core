@@ -52,19 +52,13 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 1) Real backend configured → proxy, with demo fallback on failure.
+  // 1) Real backend configured → proxy, and relay its verdict as-is.
+  // No silent demo session here: minting a local demo cookie when the real
+  // backend rejects the login only produces a stuck state ("logged in" UI
+  // with every subsequent data call 401ing). The user must fix the real
+  // credentials instead.
   if (backendBaseUrl()) {
-    const proxyResult = await proxyAuth("/api/v1/auth/login", request, body)
-    // If proxy returned non-502 (success or upstream error), relay it as-is.
-    // In dev mode, if remote backend returned 401 for canonical demo users,
-    // fall through to demo auth so local testing always works smoothly.
-    if (proxyResult.status !== 502) {
-      if (process.env.NODE_ENV !== "production" && proxyResult.status === 401 && verifyDemoCredentials(email, password)) {
-        // Fall through to demo auth below
-      } else {
-        return proxyResult
-      }
-    }
+    return proxyAuth("/api/v1/auth/login", request, body)
   }
 
   // 2) Demo fallback (used when no backend is configured, or proxy failed).

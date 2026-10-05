@@ -68,10 +68,10 @@ export default function WorkspacePage() {
         {/* Card */}
         <div className="rounded-xl border border-border/70 bg-card p-6 shadow-sm sm:p-7">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            Nama Perusahaan
+            Nama Toko / Perusahaan
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            Tampilan di dashboard dan invoice.
+            Ditampilkan pada struk kasir, surat jalan, dan dashboard operasional.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">

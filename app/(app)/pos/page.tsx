@@ -894,7 +894,7 @@ export default function POSPage() {
                 </div>
               )}
               <div className="flex justify-between text-sm sm:text-base font-extrabold text-slate-900 pt-2 border-t border-slate-200">
-                <span>Total Tagihan:</span>
+                <span>Total Belanja:</span>
                 <span className="font-mono text-[#2563EB]">
                   Rp {grandTotal.toLocaleString("id-ID")}
                 </span>
@@ -1127,7 +1127,7 @@ export default function POSPage() {
                   )}
                   {receiptData?.salesInvoiceId && (
                     <div className="text-[10px] text-slate-500 font-mono truncate">
-                      Ref Inv: {receiptData.salesInvoiceId}
+                      No. Referensi: {receiptData.salesInvoiceId}
                     </div>
                   )}
 

@@ -16,8 +16,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Tayooli — ERP Order-to-Pay & Order-to-Cash untuk Bisnis Indonesia',
-  description: 'Invoice (OCR + AI), persetujuan, pembayaran, dan akuntansi dalam satu alur yang tenang. Gratis 14 hari, tanpa kartu kredit.',
+  title: 'Tayooli — Sistem Manajemen Ritel, Gudang & Kasir POS',
+  description: 'Aplikasi kasir POS, multi-gudang, surat jalan, dan stok ritel dalam satu alur kerja yang terpadu.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

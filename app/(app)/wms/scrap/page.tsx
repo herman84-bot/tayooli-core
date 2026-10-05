@@ -798,7 +798,7 @@ export default function StockScrapPage() {
                       <span>Virtual @SCRAP</span>
                     </div>
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Pemusnahan langsung / Write-off buku besar
+                      Pemusnahan fisik / Pengurangan stok langsung
                     </p>
                   </button>
 

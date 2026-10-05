@@ -126,7 +126,7 @@ export function AutonomySettingsModal() {
                     {
                       id: "assisted",
                       title: "Level 2: Assisted (Rekomendasi)",
-                      desc: "AI menyusun proposal tindakan, eksekusi wajib persetujuan klik manusia.",
+                      desc: "AI menyusun saran tindakan, eksekusi tetap memerlukan konfirmasi Anda.",
                     },
                     {
                       id: "autopilot",
@@ -168,7 +168,7 @@ export function AutonomySettingsModal() {
                     { id: "workspace.read", label: "Membaca data dan ringkasan workspace" },
                     { id: "workspace.profile_write", label: "Mengubah identitas & profil perusahaan" },
                     { id: "workspace.team_write", label: "Mengundang dan mengelola tim" },
-                    { id: "workspace.master_write", label: "Membuat draft vendor, customer, dan produk" },
+                    { id: "workspace.master_write", label: "Menyimpan draf produk dan data operasional" },
                     { id: "workspace.payments_write", label: "Konfigurasi payment gateway (Kritis)" },
                   ].map((s) => (
                     <label key={s.id} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted/30 cursor-pointer">

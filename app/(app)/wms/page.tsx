@@ -397,7 +397,7 @@ export default function WMSDashboardPage() {
               }`}
             >
               <ArrowRightLeft className="w-4 h-4" />
-              <span>Buku Besar Pergerakan Stok (Immutable Ledger)</span>
+              <span>Riwayat Mutasi Stok</span>
             </button>
           </div>
 
@@ -424,7 +424,7 @@ export default function WMSDashboardPage() {
                     { label: "Internal Bin", value: "INTERNAL" },
                     { label: "Pallet LPN", value: "PALLET" },
                     { label: "Transit", value: "TRANSIT" },
-                    { label: "Vendor", value: "VENDOR" },
+                    { label: "Pemasok", value: "VENDOR" },
                   ].map((filter) => (
                     <button
                       key={filter.value}
@@ -563,22 +563,22 @@ export default function WMSDashboardPage() {
             </div>
           )}
 
-          {/* TAB 2: Immutable Stock Movements Ledger */}
+          {/* TAB 2: Stock Movements History */}
           {activeTab === "movements" && (
             <div className="p-4 sm:p-6 space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2">
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    Buku Besar Mutasi Stok (Stock Movement Ledger)
+                    Riwayat Mutasi Stok Gudang
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Pencatatan mutasi double-entry immutable dari lokasi fisik dan lokasi virtual sistem
+                    Catatan perpindahan fisik barang antar gudang, rak simpan, dan area transit
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-700">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    Double-Entry Verified
+                    Tercatat Otomatis
                   </span>
                 </div>
               </div>
@@ -601,13 +601,13 @@ export default function WMSDashboardPage() {
                     {loadingMovements ? (
                       <tr>
                         <td colSpan={7} className="px-4 py-8 text-center text-slate-500 text-sm">
-                          Memuat buku besar pergerakan stok...
+                          Memuat riwayat mutasi stok...
                         </td>
                       </tr>
                     ) : movements.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-4 py-12 text-center text-slate-500 text-sm">
-                          Belum ada transaksi pergerakan stok (ledger kosong).
+                          Belum ada riwayat pergerakan stok barang.
                         </td>
                       </tr>
                     ) : (
@@ -854,7 +854,7 @@ export default function WMSDashboardPage() {
                   >
                     <option value="INTERNAL">INTERNAL (Rak/Bin Biasa)</option>
                     <option value="TRANSIT">TRANSIT (Staging Area)</option>
-                    <option value="VENDOR">VENDOR (Penerimaan)</option>
+                    <option value="VENDOR">Pemasok (Area Penerimaan)</option>
                     <option value="CUSTOMER">CUSTOMER (Pengiriman)</option>
                     <option value="SCRAP">SCRAP (Barang Rusak)</option>
                   </select>

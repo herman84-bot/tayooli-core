@@ -66,14 +66,14 @@ export default function ChatPanel() {
             </div>
             <p className="text-sm font-medium text-foreground">Halo! Ada yang bisa saya bantu?</p>
             <p className="text-xs text-muted-foreground mt-1.5 max-w-[320px]">
-              Tanyakan tentang Tayooli ERP — invoice, gudang WMS, kasir POS, approval, atau pembayaran.
+              Tanyakan tentang Tayooli — kasir POS, gudang WMS, surat jalan, transfer, dan stok opname.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-md">
               {[
                 'Bagaimana cara pakai Kasir POS & cetak struk?',
                 'Bagaimana alur transfer stok antar gudang di WMS?',
                 'Cara buat Surat Jalan (DO) dan Stock Opname?',
-                'Cara buat invoice dengan OCR?',
+                'Bagaimana sinkronisasi stok marketplace bekerja?',
               ].map((suggestion) => (
                 <button
                   key={suggestion}

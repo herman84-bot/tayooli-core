@@ -112,7 +112,7 @@ const TAYOOLI_KNOWLEDGE: Array<{
 Dashboard (\`/dashboard\`) menyajikan metrik bisnis terpadu secara real-time:
 1. **Omzet & Penjualan POS**: Total pendapatan kasir harian, jumlah transaksi struk, dan rata-rata belanja.
 2. **Inventori & Pergudangan (WMS)**: Total SKU aktif, jumlah total fisik unit barang, dan mutasi barang harian.
-3. **Pusat Tindakan & Otorisasi**: Notifikasi barang dengan stok menipis (≤ ambang batas aman) dan persetujuan yang menunggu otorisasi Anda.
+3. **Peringatan Stok Menipis**: Notifikasi produk dengan sisa stok di bawah batas aman agar pengadaan dapat segera dilakukan.
 4. **Aksi Cepat**: Tombol pintas untuk langsung membuka Kasir POS, menambah produk, atau memeriksa stok gudang.`,
   },
   {

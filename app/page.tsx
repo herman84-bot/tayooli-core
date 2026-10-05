@@ -7,20 +7,24 @@ import { SiteNav } from "@/components/landing/SiteNav"
 import { Logo } from "@/components/brand/Logo"
 import {
   ArrowRight,
+  Boxes,
   CalendarClock,
   Check,
   CheckCircle2,
   ChevronDown,
+  ClipboardCheck,
   FileSpreadsheet,
   FileWarning,
-  FileText,
   Hourglass,
-  Landmark,
+  LayoutDashboard,
+  Package,
   ScanLine,
+  Settings,
   ShieldCheck,
-  ShoppingCart,
-  Wallet,
-  Workflow,
+  ShoppingBag,
+  Store,
+  Truck,
+  Warehouse,
 } from "lucide-react"
 
 /* ── Reusable styles ─────────────────────────────────────────────────────── */
@@ -44,15 +48,15 @@ const checkIcon =
 
 function HeroMockup() {
   const stats = [
-    { label: "Total Invoice", value: "Rp 1,2 M", sub: "128 invoice bulan ini" },
-    { label: "Disetujui", value: "Rp 890 Jt", sub: "62% dari total" },
-    { label: "Menunggu Persetujuan", value: "12", sub: "3 butuh tindakan Anda" },
+    { label: "Omzet POS Hari Ini", value: "Rp 4,2 Jt", sub: "14 transaksi kasir" },
+    { label: "Fisik di Gudang", value: "1.240 Unit", sub: "3 gudang aktif" },
+    { label: "Peringatan Stok", value: "2 SKU", sub: "Stok di bawah batas aman" },
   ]
   const rows = [
-    { no: "INV-2026-0142", vendor: "PT Nusantara Niaga", amount: "Rp 45.000.000", status: "Review AI", cls: "bg-blue-50 text-blue-700" },
-    { no: "INV-2026-0141", vendor: "CV Karya Mandiri", amount: "Rp 8.750.000", status: "Menunggu", cls: "bg-amber-50 text-amber-700" },
-    { no: "INV-2026-0140", vendor: "PT Maju Jaya", amount: "Rp 24.500.000", status: "Disetujui", cls: "bg-emerald-50 text-emerald-700" },
-    { no: "INV-2026-0139", vendor: "Toko Berkah", amount: "Rp 12.300.000", status: "Ditolak", cls: "bg-rose-50 text-rose-700" },
+    { no: "POS-2026-0042", desc: "Budi Santoso · Kasir Utama", amount: "Rp 450.000", status: "QRIS Lunas", cls: "bg-emerald-50 text-emerald-700" },
+    { no: "DO-2026-0018", desc: "Toko Sinar Jaya · Surat Jalan", amount: "120 Unit", status: "Terkirim", cls: "bg-blue-50 text-blue-700" },
+    { no: "POS-2026-0041", desc: "Pelanggan Tunai", amount: "Rp 125.000", status: "Tunai Lunas", cls: "bg-emerald-50 text-emerald-700" },
+    { no: "TRF-2026-0005", desc: "Gudang Utama → Cabang", amount: "50 Unit", status: "Dalam Pengiriman", cls: "bg-amber-50 text-amber-700" },
   ]
   const bars = [40, 62, 48, 78, 55, 88, 70, 96]
 
@@ -67,28 +71,29 @@ function HeroMockup() {
             <span className="h-2.5 w-2.5 rounded-full bg-zinc-300" />
             <span className="h-2.5 w-2.5 rounded-full bg-zinc-300" />
           </div>
-          <div className="flex-1 rounded-md border border-border bg-background px-3 py-1 text-center text-xs text-muted-foreground">
-            app.tayooli.id/dashboard
+          <div className="flex-1 rounded-md border border-border bg-background px-3 py-1 text-center text-xs text-muted-foreground font-mono">
+            app.tayooli.my.id/dashboard
           </div>
           <span className="hidden rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary sm:block">
-            Demo
+            Standalone ERP
           </span>
         </div>
 
         <div className="flex">
           {/* Fake sidebar */}
-          <div className="hidden w-44 shrink-0 flex-col gap-1 border-r border-border bg-background p-3 sm:flex">
+          <div className="hidden w-48 shrink-0 flex-col gap-1 border-r border-border bg-background p-3 sm:flex">
             <div className="mb-2 flex items-center gap-2 px-2">
               <Logo size={24} />
               <span className="text-xs font-semibold text-foreground">Tayooli</span>
             </div>
             {[
-              { icon: Landmark, label: "Dashboard", active: true },
-              { icon: FileText, label: "Invoice" },
-              { icon: ShoppingCart, label: "Purchase Order" },
-              { icon: Workflow, label: "Persetujuan" },
-              { icon: Wallet, label: "Pembayaran" },
-              { icon: Landmark, label: "Akuntansi" },
+              { icon: LayoutDashboard, label: "Dashboard", active: true },
+              { icon: Package, label: "Products" },
+              { icon: Warehouse, label: "Warehouse & Stock" },
+              { icon: Truck, label: "Surat Jalan (DO)" },
+              { icon: ShoppingBag, label: "Marketplace" },
+              { icon: Store, label: "Point of Sale" },
+              { icon: Settings, label: "Settings" },
             ].map(({ icon: Icon, label, active }) => (
               <div
                 key={label}
@@ -108,13 +113,13 @@ function HeroMockup() {
           <div className="flex-1 space-y-4 bg-background p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-bold text-foreground">Dashboard</div>
+                <div className="text-sm font-bold text-foreground">Dashboard Operasional</div>
                 <div className="text-xs text-muted-foreground">
-                  Ringkasan keuangan September 2026
+                  Kasir POS, pergudangan, dan mutasi barang hari ini
                 </div>
               </div>
-              <div className="hidden rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground sm:block">
-                + Invoice Baru
+              <div className="hidden rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white sm:block">
+                + Buka Kasir POS
               </div>
             </div>
 
@@ -123,16 +128,16 @@ function HeroMockup() {
               {stats.map((s) => (
                 <div key={s.label} className="rounded-lg border border-border bg-card p-3">
                   <div className="text-[11px] text-muted-foreground">{s.label}</div>
-                  <div className="mt-0.5 text-sm font-bold text-foreground sm:text-base">{s.value}</div>
+                  <div className="mt-0.5 text-sm font-bold text-foreground sm:text-base font-mono">{s.value}</div>
                   <div className="mt-0.5 hidden text-[10px] text-muted-foreground lg:block">{s.sub}</div>
                 </div>
               ))}
             </div>
 
             <div className="grid gap-3 lg:grid-cols-5">
-              {/* Invoice table */}
+              {/* Transactions table */}
               <div className="rounded-lg border border-border bg-card p-3 lg:col-span-3">
-                <div className="mb-2 text-xs font-semibold text-foreground">Invoice Terbaru</div>
+                <div className="mb-2 text-xs font-semibold text-foreground">Transaksi Kasir &amp; Pengiriman Terbaru</div>
                 <div className="space-y-1.5">
                   {rows.map((r) => (
                     <div
@@ -141,10 +146,10 @@ function HeroMockup() {
                     >
                       <div className="min-w-0">
                         <div className="font-mono text-[11px] font-medium text-foreground">{r.no}</div>
-                        <div className="truncate text-[10px] text-muted-foreground">{r.vendor}</div>
+                        <div className="truncate text-[10px] text-muted-foreground">{r.desc}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="hidden text-[11px] font-medium text-zinc-700 sm:block">{r.amount}</span>
+                        <span className="hidden text-[11px] font-medium font-mono text-zinc-700 sm:block">{r.amount}</span>
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${r.cls}`}>
                           {r.status}
                         </span>
@@ -156,7 +161,7 @@ function HeroMockup() {
 
               {/* Mini bar chart */}
               <div className="rounded-lg border border-border bg-card p-3 lg:col-span-2">
-                <div className="mb-2 text-xs font-semibold text-foreground">Arus Kas 8 Bulan</div>
+                <div className="mb-2 text-xs font-semibold text-foreground">Tren Omzet Mingguan</div>
                 <div className="flex h-28 items-end gap-1.5">
                   {bars.map((h, i) => (
                     <div
@@ -166,13 +171,13 @@ function HeroMockup() {
                     />
                   ))}
                 </div>
-                <div className="mt-2 flex justify-between text-[9px] text-muted-foreground">
-                  {["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu"].map((m) => (
+                <div className="mt-2 flex justify-between text-[9px] text-muted-foreground font-mono">
+                  {["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min", "Hari ini"].map((m) => (
                     <span key={m}>{m}</span>
                   ))}
                 </div>
                 <div className="mt-3 rounded-md bg-success/10 px-2.5 py-1.5 text-[10px] font-medium text-success">
-                  ▲ +18% dibanding kuartal lalu
+                  ▲ Omzet stabil, stok terkendali
                 </div>
               </div>
             </div>
@@ -180,28 +185,28 @@ function HeroMockup() {
         </div>
       </div>
 
-      {/* Floating approval card */}
+      {/* Floating POS success card */}
       <div className="absolute -right-4 -top-8 hidden w-64 rounded-xl border border-border bg-card p-4 shadow-popover lg:block">
         <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 text-success" />
-          <span className="text-xs font-semibold text-foreground">Persetujuan diterima</span>
+          <Store className="h-4 w-4 text-emerald-600" />
+          <span className="text-xs font-semibold text-foreground">Transaksi Kasir Berhasil</span>
         </div>
         <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-          PO-2026-0142 · PT Nusantara Niaga
+          POS-2026-0042 · QRIS Lunas
           <br />
-          Rp 45.000.000
+          <span className="font-mono font-medium text-foreground">Rp 450.000</span> · Stok otomatis berkurang
         </p>
-        <p className="mt-2 text-[10px] text-muted-foreground">oleh Andi · 2 menit lalu</p>
+        <p className="mt-2 text-[10px] text-muted-foreground">Kasir Toko 1 · Baru saja</p>
       </div>
 
-      {/* Floating AI review card */}
+      {/* Floating DO card */}
       <div className="absolute -bottom-8 -left-4 hidden w-64 rounded-xl border border-border bg-card p-4 shadow-popover lg:block">
         <div className="flex items-center gap-2">
-          <ScanLine className="h-4 w-4 text-primary" />
-          <span className="text-xs font-semibold text-foreground">OCR selesai</span>
+          <Truck className="h-4 w-4 text-primary" />
+          <span className="text-xs font-semibold text-foreground">Surat Jalan Siap Kirim</span>
         </div>
         <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-          INV-2026-0142 terbaca otomatis dari PDF — tanpa salah ketik.
+          DO-2026-0018 ke Toko Sinar Jaya telah dicetak, alokasi armada kurir selesai.
         </p>
       </div>
     </div>
@@ -210,17 +215,17 @@ function HeroMockup() {
 
 function StatsBand() {
   const stats = [
-    { value: "3×", label: "lebih cepat siklus invoice, dari terima hingga bayar" },
-    { value: "98%", label: "akurasi pembacaan OCR dengan review AI" },
-    { value: "24 jam", label: "rata-rata invoice disetujui dengan workflow" },
-    { value: "15+", label: "kanal pembayaran & integrasi siap pakai" },
+    { value: "< 2 dtk", label: "transaksi kasir selesai dan struk thermal tercetak" },
+    { value: "100%", label: "sinkronisasi saldo unit fisik antar gudang dan cabang" },
+    { value: "4 kanal", label: "integrasi marketplace (Tokopedia, Shopee, TikTok, Lazada)" },
+    { value: "12 modul", label: "operasional mandiri tanpa ketergantungan modul enterprise" },
   ]
   return (
     <section className="py-12 sm:py-14">
       <div className={`${container} grid grid-cols-2 gap-x-8 gap-y-8 sm:gap-y-10 lg:grid-cols-4`}>
         {stats.map((s) => (
           <div key={s.value}>
-            <div className="text-3xl font-bold tracking-tight text-primary sm:text-4xl">{s.value}</div>
+            <div className="text-3xl font-bold tracking-tight text-primary sm:text-4xl font-mono">{s.value}</div>
             <p className="mt-1.5 max-w-[220px] text-xs leading-relaxed text-muted-foreground sm:text-sm">
               {s.label}
             </p>
@@ -235,34 +240,34 @@ function ProblemSection() {
   const pains = [
     {
       icon: FileWarning,
-      title: "Invoice tersebar di mana-mana",
-      desc: "Email, Excel, chat — rawan salah input, hilang, dan duplikat. Tidak ada satu sumber kebenaran.",
+      title: "Stok tercatat beda dengan fisik",
+      desc: "Buku catatan menunjukkan ada barang, tapi rak gudang kosong. Pembeli kecewa, pesanan terpaksa dibatalkan.",
     },
     {
       icon: Hourglass,
-      title: "Persetujuan berlarut-larut",
-      desc: "Tagihan menunggu tanda tangan tanpa jejak yang jelas. Tak ada yang tahu di mana proses berhenti.",
+      title: "Antrean kasir menumpuk",
+      desc: "Kasir lama mencari nama produk atau salah menghitung kembalian uang. Antrean panjang saat jam ramai toko.",
     },
     {
       icon: CalendarClock,
-      title: "Pembayaran telat, cash flow tersendat",
-      desc: "Jatuh tempo terlewat, denda menumpuk, dan hubungan dengan vendor mulai renggang.",
+      title: "Overselling di toko online",
+      desc: "Barang laku di toko fisik tapi stok di marketplace belum diubah. Penjual kena penalti pembatalan pesanan.",
     },
     {
       icon: FileSpreadsheet,
-      title: "Laporan dirapikan manual",
-      desc: "Jurnal, rekonsiliasi, dan laporan dikerjakan larut malam di spreadsheet yang gampang salah.",
+      title: "Surat jalan & opname manual",
+      desc: "Surat jalan tulis tangan mudah hilang atau salah nomor armada. Audit stok opname harus tutup toko berhari-hari.",
     },
   ]
   return (
     <section className="bg-card py-16 sm:py-20">
       <div className={container}>
         <div className="max-w-2xl">
-          <p className={eyebrow}>Masalahnya</p>
-          <h2 className={`${sectionTitle} mt-3`}>Finance manual itu mahal — diam-diam.</h2>
+          <p className={eyebrow}>Tantangan Operasional</p>
+          <h2 className={`${sectionTitle} mt-3`}>Kelola stok dan kasir manual itu rawan selisih.</h2>
           <p className={`${sectionLead} mt-4`}>
-            Setiap jam yang dipakai mengetik ulang invoice adalah jam yang tidak dipakai untuk
-            mengelola bisnis. Ini yang terjadi hampir setiap minggu:
+            Waktu Anda habis untuk mencari barang di gudang atau mencocokkan nota manual. Tayooli merapikan
+            alur dari penerimaan barang, kasir toko, hingga pengiriman.
           </p>
         </div>
         <div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
@@ -328,169 +333,167 @@ function FeatureRow({
   )
 }
 
-/** Mini product panels that hint at actual UI without being abstract decorations. */
-function FeatureVisualOCR() {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-card">
-      <div className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <ScanLine className="h-4 w-4" />
-        </div>
-        <span className="text-xs font-semibold text-foreground">OCR & Validation</span>
-        <span className="ml-auto rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">
-          Tervalidasi
-        </span>
-      </div>
-      <div className="mt-4 space-y-2">
-        {[
-          { field: "Vendor", val: "PT Nusantara Niaga" },
-          { field: "No. Invoice", val: "INV-2026-0142" },
-          { field: "Total", val: "Rp 45.000.000" },
-          { field: "PPN", val: "Rp 4.500.000" },
-        ].map((f) => (
-          <div key={f.field} className="flex items-center justify-between rounded-md bg-background px-3 py-2">
-            <span className="text-xs text-muted-foreground">{f.field}</span>
-            <span className="font-mono text-xs font-medium text-foreground">{f.val}</span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 flex items-center gap-2 rounded-md bg-primary/5 px-3 py-2">
-        <Check className="h-3.5 w-3.5 text-success" />
-        <span className="text-[11px] text-muted-foreground">Duplikat tidak terdeteksi · Angka cocok 100%</span>
-      </div>
-    </div>
-  )
-}
-
-function FeatureVisualApproval() {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-card">
-      <div className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Workflow className="h-4 w-4" />
-        </div>
-        <span className="text-xs font-semibold text-foreground">Approval Pipeline</span>
-      </div>
-      <div className="mt-4 space-y-2">
-        {[
-          { step: "Admin", status: "Disetujui", color: "bg-success/10 text-success" },
-          { step: "Akuntan", status: "Disetujui", color: "bg-success/10 text-success" },
-          { step: "Approver", status: "Menunggu", color: "bg-amber-50 text-amber-700" },
-        ].map((s) => (
-          <div key={s.step} className="flex items-center justify-between rounded-md bg-background px-3 py-2">
-            <span className="text-xs font-medium text-foreground">{s.step}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${s.color}`}>{s.status}</span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 flex items-center gap-2 rounded-md bg-background px-3 py-2">
-        <span className="text-[11px] text-muted-foreground">Limit: &gt;Rp 10.000.000 → ApproverRequired</span>
-      </div>
-    </div>
-  )
-}
-
 function FeaturesSection() {
   return (
     <section id="fitur" className="scroll-mt-20 border-t border-border bg-muted/40 py-16 sm:py-20">
       <div className={container}>
         <div className="max-w-2xl">
-          <p className={eyebrow}>Satu sistem, seluruh alur</p>
+          <p className={eyebrow}>12 Modul Terpadu</p>
           <h2 className={`${sectionTitle} mt-3`}>
-            Dari invoice diterima sampai jurnal tercatat — tanpa bolak-balik.
+            Dari kasir toko, gudang, hingga surat jalan — semua terhubung.
           </h2>
           <p className={`${sectionLead} mt-4`}>
-            Tayooli menutup seluruh siklus order-to-pay dan order-to-cash untuk bisnis Indonesia,
-            dengan otomatisasi di titik-titik yang paling sering menguras waktu.
+            Tayooli dirancang khusus untuk toko ritel, grosir, dan distributor di Indonesia yang butuh
+            sistem cepat tanpa menu enterprise yang membingungkan.
           </p>
         </div>
 
         <div className="mt-14 space-y-16 sm:space-y-20">
           <FeatureRow
-            eyebrowLabel="Hemat Waktu"
-            title="Invoice dibaca mesin, bukan diketik"
-            desc="Upload PDF atau foto — OCR membaca, AI memvalidasi, lalu invoice masuk alur persetujuan. Tanpa salah ketik, tanpa input ulang."
+            eyebrowLabel="Kasir Cepat & Struk"
+            title="Kasir POS toko dengan barcode scanner"
+            desc="Layani transaksi pelanggan dalam hitungan detik. Scan barcode kemasan, hitung kembalian otomatis, dan cetak struk thermal 58mm atau 80mm."
             bullets={[
-              "OCR otomatis dari PDF dan foto, angka terbaca presisi",
-              "AI mendeteksi anomali, duplikat, dan selisih jumlah",
-              "Data tervalidasi sebelum pernah menyentuh pembukuan",
+              "Mendukung scan barcode via kamera HP/laptop dan scanner USB/Bluetooth",
+              "Pilihan pembayaran fleksibel: Tunai, QRIS, dan Kartu Debit",
+              "Saldo stok gudang langsung terpotong saat transaksi selesai",
             ]}
-            visual={<FeatureVisualOCR />}
+            visual={
+              <div className="rounded-xl border border-border bg-card p-5 shadow-card">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600/10 text-emerald-600">
+                    <Store className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">Point of Sale (POS)</span>
+                  <span className="ml-auto rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[10px] font-medium">
+                    Kasir Aktif
+                  </span>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {[
+                    { item: "Kopi Susu Gula Aren 250ml", qty: "2 pcs", val: "Rp 36.000" },
+                    { item: "Minyak Goreng Sawit 2L", qty: "1 pouch", val: "Rp 34.000" },
+                    { item: "Gula Pasir Kristal 1kg", qty: "2 pack", val: "Rp 29.000" },
+                  ].map((f) => (
+                    <div key={f.item} className="flex items-center justify-between rounded-md bg-background px-3 py-2">
+                      <div className="min-w-0 pr-2">
+                        <div className="text-xs font-medium text-foreground truncate">{f.item}</div>
+                        <div className="text-[10px] text-muted-foreground">{f.qty}</div>
+                      </div>
+                      <span className="font-mono text-xs font-semibold text-foreground shrink-0">{f.val}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center justify-between rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 px-3 py-2">
+                  <span className="text-xs font-medium text-emerald-800 dark:text-emerald-200">Total Belanja (QRIS)</span>
+                  <span className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-300">Rp 99.000</span>
+                </div>
+              </div>
+            }
           />
+
           <FeatureRow
-            eyebrowLabel="Alur Terkendali"
-            title="Persetujuan yang jelas, tanpa kejar-kejaran"
-            desc="Aturan approval berbasis peran: siapa menyetujui, berapa limitnya, dan apa yang terjadi setelahnya — semua tercatat."
+            eyebrowLabel="Logistik & Distribusi"
+            title="Kelola multi-gudang dan terbitkan Surat Jalan (DO)"
+            desc="Kendalikan pergerakan barang antar gudang cabang. Terbitkan dokumen Surat Jalan resmi berstandar ekspedisi Indonesia dalam format cetak rapi."
             bullets={[
-              "Alur PO → GR → persetujuan → payment order yang utuh",
-              "Peran admin, akuntan, dan approver dengan limit berbeda",
-              "Jejak audit lengkap untuk setiap keputusan",
-            ]}
-            visual={<FeatureVisualApproval />}
-            reversed
-          />
-          <FeatureRow
-            eyebrowLabel="Keuangan Akurat"
-            title="Jurnal terisi sendiri dari setiap transaksi"
-            desc="Setiap invoice dan pembayaran yang disetujui otomatis membentuk jurnal — chart of accounts dan laporan selalu selaras."
-            bullets={[
-              "Chart of accounts & jurnal otomatis tanpa entri ganda",
-              "Rekonsiliasi pembayaran real-time via webhook",
-              "Dashboard: status invoice, arus kas, top vendor",
+              "Monitoring stok unit fisik per rak dan lokasi gudang",
+              "Alur transfer stok cabang: Draft → Pending → In Transit → Received",
+              "Cetak Surat Jalan Delivery Order lengkap nomor polisi dan nama kurir",
             ]}
             visual={
               <div className="rounded-xl border border-border bg-card p-5 shadow-card">
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Landmark className="h-4 w-4" />
+                    <Truck className="h-4 w-4" />
                   </div>
-                  <span className="text-xs font-semibold text-foreground">Jurnal Otomatis</span>
+                  <span className="text-xs font-semibold text-foreground">Surat Jalan (DO)</span>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {[
+                    { label: "Nomor DO", val: "DO-2026-0018" },
+                    { label: "Tujuan Pengiriman", val: "Toko Sinar Jaya, Bekasi" },
+                    { label: "Armada / Sopir", val: "B 9876 KDA (Sulaeman)" },
+                    { label: "Total Muatan", val: "120 Karton" },
+                  ].map((s) => (
+                    <div key={s.label} className="flex items-center justify-between rounded-md bg-background px-3 py-2">
+                      <span className="text-xs text-muted-foreground">{s.label}</span>
+                      <span className="font-mono text-xs font-medium text-foreground">{s.val}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-2 rounded-md bg-primary/5 px-3 py-2">
+                  <Check className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-[11px] text-muted-foreground">Siap cetak format resmi tanda terima</span>
+                </div>
+              </div>
+            }
+            reversed
+          />
+
+          <FeatureRow
+            eyebrowLabel="Akurasi Inventori"
+            title="Stock Opname berkala & pencatatan barang rusak"
+            desc="Audit stok fisik tanpa perlu menghentikan penjualan toko. Rekonsiliasi selisih hitung otomatis, pisahkan barang cacat atau kadaluwarsa ke gudang scrap."
+            bullets={[
+              "Pencatatan opname fisik cepat per kategori atau per lorong rak",
+              "Penyesuaian selisih otomatis tercatat di buku besar mutasi",
+              "Pencatatan afkir/scrap agar stok yang rusak tidak ikut terjual",
+            ]}
+            visual={
+              <div className="rounded-xl border border-border bg-card p-5 shadow-card">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <ClipboardCheck className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs font-semibold text-foreground">Audit Stock Opname</span>
                 </div>
                 <div className="mt-4 space-y-2">
                   <div className="rounded-md bg-background px-3 py-2">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Debit</div>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">SKU: MAS-KOP-001</div>
                     <div className="mt-0.5 flex items-center justify-between">
-                      <span className="text-xs text-foreground">Beban Operasional</span>
-                      <span className="font-mono text-xs font-medium text-foreground">45.000.000</span>
+                      <span className="text-xs text-foreground">Kopi Susu Gula Aren</span>
+                      <span className="font-mono text-xs font-medium text-foreground">Sistem: 50 · Fisik: 48 (-2)</span>
                     </div>
                   </div>
                   <div className="rounded-md bg-background px-3 py-2">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Kredit</div>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">SKU: MAS-OIL-002</div>
                     <div className="mt-0.5 flex items-center justify-between">
-                      <span className="text-xs text-foreground">Piutang Usaha</span>
-                      <span className="font-mono text-xs font-medium text-foreground">45.000.000</span>
+                      <span className="text-xs text-foreground">Minyak Goreng 2L</span>
+                      <span className="font-mono text-xs font-medium text-foreground">Sistem: 30 · Fisik: 30 (Cocok)</span>
                     </div>
                   </div>
                 </div>
                 <div className="mt-3 flex items-center gap-2 rounded-md bg-success/5 px-3 py-2">
                   <Check className="h-3.5 w-3.5 text-success" />
-                  <span className="text-[11px] text-muted-foreground">Jurnal tercatat otomatis · COA sinkron</span>
+                  <span className="text-[11px] text-muted-foreground">Selisih 2 botol dialihkan ke catatan scrap rusak</span>
                 </div>
               </div>
             }
           />
+
           <FeatureRow
-            eyebrowLabel="Siap Bayar"
-            title="Dibayar lewat kanal favorit pelanggan"
-            desc="Terhubung dengan payment gateway lokal, dengan status pembayaran yang sinkron sampai ke pembukuan."
+            eyebrowLabel="Omnichannel Ritel"
+            title="Sinkronisasi stok dengan toko online"
+            desc="Cegah overselling saat produk laku bersamaan di toko fisik dan marketplace. Saldo stok selalu termutakhirkan secara konsisten."
             bullets={[
-              "Pakasir & Midtrans terpasang, tinggal isi kredensial",
-              "Status pembayaran terpantau real-time",
-              "Multi-tenant dengan isolasi data (RLS) di setiap lapisan",
+              "Mendukung alokasi stok untuk Tokopedia, Shopee, TikTok, dan Lazada",
+              "Peringatan stok menipis otomatis sebelum persediaan kosong",
+              "Riwayat mutasi keluar masuk barang transparan dan rapi",
             ]}
             visual={
               <div className="rounded-xl border border-border bg-card p-5 shadow-card">
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Wallet className="h-4 w-4" />
+                    <ShoppingBag className="h-4 w-4" />
                   </div>
-                  <span className="text-xs font-semibold text-foreground">Payment Channels</span>
+                  <span className="text-xs font-semibold text-foreground">Saluran Marketplace</span>
                 </div>
                 <div className="mt-4 space-y-2">
                   {[
-                    { name: "Pakasir", status: "Terhubung", color: "bg-success/10 text-success" },
-                    { name: "Midtrans", status: "Terhubung", color: "bg-success/10 text-success" },
-                    { name: "Transfer Bank", status: "Aktif", color: "bg-primary/10 text-primary" },
+                    { name: "Tokopedia", status: "Terhubung", color: "bg-success/10 text-success" },
+                    { name: "Shopee", status: "Terhubung", color: "bg-success/10 text-success" },
+                    { name: "TikTok Shop", status: "Aktif", color: "bg-primary/10 text-primary" },
                   ].map((g) => (
                     <div key={g.name} className="flex items-center justify-between rounded-md bg-background px-3 py-2">
                       <span className="text-xs font-medium text-foreground">{g.name}</span>
@@ -512,18 +515,18 @@ function HowItWorks() {
   const steps = [
     {
       n: "01",
-      title: "Daftar & undang tim",
-      desc: "Buat workspace, undang admin, akuntan, dan approver. Atur peran dan limit persetujuan sekali.",
+      title: "Input master produk & gudang",
+      desc: "Daftarkan SKU produk, harga modal, harga jual ritel, dan tentukan gudang atau lokasi penyimpanan fisik Anda.",
     },
     {
       n: "02",
-      title: "Masukkan data tanpa mengetik",
-      desc: "Upload invoice (OCR membacanya otomatis) atau buat PO dan goods receipt langsung di sistem.",
+      title: "Jalankan kasir POS & mutasi barang",
+      desc: "Mulai transaksi belanja di toko fisik dengan scanner barcode dan terbitkan Surat Jalan resmi saat mengirim barang.",
     },
     {
       n: "03",
-      title: "Setujui, bayar, lacak",
-      desc: "Alur approval berjalan, payment order terbit, dan setiap status terpantau real-time sampai jurnal.",
+      title: "Pantau omzet & stok real-time",
+      desc: "Stok gudang otomatis terpotong, laporan omzet harian langsung terangkum, dan alarm stok menipis siap mengingatkan Anda.",
     },
   ]
   return (
@@ -531,10 +534,10 @@ function HowItWorks() {
       <div className={container}>
         <div className="max-w-2xl">
           <p className={eyebrow}>Cara Kerja</p>
-          <h2 className={`${sectionTitle} mt-3`}>Produktif dalam tiga langkah.</h2>
+          <h2 className={`${sectionTitle} mt-3`}>Mudah digunakan dalam tiga langkah.</h2>
           <p className={`${sectionLead} mt-4`}>
-            Tidak perlu implementasi berbulan-bulan. Alur yang sama dengan tim finance Anda, hanya
-            tanpa kerja manual.
+            Tidak butuh pelatihan berminggu-minggu. Tim kasir dan staf gudang Anda bisa langsung
+            mengoperasikannya pada hari pertama.
           </p>
         </div>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
@@ -555,29 +558,29 @@ function Testimonials() {
   const items = [
     {
       quote:
-        "Sebelumnya invoice kami numpuk di email dan Excel. Sekarang OCR langsung baca, approver tinggal klik — siklus pembayaran turun dari dua minggu jadi tiga hari.",
+        "Dulu kasir sering antre lama saat pembeli ramai karena harus cari harga manual. Pakai scanner barcode Tayooli, transaksi selesai dalam hitungan detik dan struk langsung keluar.",
       name: "Rina Puspitasari",
-      role: "Finance Manager, PT Nusantara Niaga",
+      role: "Manajer Toko, Ritel Sembako Modern",
     },
     {
       quote:
-        "Yang saya suka: alur persetujuannya jelas. Tidak ada lagi invoice hilang di meja orang. Semua ada jejaknya, dan laporan akuntansi terisi sendiri.",
+        "Pengiriman ke agen distributor sekarang rapi dengan Surat Jalan resmi. Sopir bawa dokumen bertanda tangan lengkap dan stok gudang otomatis terpotong.",
       name: "Budi Santoso",
-      role: "Owner, CV Karya Mandiri",
+      role: "Kepala Gudang, CV Niaga Sejahtera",
     },
     {
       quote:
-        "Kami menjalankan tiga entitas. Isolasi data per tenant bikin audit tenang, dan pembayaran via gateway lokal langsung tersinkron ke pembukuan.",
+        "Sangat terbantu dengan fitur Stock Opname dan transfer cabang. Selisih barang langsung ketahuan dan tidak ada lagi pesanan marketplace yang dibatalkan karena kehabisan stok.",
       name: "Dewi Lestari",
-      role: "Head of Finance, PT IndoLogistik",
+      role: "Pemilik Usaha, Grosir Berkah Mandiri",
     },
   ]
   return (
     <section className="py-16 sm:py-20">
       <div className={container}>
         <div className="max-w-2xl">
-          <p className={eyebrow}>Testimoni</p>
-          <h2 className={`${sectionTitle} mt-3`}>Dipakai tim finance yang butuh ketenangan.</h2>
+          <p className={eyebrow}>Pengalaman Pengguna</p>
+          <h2 className={`${sectionTitle} mt-3`}>Diandalkan pelaku usaha toko &amp; gudang.</h2>
         </div>
         <div className="mt-12 grid gap-8 sm:gap-6 md:grid-cols-3">
           {items.map((t) => (
@@ -600,28 +603,28 @@ function Testimonials() {
 function Faq() {
   const items = [
     {
-      q: "Apakah Tayooli bisa membaca invoice dari PDF atau foto?",
-      a: "Bisa. Upload file dan OCR membacanya otomatis, lalu AI memvalidasi angka, mendeteksi anomali atau duplikat sebelum invoice masuk alur persetujuan. Anda tetap bisa mengoreksi sebelum disetujui.",
+      q: "Apakah kasir POS bisa digunakan dengan alat barcode scanner?",
+      a: "Bisa. Anda dapat menggunakan kamera bawaan perangkat atau alat barcode scanner laser eksternal (USB/Bluetooth) tipe plug-and-play tanpa driver tambahan.",
     },
     {
-      q: "Bagaimana alur persetujuan bekerja?",
-      a: "Anda mengatur peran (admin, akuntan, approver) beserta limitnya. Invoice atau PO yang melewati limit otomatis masuk antrean approver yang sesuai — semua keputusan terekam dalam jejak audit.",
+      q: "Format printer apa yang didukung untuk cetak struk kasir?",
+      a: "Kasir POS mendukung pencetakan ke printer thermal ukuran standar 58mm dan 80mm secara langsung dari browser.",
     },
     {
-      q: "Apakah ada biaya per transaksi?",
-      a: "Tidak. Langganan bersifat flat per bulan. Biaya dari payment gateway hanya muncul jika Anda memakainya, sesuai tarif gateway itu sendiri.",
+      q: "Apakah Surat Jalan (DO) bisa langsung dicetak?",
+      a: "Ya. Setiap Surat Jalan yang diterbitkan sudah memiliki layout cetak standar bisnis Indonesia lengkap dengan kolom nomor polisi kendaraan, nama sopir, dan tanda terima barang.",
     },
     {
-      q: "Bagaimana keamanan data antar-perusahaan?",
-      a: "Tayooli multi-tenant dengan row-level security di PostgreSQL — data setiap tenant terisolasi di tingkat database, bukan sekadar di aplikasi.",
+      q: "Bagaimana cara kerja transfer stok antar gudang?",
+      a: "Transfer stok memiliki alur jelas: pengajuan (Draft), persetujuan staf, barang dalam perjalanan (In Transit), hingga diterima dan diverifikasi oleh gudang tujuan.",
     },
     {
       q: "Bisa dicoba tanpa kartu kredit?",
-      a: "Tentu. 14 hari gratis, tanpa kartu kredit, batalkan kapan saja. Untuk melihat langsung, masuk dengan akun demo: admin@test.com / password123.",
+      a: "Tentu. 14 hari gratis tanpa kartu kredit. Anda juga dapat masuk ke akun demo pengujian menggunakan admin@test.com / password123.",
     },
     {
-      q: "Bagaimana integrasi dengan bank atau gateway lain?",
-      a: "Pakasir dan Midtrans sudah terpasang. Untuk kebutuhan khusus, tersedia akses API — tim kami bisa membahas kustomisasi untuk Enterprise.",
+      q: "Apakah data antar toko atau cabang terpisah aman?",
+      a: "Ya. Tayooli menggunakan arsitektur multi-tenant dengan keamanan Row-Level Security di database PostgreSQL sehingga data antar akun terlindungi secara ketat.",
     },
   ]
   return (
@@ -629,7 +632,7 @@ function Faq() {
       <div className={container}>
         <div className="max-w-2xl">
           <p className={eyebrow}>FAQ</p>
-          <h2 className={`${sectionTitle} mt-3`}>Pertanyaan yang sering ditanyakan.</h2>
+          <h2 className={`${sectionTitle} mt-3`}>Pertanyaan yang sering diajukan.</h2>
         </div>
         <div className="mt-10 max-w-3xl space-y-3">
           {items.map((item) => (
@@ -660,11 +663,10 @@ function FinalCta() {
               Mulai Sekarang
             </p>
             <h2 className="mt-4 text-2xl font-bold tracking-tight text-background sm:text-4xl">
-              Keuangan yang tenang dan terkendali.
+              Operasional toko &amp; gudang lebih teratur.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-background/70 sm:text-base">
-              Gratis 14 hari. Tanpa kartu kredit. Batalkan kapan saja — invoice, persetujuan, dan
-              pembayaran Anda beres sebelum akhir pekan.
+              Coba gratis 14 hari tanpa kartu kredit. Kelola transaksi kasir, stok fisik, dan pengiriman barang Anda dalam satu sistem yang rapi.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
@@ -691,7 +693,7 @@ function FinalCta() {
 function Footer() {
   const cols = [
     {
-      title: "Produk",
+      title: "Modul",
       links: [
         { label: "Fitur", href: "#fitur" },
         { label: "Cara Kerja", href: "#cara-kerja" },
@@ -708,11 +710,11 @@ function Footer() {
       ],
     },
     {
-      title: "Perusahaan",
+      title: "Aplikasi",
       links: [
-        { label: "Tentang", href: "#" },
-        { label: "Keamanan", href: "#" },
-        { label: "Kontak", href: "#" },
+        { label: "Kasir POS", href: "/login" },
+        { label: "Gudang (WMS)", href: "/login" },
+        { label: "Surat Jalan", href: "/login" },
       ],
     },
   ]
@@ -726,8 +728,7 @@ function Footer() {
               <span className="text-lg font-semibold tracking-tight text-foreground">Tayooli</span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              ERP order-to-pay & order-to-cash untuk bisnis Indonesia — invoice, persetujuan, dan
-              pembayaran dalam satu alur yang tenang.
+              Sistem manajemen operasional ritel, multi-gudang (WMS), dan kasir POS untuk bisnis Indonesia.
             </p>
           </div>
           {cols.map((col) => (
@@ -749,10 +750,10 @@ function Footer() {
           ))}
         </div>
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-border pt-6 sm:flex-row sm:items-center">
-          <p className="text-xs text-muted-foreground">© 2026 Tayooli. Dibuat untuk finance yang tenang.</p>
+          <p className="text-xs text-muted-foreground">&copy; 2026 Tayooli. Sistem Manajemen Ritel &amp; Pergudangan.</p>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-            Data terisolasi per tenant · TLS & RLS
+            Data terisolasi per tenant · Keamanan RLS PostgreSQL
           </p>
         </div>
       </div>
@@ -791,15 +792,15 @@ export default async function LandingPage() {
         <div className={`${container} pt-12 sm:pt-16 lg:pt-20`}>
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-medium text-primary">
-              <span className="h-1.5 w-1.5 rounded-full bg-success" />
-              AI-driven ERP · Order-to-Pay & Order-to-Cash
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+              Sistem Operasional Toko Ritel &amp; Pergudangan WMS
             </span>
             <h1 className="mt-5 text-4xl font-bold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-5xl xl:text-[3.4rem]">
-              Tagihan beres, pembayaran lancar, laporan akurat.
+              Stok gudang rapi, kasir cepat, pengiriman terkontrol.
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Tayooli menyatukan invoice (OCR + AI), persetujuan, dan pembayaran dalam satu alur —
-              dari PO hingga jurnal. Otomatis, aman, dan dibangun untuk bisnis Indonesia.
+              Tayooli menyatukan transaksi kasir toko fisik (POS), manajemen stok multi-gudang,
+              surat jalan (DO), dan sinkronisasi marketplace dalam satu alur kerja yang mudah digunakan.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link href="/login" className={ctaPrimary}>
@@ -811,7 +812,7 @@ export default async function LandingPage() {
               </Link>
             </div>
             <p className="mt-5 text-xs text-muted-foreground">
-              Tanpa kartu kredit · Batalkan kapan saja · Coba akun demo:{" "}
+              Tanpa kartu kredit · Batalkan kapan saja · Akun demo pengujian:{" "}
               <span className="font-mono text-foreground/80">admin@test.com</span>
             </p>
           </div>
