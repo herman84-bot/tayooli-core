@@ -1,145 +1,97 @@
 # Tayooli ERP Core (Standalone)
 
-Standalone, high-performance B2B Enterprise Resource Planning (ERP) platform designed for self-hosting on affordable VPS infrastructure (1–2 vCPU, 1–2 GB RAM).
-
-Decoupled from heavy message brokers (Kafka) and cloud AI bloat, this core edition is laser-focused on daily retail, warehouse, and financial operations.
+> 📖 **PANDUAN PENTING UNTUK DEVELOPER & AI AGENT**:  
+> Repositori ini adalah **hasil pecahan dan penyederhanaan mandiri (*standalone decoupling*)** dari repositori enterprise `Erp-Like-PAPER-ID`.  
+> Untuk panduan lengkap orientasi, batasan arsitektur, dan aturan pengerjaan agar tidak bingung, silakan baca:  
+> 👉 **[`AI_ONBOARDING_GUIDE.md`](./AI_ONBOARDING_GUIDE.md)** dan **[`ARCHITECTURE.md`](./ARCHITECTURE.md)**.
 
 ---
 
-## 🚀 Fitur Utama
+## 📌 Latar Belakang & Asal-Usul Proyek
 
-1. **Dashboard Eksekutif**:
-   - Konsolidasi real-time omzet POS harian/total, struk kasir, pelanggan aktif.
-   - Metrik pergudangan WMS (total unit fisik, gudang aktif, mutasi harian).
-   - Widget peringatan stok menipis (Low Stock Alert).
-   - Trend invoice pembelian 6 bulan & Top 5 vendor.
+Sistem ERP ini sebelumnya tergabung dalam repositori monolitik `Erp-Like-PAPER-ID` yang di-deploy pada server Google Cloud Platform (GCP). Karena kebutuhan pasar UMKM dan bisnis ritel/gudang di Indonesia memerlukan sistem yang **ringan, cepat, mandiri, dan dapat di-host dengan biaya terjangkau**, maka fitur inti diekstraksi ke repositori terpisah ini: **`tayooli-core`**.
 
-2. **POS (Point of Sale / Kasir)**:
-   - Antarmuka kasir cepat, barcode scanner support, mode direct sale.
-   - Kalkulasi diskon, pajak, nominal bayar, dan uang kembalian.
-   - **Pemotongan stok gudang otomatis** secara real-time saat transaksi selesai.
-   - Cetak struk kasir (printer thermal ESC/POS 58mm/80mm & cetak standar).
-   - Riwayat struk & cetak ulang.
+### Perbedaan Utama:
 
-3. **Gudang & Inventori (WMS)**:
-   - Master Produk & SKU unik per tenant.
-   - Manajemen Multi-Gudang & Hierarki Lokasi Rak/Palet.
-   - Siklus Transfer Antar-Gudang (Draft $\rightarrow$ Pending Approval $\rightarrow$ Approved/Rejected $\rightarrow$ In Transit $\rightarrow$ Received).
-   - Stock Opname fisik & penyesuaian selisih stok.
-   - Penerbitan Surat Jalan resmi (Delivery Order).
+| Komponen | Repositori Induk (`Erp-Like-PAPER-ID`) | Repositori Ini (`tayooli-core`) |
+| :--- | :--- | :--- |
+| **Fokus Bisnis** | Korporat besar (P2P, O2C, Multi-ledger, Approval matriks) | Ritel, Pergudangan WMS, Kasir POS mandiri |
+| **Server & Hosting** | Google Cloud Platform (GCP) VM (`104.197.178.237`) | **Zeabur PaaS** (`https://tayooli.my.id`) |
+| **Broker Pesan** | Apache Kafka (KRaft mode) | Dipangkas / Tidak diperlukan (*Zero bloat*) |
+| **AI Worker** | Worker Python gRPC terpisah | Ringan / Terintegrasi langsung via Next.js API |
+| **Modul UI** | Lusinan modul enterprise | **Tepat 12 Modul Operasional Inti** |
 
-4. **Keuangan & Akuntansi (Finance & Accounting)**:
-   - **Procure-to-Pay (AP)**: Vendor Invoices, Purchase Orders (PO), Goods Receipts (GR), 3-Way Matching, Payment Orders, dan Approval Requests.
-   - **Order-to-Cash (AR)**: Pelanggan (Customers), Pesanan Penjualan (Sales Orders), dan Faktur Penjualan (Sales Invoices).
-   - **Buku Besar**: Bagan Akun (Chart of Accounts) & Jurnal Umum (Journal Entries).
+---
 
-5. **Akun & Multi-Tenancy (Auth & Tenancy)**:
-   - Row-Level Security (RLS) PostgreSQL tingkat lanjut (isolasi data antar tenant).
-   - Registrasi, Login sesi berbasis HttpOnly JWT Cookie.
-   - Onboarding Workspace mandiri.
-   - Integrasi Brevo HTTP API v3 (dan fallback SMTP) untuk pengiriman email verifikasi dan reset password.
-   - Manajemen Anggota Tim & Hak Akses (Role-Based Access Control).
+## 🚀 12 Modul Operasional Inti (The 12 Core Modules)
+
+Sistem antarmuka `tayooli-core` dirancang terstruktur dalam 4 kelompok hierarki yang bersih:
+
+### 1. OVERVIEW
+- **Dashboard (`/dashboard`)**: Ringkasan performa omzet POS harian, jumlah transaksi kasir, total fisik stok barang di seluruh gudang, serta pusat peringatan barang menipis (*Low Stock Alert*).
+
+### 2. INVENTORY
+- **Products (`/products`)**: Master data barang, pengelolaan SKU unik, harga modal (HPP), harga jual ritel, batas stok aman, dan barcode kemasan.
+
+### 3. WAREHOUSE & POS
+- **Warehouse & Stock (`/wms`)**: Manajemen multi-gudang, pemantauan saldo unit fisik per rak/lokasi, dan buku besar mutasi keluar-masuk barang.
+- **Surat Jalan DO (`/wms/delivery-orders`)**: Penerbitan, alokasi armada/ekspedisi, dan cetak dokumen resmi Delivery Order (DO) berstandar bisnis Indonesia.
+- **Marketplace Omnichannel (`/wms/marketplace`)**: Sinkronisasi stok terpusat lintas channel (Tokopedia, Shopee, TikTok Shop, Lazada) guna mencegah *overselling*.
+- **Stock Transfers (`/wms/transfers`)**: Alur perpindahan barang antar gudang (*Draft $\rightarrow$ Pending Approval $\rightarrow$ In Transit $\rightarrow$ Received*).
+- **Stock Opname (`/wms/opname`)**: Audit fisik berkala dan penyesuaian selisih (*variance reconciliation*) otomatis.
+- **Barang Rusak / Scrap (`/wms/scrap`)**: Pencatatan barang cacat, afkir, kadaluwarsa, dan eksekusi *write-off* pengurangan stok dari gudang aktif.
+- **Barcode Scanner (`/wms/scanner`)**: Pemindaian barcode produk dengan kamera laptop/ponsel maupun alat scanner gun eksternal.
+- **Point of Sale (`/pos`)**: Kasir kasir cepat toko fisik, barcode input, perhitungan uang kembalian, cetak struk thermal 58mm/80mm, serta pemotongan stok gudang secara otomatis.
+
+### 4. ACCOUNT
+- **Settings (`/settings`)**: Konfigurasi profil perusahaan, preferensi mata uang (IDR), pengaturan tarif PPN, dan keamanan akun.
+- **Help & Support (`/help`)**: Asisten AI panduan resmi Tayooli Support dan pelaporan tiket kendala teknis.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Backend**: Go 1.23 (Chi router, Clean/Hexagonal Architecture, pure `database/sql` without ORM).
-- **Frontend**: Next.js 15 (App Router, TypeScript, Tailwind CSS, TanStack Query, Zustand, ZenSpace Design System).
-- **Database**: PostgreSQL 15 (dengan Row-Level Security).
-- **Gateway**: Nginx Reverse Proxy (Single-Domain architecture).
+- **Frontend**: Next.js 15 (App Router, React 19, TypeScript strict mode, Tailwind CSS, TanStack Query v5, Zustand).
+- **Backend**: Go 1.24 (Chi router, Clean/Hexagonal Architecture, pure `database/sql` & `pgx`, zero ORM).
+- **Database**: PostgreSQL 15 (Row-Level Security multi-tenant).
+- **Support Engine**: Native AI Assistant with built-in 12-module Indonesian ERP knowledge engine and clean markdown parser.
 
 ---
 
-## 📦 Panduan Deploy ke VPS (Docker Compose)
+## 💻 Panduan Menjalankan Secara Lokal (Local Development)
 
-### Prasyarat di VPS:
-- Ubuntu 22.04 LTS atau 24.04 LTS (RAM minimal 1 GB atau 2 GB).
-- Docker & Docker Compose plugin terpasang:
-  ```bash
-  sudo apt update && sudo apt install -y docker.io docker-compose-plugin
-  sudo systemctl enable --now docker
-  ```
-
-### Langkah 1: Clone Repository
+### 1. Menjalankan Frontend
 ```bash
-git clone https://github.com/herman84-bot/tayooli-core.git /opt/tayooli
-cd /opt/tayooli
-```
+# Masuk ke direktori tayooli-core
+cd tayooli-core
 
-### Langkah 2: Konfigurasi Environment
-Salin file template `.env.example`:
-```bash
-cp .env.example .env
-nano .env
-```
-Sesuaikan variabel berikut:
-- `DB_PASSWORD`: Password database PostgreSQL baru yang kuat.
-- `JWT_SECRET`: Token acak minimal 32 karakter (misal hasil dari `openssl rand -hex 32`).
-- `APP_URL`: Alamat domain Anda (contoh: `https://erp.domainanda.com` atau `http://IP_VPS`).
-- `FRONTEND_ORIGIN`: Sama dengan `APP_URL`.
-- `BREVO_API_KEY`: Kunci API Brevo jika ingin mengaktifkan pengiriman email (opsional).
+# Install dependensi
+npm install --legacy-peer-deps
 
-### Langkah 3: Jalankan Aplikasi
-```bash
-docker compose up -d --build
-```
-Sistem akan otomatis:
-1. Menjalankan container PostgreSQL 15 dan mengeksekusi seluruh migrasi database (`001` s/d `027`).
-2. Meng-compile backend Go ke static binary yang sangat ringan.
-3. Membangun Next.js ke mode standalone.
-4. Menyalakan Nginx reverse proxy di port 80.
-
-Cek status layanan:
-```bash
-docker compose ps
-```
-
----
-
-## 🌐 Menghubungkan Domain & SSL (HTTPS)
-
-1. Arahkan **DNS A Record** domain Anda (misal `erp.domainanda.com`) ke IP publik VPS Anda.
-2. Edit `nginx/nginx.conf` di baris `server_name`:
-   ```nginx
-   server_name erp.domainanda.com;
-   ```
-3. Pasang sertifikat SSL gratis dengan Certbot:
-   ```bash
-   sudo apt install -y certbot python3-certbot-nginx
-   sudo certbot --nginx -d erp.domainanda.com
-   ```
-4. Restart Nginx:
-   ```bash
-   docker compose restart nginx
-   ```
-
----
-
-## 💻 Menjalankan Frontend Secara Lokal
-Untuk menjalankan frontend secara lokal:
-```bash
+# Jalankan dev server (Otomatis berjalan di Port 3000)
 npm run dev
-# Aplikasi siap diakses di http://localhost:3000
 ```
-> **PENTING UNTUK PENGEMBANG & AI AGENT:**
-> - Port aplikasi frontend Tayooli di lokal adalah **`http://localhost:3000`**.
-> - Jangan gunakan port **`3080`** (port 3080 adalah port antarmuka DeepSeek Harness GUI, bukan aplikasi Tayooli).
+Akses di browser: **`http://localhost:3000`**  
+*(Catatan: Jangan gunakan Port 3080 karena port tersebut adalah port DeepSeek Harness GUI).*
 
----
-
-## 🧪 Pengujian & Verifikasi Lokal
-
-Untuk menjalankan pengujian unit secara lokal:
-
-**Backend Go:**
+### 2. Menjalankan Backend Go (Opsional)
 ```bash
 cd backend/go-core
-go test ./...
+go run cmd/api/main.go
 ```
+Backend berjalan di port `8081`. Frontend secara bawaan telah dikonfigurasi untuk meneruskan API proxy ke backend Zeabur (`https://tayooli-backend.zeabur.app`) atau backend lokal jika aktif.
 
-**Frontend Next.js:**
-```bash
-npm test
-npx tsc --noEmit
-```
+---
+
+## 🌐 Alur Deployment Produksi (Zeabur PaaS)
+
+1. Repository terhubung ke **Zeabur PaaS**:
+   - Frontend: `https://tayooli.my.id` (A record: `43.157.210.155`).
+   - Backend: `https://tayooli-backend.zeabur.app`.
+2. Setiap kali perubahan di-push ke branch `main`:
+   ```bash
+   git add .
+   git commit -m "feat/fix: deskripsi perubahan"
+   git push origin main
+   ```
+   Zeabur akan otomatis melakukan proses *build & deploy* secara mandiri.
