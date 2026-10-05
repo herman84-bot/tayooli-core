@@ -46,6 +46,9 @@ test-results/
 # Graphify AST cache output (regenerable tool artifact)
 graphify-out/
 
+# Code graph cache (regenerable, built locally by codegraph CLI)
+.codegraph/
+
 # One-off QA/debug scripts. These are throwaway and frequently embed live
 # credentials, so they stay local. Durable smoke scripts are re-included below.
 scripts/*

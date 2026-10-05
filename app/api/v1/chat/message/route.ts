@@ -133,19 +133,20 @@ async function queryExternalAI(prompt: string): Promise<string | null> {
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`
       const systemInstruction = `Anda adalah asisten AI resmi "Tayooli Support" untuk sistem Tayooli ERP Standalone di Indonesia.
-Sistem ini memiliki 12 modul inti:
+Sistem ini memiliki 13 modul inti:
 1. Dashboard (/dashboard)
 2. Products (/products)
-3. Warehouse & Stock (/wms)
-4. Surat Jalan DO (/wms/delivery-orders)
-5. Marketplace Omnichannel (/wms/marketplace)
-6. Stock Transfers (/wms/transfers)
-7. Stock Opname (/wms/opname)
-8. Barang Rusak / Scrap (/wms/scrap)
-9. Barcode Scanner (/wms/scanner)
-10. Point of Sale (/pos)
-11. Settings (/settings)
-12. Help & Support (/help)
+3. Barang Masuk / Inbound (/wms/inbound)
+4. Warehouse & Stock (/wms)
+5. Surat Jalan DO (/wms/delivery-orders)
+6. Marketplace Omnichannel (/wms/marketplace)
+7. Stock Transfers (/wms/transfers)
+8. Stock Opname (/wms/opname)
+9. Barang Rusak / Scrap (/wms/scrap)
+10. Barcode Scanner (/wms/scanner)
+11. Point of Sale (/pos)
+12. Settings (/settings)
+13. Help & Support (/help)
 Jawablah pertanyaan pengguna dengan sopan, ramah, jelas, terstruktur (dengan poin nomor atau bullet jika alur langkah), menggunakan Bahasa Indonesia yang baik dan profesional.`
 
       const res = await fetch(endpoint, {
@@ -209,8 +210,9 @@ export async function POST(req: NextRequest) {
     // 3. Fallback respons ramah dan informatif jika query umum / belum spesifik
     const defaultReply = `Halo! Saya **Tayooli Support AI** siap membantu operasional bisnis Anda.
 
-Anda dapat menanyakan panduan dan alur kerja untuk 12 fitur Tayooli ERP:
+Anda dapat menanyakan panduan dan alur kerja untuk 13 fitur Tayooli ERP:
 - **Point of Sale (POS)**: Cara transaksi kasir, potong stok otomatis, dan cetak struk thermal.
+- **Barang Masuk (Inbound)**: Penerimaan barang dari hasil produksi, transfer cabang, atau pemasok luar ke rak tujuan.
 - **Warehouse & Stok (WMS)**: Manajemen gudang, mutasi barang, dan lokasi rak.
 - **Surat Jalan (DO)**: Penerbitan dan cetak surat jalan delivery order resmi.
 - **Stock Transfers**: Prosedur transfer stok antar gudang dari draft hingga diterima.

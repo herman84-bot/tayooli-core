@@ -18,8 +18,8 @@ jest.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
 }))
 
-describe('Sidebar Navigation - 12 Clean Core Modules Hierarchy', () => {
-  it('renders all 12 core clean module links', () => {
+describe('Sidebar Navigation - 13 Clean Core Modules Hierarchy', () => {
+  it('renders all 13 core clean module links', () => {
     render(<Sidebar />)
 
     // 1. Dashboard (/dashboard)

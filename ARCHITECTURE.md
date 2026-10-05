@@ -12,8 +12,8 @@ Sistem ini dipisahkan dari beban arsitektur enterprise yang kompleks (*Apache Ka
 
 ---
 
-## 2. Struktur Modul: 12 Fitur Inti (The 12 Core Modules)
-Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada **12 modul operasional utama**:
+## 2. Struktur Modul: 13 Fitur Inti (The 13 Core Modules)
+Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada **13 modul operasional utama**:
 
 ```text
 1. OVERVIEW
@@ -23,6 +23,7 @@ Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada 
    - Products (/products) : Master data katalog barang, SKU unik, harga modal (HPP), harga jual, dan kode barcode.
 
 3. WAREHOUSE & POS
+   - Barang Masuk / Inbound (/wms/inbound) : Pencatatan barang masuk dari pemasok, hasil produksi, dan transfer antar gudang, langsung menambah stok di rak tujuan.
    - Warehouse & Stock (/wms) : Manajemen multi-gudang, monitoring level stok fisik, dan riwayat mutasi barang.
    - Surat Jalan DO (/wms/delivery-orders) : Penerbitan dan cetak dokumen resmi Delivery Order untuk ekspedisi/kurir.
    - Marketplace Omnichannel (/wms/marketplace) : Sinkronisasi stok terpusat lintas channel (Tokopedia, Shopee, TikTok Shop, Lazada).
@@ -49,7 +50,7 @@ Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada 
 - **State & Data Fetching**: TanStack Query v5 & Zustand
 - **Local Dev Port**: **3000** (`http://localhost:3000`)
 - **API Proxy**: `app/api/v1/[...path]/route.ts` (meneruskan request ke backend Zeabur)
-- **Built-in Support AI**: `app/api/v1/chat/message/route.ts` (penjawab panduan 12 modul dengan format rapi tanpa karakter markdown mentah)
+- **Built-in Support AI**: `app/api/v1/chat/message/route.ts` (penjawab panduan 13 modul dengan format rapi tanpa karakter markdown mentah)
 
 ### Backend:
 - **Framework**: Go 1.24 (Chi Router, Clean/Hexagonal Architecture)

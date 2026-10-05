@@ -338,7 +338,7 @@ function FeaturesSection() {
     <section id="fitur" className="scroll-mt-20 border-t border-border bg-muted/40 py-16 sm:py-20">
       <div className={container}>
         <div className="max-w-2xl">
-          <p className={eyebrow}>12 Modul Terpadu</p>
+          <p className={eyebrow}>13 Modul Terpadu</p>
           <h2 className={`${sectionTitle} mt-3`}>
             Dari kasir toko, gudang, hingga surat jalan — semua terhubung.
           </h2>

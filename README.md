@@ -19,11 +19,11 @@ Sistem ERP ini sebelumnya tergabung dalam repositori monolitik `Erp-Like-PAPER-I
 | **Server & Hosting** | Google Cloud Platform (GCP) VM (`104.197.178.237`) | **Zeabur PaaS** (`https://tayooli.my.id`) |
 | **Broker Pesan** | Apache Kafka (KRaft mode) | Dipangkas / Tidak diperlukan (*Zero bloat*) |
 | **AI Worker** | Worker Python gRPC terpisah | Ringan / Terintegrasi langsung via Next.js API |
-| **Modul UI** | Lusinan modul enterprise | **Tepat 12 Modul Operasional Inti** |
+| **Modul UI** | Lusinan modul enterprise | **Tepat 13 Modul Operasional Inti** |
 
 ---
 
-## 🚀 12 Modul Operasional Inti (The 12 Core Modules)
+## 🚀 13 Modul Operasional Inti (The 13 Core Modules)
 
 Sistem antarmuka `tayooli-core` dirancang terstruktur dalam 4 kelompok hierarki yang bersih:
 
@@ -34,6 +34,7 @@ Sistem antarmuka `tayooli-core` dirancang terstruktur dalam 4 kelompok hierarki 
 - **Products (`/products`)**: Master data barang, pengelolaan SKU unik, harga modal (HPP), harga jual ritel, batas stok aman, dan barcode kemasan.
 
 ### 3. WAREHOUSE & POS
+- **Barang Masuk (Inbound) (`/wms/inbound`)**: Pencatatan barang masuk dari pemasok, hasil produksi, dan transfer antar gudang, langsung menambah stok di rak tujuan. Mendukung tiga tipe penerimaan: Hasil Produksi (dapur/pabrik), Transfer Cabang (antar-gudang), dan Pemasok Luar (vendor).
 - **Warehouse & Stock (`/wms`)**: Manajemen multi-gudang, pemantauan saldo unit fisik per rak/lokasi, dan buku besar mutasi keluar-masuk barang.
 - **Surat Jalan DO (`/wms/delivery-orders`)**: Penerbitan, alokasi armada/ekspedisi, dan cetak dokumen resmi Delivery Order (DO) berstandar bisnis Indonesia.
 - **Marketplace Omnichannel (`/wms/marketplace`)**: Sinkronisasi stok terpusat lintas channel (Tokopedia, Shopee, TikTok Shop, Lazada) guna mencegah *overselling*.
@@ -54,7 +55,7 @@ Sistem antarmuka `tayooli-core` dirancang terstruktur dalam 4 kelompok hierarki 
 - **Frontend**: Next.js 15 (App Router, React 19, TypeScript strict mode, Tailwind CSS, TanStack Query v5, Zustand).
 - **Backend**: Go 1.24 (Chi router, Clean/Hexagonal Architecture, pure `database/sql` & `pgx`, zero ORM).
 - **Database**: PostgreSQL 15 (Row-Level Security multi-tenant).
-- **Support Engine**: Native AI Assistant with built-in 12-module Indonesian ERP knowledge engine and clean markdown parser.
+- **Support Engine**: Native AI Assistant with built-in 13-module Indonesian ERP knowledge engine and clean markdown parser.
 
 ---
 

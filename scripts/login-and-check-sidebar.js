@@ -1,6 +1,9 @@
 const { chromium } = require('@playwright/test');
+const { requireCredentials } = require('./_live-helpers');
+// Credentials: set TAYOOLI_EMAIL and TAYOOLI_PASSWORD (see scripts/_live-helpers.js).
 
 (async () => {
+  const creds = requireCredentials();
   const browser = await chromium.connectOverCDP('http://127.0.0.1:9100');
   const context = browser.contexts()[0];
   const pages = context.pages();
@@ -12,8 +15,8 @@ const { chromium } = require('@playwright/test');
   }
 
   console.log('Logging in on:', page.url());
-  await page.fill('input[type="email"]', 'admin@test.com');
-  await page.fill('input[type="password"]', 'password123');
+  await page.fill('input[type="email"]', creds.email);
+  await page.fill('input[type="password"]', creds.password);
   await page.waitForTimeout(500);
 
   await page.evaluate(() => {

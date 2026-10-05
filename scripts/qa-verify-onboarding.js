@@ -1,5 +1,8 @@
 // scripts/qa-verify-onboarding.js
 // E2E QA Verification Script for Tayooli ERP User Registration & Onboarding Flow
+//
+// Required env: TAYOOLI_QA_PASSWORD - password (>= 8 chars) used for the throwaway
+// QA account this script registers. No password is hardcoded in the repo.
 
 const { execSync } = require('child_process');
 
@@ -28,7 +31,10 @@ async function runVerification() {
   const timestamp = Date.now();
   const testEmail = `qa_owner_${timestamp}@tayoolitest.internal`;
   const testFullName = `QA Owner ${timestamp}`;
-  const testPassword = 'Password123!';
+  const testPassword = process.env.TAYOOLI_QA_PASSWORD;
+  if (!testPassword) {
+    throw new Error('Set TAYOOLI_QA_PASSWORD before running this script.');
+  }
   const renamedCompany = `PT Verification Global ${timestamp}`;
 
   const results = {
@@ -175,7 +181,7 @@ async function runVerification() {
       body: JSON.stringify({
         full_name: 'Another User',
         email: testEmail,
-        password: 'Password123!',
+        password: testPassword,
       }),
     });
     const dupStatus = dupRes.status;
