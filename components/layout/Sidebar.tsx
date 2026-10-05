@@ -41,19 +41,24 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    label: 'Core / Utama',
+    label: 'Overview',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-      { href: '/products', label: 'Master Produk', icon: Box },
     ],
   },
   {
-    label: 'Gudang & Inventori',
+    label: 'Inventory',
     items: [
-      { href: '/wms', label: 'WMS Gudang', icon: Warehouse, exact: true },
+      { href: '/products', label: 'Products', icon: Box },
+    ],
+  },
+  {
+    label: 'Warehouse & POS',
+    items: [
+      { href: '/wms', label: 'Warehouse & Stock', icon: Warehouse, exact: true },
       { href: '/wms/delivery-orders', label: 'Surat Jalan (DO)', icon: FileCheck },
       { href: '/wms/marketplace', label: 'Marketplace Omnichannel', icon: ShoppingBag },
-      { href: '/wms/transfers', label: 'Transfer Stok', icon: Truck },
+      { href: '/wms/transfers', label: 'Stock Transfers', icon: Truck },
       { href: '/wms/opname', label: 'Stock Opname', icon: ClipboardCheck },
       { href: '/wms/scrap', label: 'Barang Rusak / Scrap', icon: AlertTriangle },
       { href: '/wms/scanner', label: 'Barcode Scanner', icon: ScanLine },
@@ -61,7 +66,7 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Pengaturan',
+    label: 'Account',
     items: [
       { href: '/settings', label: 'Settings', icon: Settings },
       { href: '/help', label: 'Help & Support', icon: MessageCircle, tutorial: 'help-support' },
