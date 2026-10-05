@@ -109,7 +109,18 @@ SELECT
   (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE tenant_id = $1)                 AS total_units,
   (SELECT COUNT(*) FROM warehouses WHERE tenant_id = $1 AND is_active = true)             AS total_warehouses,
   (SELECT COUNT(*) FROM warehouse_locations WHERE tenant_id = $1)                         AS total_locations,
-  (SELECT COUNT(*) FROM stock_movements WHERE tenant_id = $1 AND created_at >= CURRENT_DATE) AS today_movements`
+  (SELECT COUNT(*) FROM stock_movements WHERE tenant_id = $1 AND created_at >= CURRENT_DATE) AS today_movements,
+  (SELECT COALESCE(SUM(i.quantity * p.price), 0)
+     FROM inventory i JOIN products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
+    WHERE i.tenant_id = $1)                                                               AS total_stock_value`
+
+const dashboardSalesOrderStats = `
+SELECT
+  COUNT(*)                                       AS total,
+  COUNT(*) FILTER (WHERE status = 'CONFIRMED')   AS confirmed,
+  COUNT(*) FILTER (WHERE status = 'PENDING')     AS pending
+FROM sales_orders
+WHERE tenant_id = $1`
 
 const dashboardLowStockItems = `
 SELECT p.sku, p.name, COALESCE(s.quantity, 0) AS current_stock
@@ -287,6 +298,7 @@ func (r *DashboardRepo) GetSummary(ctx context.Context, tenantID uuid.UUID) (*do
 		&summary.WMS.TotalWarehouses,
 		&summary.WMS.TotalLocations,
 		&summary.WMS.TodayMovements,
+		&summary.WMS.TotalStockValue,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("DashboardRepo.GetSummary: WMS counts: %w", err)
@@ -329,6 +341,16 @@ func (r *DashboardRepo) GetSummary(ctx context.Context, tenantID uuid.UUID) (*do
 	)
 	if err != nil {
 		return nil, fmt.Errorf("DashboardRepo.GetSummary: sales invoice stats: %w", err)
+	}
+
+	// 14. Sales order (Order-to-Cash) counts
+	err = tx.QueryRowContext(ctx, dashboardSalesOrderStats, tenantID).Scan(
+		&summary.SalesOrders.Total,
+		&summary.SalesOrders.Confirmed,
+		&summary.SalesOrders.Pending,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("DashboardRepo.GetSummary: sales order stats: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

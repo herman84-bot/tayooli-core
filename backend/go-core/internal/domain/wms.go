@@ -13,6 +13,9 @@ import (
 var (
 	ErrWarehouseNotFound     = errors.New("warehouse not found")
 	ErrLocationNotFound      = errors.New("location not found")
+	// ErrSourceLocationRequired: a transfer item has no source rack, so stock
+	// cannot be deducted from a concrete location.
+	ErrSourceLocationRequired = errors.New("transfer item source location required")
 	ErrInsufficientStock     = errors.New("insufficient stock at location")
 	ErrBarcodeNotFound       = errors.New("barcode or external sku not found")
 	ErrUnauthorizedWarehouse = errors.New("user is not authorized to access this warehouse")

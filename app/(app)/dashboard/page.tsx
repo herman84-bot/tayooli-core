@@ -13,12 +13,49 @@ import {
   ExternalLink,
   RefreshCw,
   ArrowLeftRight,
+  ArrowDownLeft,
+  ShoppingCart,
 } from 'lucide-react'
 import { EMPTY_DASHBOARD_SUMMARY } from '@/lib/schemas/dashboard'
 import { formatCurrency } from '@/lib/currency'
 
-// Dashboard tayooli-core: hanya metrik POS & WMS (lihat README.md / AI_ONBOARDING_GUIDE.md).
-// Modul P2P (vendor, invoice, PO, GR, payment) sengaja TIDAK ditampilkan.
+// Dashboard tayooli-core: 4 area ringkasan.
+// 1) Ribbon keuangan (penjualan, kas masuk, valuasi stok, pengeluaran vendor)
+// 2) POS kasir & penjualan  3) Gudang & monitoring stok (WMS)
+// 4) Pembelian & vendor (procure-to-pay), tampil read-only tanpa tautan modul.
+
+function formatTime(createdAt: string): string {
+  if (!createdAt) return ''
+  const d = new Date(createdAt)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+}
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  href,
+  linkLabel,
+}: {
+  icon: React.ElementType
+  title: string
+  href?: string
+  linkLabel?: string
+}) {
+  return (
+    <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+      </div>
+      {href && linkLabel && (
+        <Link href={href} className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1">
+          {linkLabel} <ExternalLink className="h-3 w-3" />
+        </Link>
+      )}
+    </div>
+  )
+}
 
 interface StatCardProps {
   label: string
@@ -68,7 +105,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-lg font-bold tracking-tight text-foreground">Dashboard</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Ringkasan omzet kasir (POS), stok gudang (WMS), dan peringatan stok menipis.
+            Ringkasan kasir POS, gudang dan stok, penjualan, serta pembelian dari vendor.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -126,55 +163,52 @@ export default function DashboardPage() {
 
       <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 ${loading ? 'opacity-50' : ''}`}>
         <StatCard
-          label="Omzet POS Hari Ini"
-          value={formatCurrency(s.pos.today_revenue, { compact: true })}
+          label="Total Penjualan"
+          value={formatCurrency(s.financial_overview.total_revenue, { compact: true })}
           icon={TrendingUp}
           iconClass="text-emerald-600"
           bg="bg-emerald-50 dark:bg-emerald-950/30"
-          subtext={`Total: ${formatCurrency(s.pos.total_revenue, { compact: true })}`}
+          subtext={`Piutang: ${formatCurrency(s.financial_overview.accounts_receivable, { compact: true })}`}
         />
         <StatCard
-          label="Transaksi Hari Ini"
-          value={s.pos.today_orders_count}
-          icon={Receipt}
+          label="Kas Masuk"
+          value={formatCurrency(s.financial_overview.cash_inflow, { compact: true })}
+          icon={ArrowDownLeft}
+          iconClass="text-emerald-600"
+          bg="bg-emerald-50 dark:bg-emerald-950/30"
+          subtext="Penerimaan POS & faktur lunas"
+        />
+        <StatCard
+          label="Valuasi Stok"
+          value={formatCurrency(s.wms.total_stock_value, { compact: true })}
+          icon={Package}
           iconClass="text-blue-600"
           bg="bg-blue-50 dark:bg-blue-950/30"
-          subtext={`Total: ${s.pos.total_orders_count} transaksi`}
+          subtext={`${s.wms.total_physical_units} unit di ${s.wms.total_warehouses} gudang`}
         />
         <StatCard
-          label="Unit Fisik di Gudang"
-          value={s.wms.total_physical_units}
-          icon={Package}
-          iconClass="text-teal-600"
-          bg="bg-teal-50 dark:bg-teal-950/30"
-          subtext={`${s.wms.total_skus} SKU aktif`}
-        />
-        <StatCard
-          label="Stok Menipis"
-          value={s.wms.low_stock_items.length}
-          icon={AlertTriangle}
-          iconClass="text-amber-600"
-          bg="bg-amber-50 dark:bg-amber-950/30"
-          subtext="SKU dengan stok ≤ 5 unit"
+          label="Pengeluaran Vendor"
+          value={formatCurrency(s.financial_overview.total_expense, { compact: true })}
+          icon={Receipt}
+          iconClass="text-slate-600"
+          bg="bg-slate-100 dark:bg-slate-900/40"
+          subtext={`Dibayar: ${formatCurrency(s.financial_overview.cash_outflow, { compact: true })}`}
         />
       </div>
 
       <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${loading ? 'opacity-50' : ''}`}>
         <section className="border border-border/60 rounded-lg bg-card">
-          <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Store className="h-3.5 w-3.5 text-muted-foreground" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Kasir POS</h2>
-            </div>
-            <Link href="/pos" className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1">
-              Buka POS <ExternalLink className="h-3 w-3" />
-            </Link>
-          </div>
+          <SectionHeader icon={Store} title="POS Kasir & Penjualan" href="/pos" linkLabel="Buka POS Kasir →" />
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-3 gap-2.5">
               <MiniStat label="Omzet Hari Ini" value={formatCurrency(s.pos.today_revenue, { compact: true })} />
-              <MiniStat label="Struk Hari Ini" value={s.pos.today_orders_count} />
-              <MiniStat label="Total Struk" value={s.pos.total_orders_count} />
+              <MiniStat label="Transaksi Hari Ini" value={s.pos.today_orders_count} />
+              <MiniStat label="Rata-rata Keranjang" value={formatCurrency(s.pos.average_basket_size, { compact: true })} />
+            </div>
+            <div className="grid grid-cols-3 gap-2.5">
+              <MiniStat label="Sales Order" value={s.sales_orders.total} />
+              <MiniStat label="Order Pending" value={s.sales_orders.pending} />
+              <MiniStat label="Pelanggan" value={s.customers.active} />
             </div>
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1.5">
@@ -182,18 +216,26 @@ export default function DashboardPage() {
               </div>
               {s.pos.recent_orders.length > 0 ? (
                 <ul className="divide-y divide-border/40 border border-border/50 rounded-lg overflow-hidden">
-                  {s.pos.recent_orders.map((order) => (
-                    <li key={order.order_number} className="px-3 py-2 flex items-center justify-between gap-2 text-[12px]">
-                      <div className="min-w-0">
-                        <div className="font-mono text-foreground font-medium truncate">{order.order_number}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">{order.customer_name}</div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-mono font-semibold text-foreground tabular-nums">{formatCurrency(order.total_amount)}</div>
-                        <div className="text-[10px] text-muted-foreground">{order.payment_method}</div>
-                      </div>
-                    </li>
-                  ))}
+                  {s.pos.recent_orders.map((order) => {
+                    const time = formatTime(order.created_at)
+                    return (
+                      <li key={order.order_number} className="px-3 py-2 flex items-center justify-between gap-2 text-[12px]">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-foreground font-medium truncate">{order.order_number}</span>
+                            {time && <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{time}</span>}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground truncate">{order.customer_name}</div>
+                        </div>
+                        <div className="text-right shrink-0 flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-muted text-muted-foreground border border-border/50">
+                            {order.payment_method}
+                          </span>
+                          <span className="font-mono font-semibold text-foreground tabular-nums">{formatCurrency(order.total_amount)}</span>
+                        </div>
+                      </li>
+                    )
+                  })}
                 </ul>
               ) : (
                 <div className="px-3 py-6 text-center text-xs text-muted-foreground bg-muted/20 rounded-lg">
@@ -205,15 +247,7 @@ export default function DashboardPage() {
         </section>
 
         <section className="border border-border/60 rounded-lg bg-card">
-          <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Warehouse className="h-3.5 w-3.5 text-muted-foreground" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Gudang &amp; Stok</h2>
-            </div>
-            <Link href="/wms" className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1">
-              Kelola Gudang <ExternalLink className="h-3 w-3" />
-            </Link>
-          </div>
+          <SectionHeader icon={Warehouse} title="Gudang & Monitoring Stok" href="/wms" linkLabel="Kelola Gudang" />
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-3 gap-2.5">
               <MiniStat label="Gudang / Lokasi" value={`${s.wms.total_warehouses} / ${s.wms.total_locations}`} />
@@ -265,6 +299,45 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
+
+      <section className={`border border-border/60 rounded-lg bg-card ${loading ? 'opacity-50' : ''}`}>
+        <SectionHeader icon={ShoppingCart} title="Pembelian & Vendor (Procure-to-Pay)" />
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+            <MiniStat label="Faktur Vendor" value={s.invoices.total} />
+            <MiniStat label="Disetujui" value={s.invoices.approved} />
+            <MiniStat label="Menunggu" value={s.invoices.pending} />
+            <MiniStat label="Vendor Aktif" value={s.vendors.active} />
+            <MiniStat label="PO" value={s.purchase_orders.total} />
+            <MiniStat label="Penerimaan Barang" value={s.goods_receipts.total} />
+            <MiniStat label="Hutang Belum Dibayar" value={formatCurrency(s.payments.pending_amount, { compact: true })} />
+          </div>
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1.5">
+              Vendor Teratas
+            </div>
+            {s.top_vendors.length > 0 ? (
+              <ul className="divide-y divide-border/40 border border-border/50 rounded-lg overflow-hidden">
+                {s.top_vendors.map((v) => (
+                  <li key={v.vendor_id} className="px-3 py-2 flex items-center justify-between gap-2 text-[12px]">
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground truncate">{v.vendor_name}</div>
+                      <div className="text-[10px] text-muted-foreground">{v.invoice_count} faktur</div>
+                    </div>
+                    <span className="font-mono font-semibold text-foreground tabular-nums shrink-0">
+                      {formatCurrency(v.total_amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="px-3 py-6 text-center text-xs text-muted-foreground bg-muted/20 rounded-lg">
+                Belum ada faktur vendor.
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

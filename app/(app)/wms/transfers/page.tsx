@@ -94,6 +94,16 @@ export default function TransfersPage() {
   // Selected warehouse locations for destination putaway
   const { data: toLocations = [] } = useWarehouseLocations(toWhId || null)
 
+  // Effective source rack of a line item: keep the user's choice only while it
+  // still belongs to the currently selected source warehouse, otherwise default
+  // to that warehouse's first rack. Used by both the dropdown and the submit so
+  // an item can never be saved with source_location_id = null or a rack from a
+  // previously selected warehouse.
+  const effectiveSourceLoc = (item: LineItemDraft): string | undefined =>
+    item.sourceLocationId && sourceLocations.some((l) => l.id === item.sourceLocationId)
+      ? item.sourceLocationId
+      : sourceLocations[0]?.id
+
   // Filtered transfers
   const filteredTransfers = useMemo(() => {
     return transfers.filter((t) => {
@@ -239,6 +249,10 @@ export default function TransfersPage() {
   // Add line item draft in modal
   const handleAddLineItem = () => {
     if (products.length === 0) return
+    if (!fromWhId) {
+      setModalError("Pilih Gudang Asal terlebih dahulu sebelum menambah barang.")
+      return
+    }
     const firstProduct = products[0]
     setLineItems((prev) => [
       ...prev,
@@ -293,15 +307,11 @@ export default function TransfersPage() {
       setModalError("Gudang asal belum memiliki lokasi rak penyimpanan. Buat minimal 1 rak di menu Gudang & Stok.")
       return
     }
-    if (toLocations.length === 0) {
-      setModalError("Gudang tujuan belum memiliki lokasi rak penyimpanan. Buat minimal 1 rak di menu Gudang & Stok sebelum mentransfer barang.")
-      return
-    }
     if (lineItems.length === 0) {
       setModalError("Minimal 1 barang harus dimasukkan ke dalam daftar transfer.")
       return
     }
-    const missingLoc = lineItems.some((item) => !item.sourceLocationId)
+    const missingLoc = lineItems.some((item) => !effectiveSourceLoc(item))
     if (missingLoc) {
       setModalError("Setiap barang wajib memiliki lokasi rak asal yang valid.")
       return
@@ -321,7 +331,7 @@ export default function TransfersPage() {
         items: lineItems.map((item) => ({
           product_id: item.productId,
           requested_qty: item.quantity,
-          source_location_id: item.sourceLocationId || undefined,
+          source_location_id: effectiveSourceLoc(item),
         })),
       })
 
@@ -468,10 +478,8 @@ export default function TransfersPage() {
             <button
               type="button"
               onClick={() => {
+                // No auto-added row: racks are unknown until a source warehouse is chosen.
                 setShowCreateModal(true)
-                if (lineItems.length === 0 && products.length > 0) {
-                  handleAddLineItem()
-                }
               }}
               className="inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-sm"
             >
@@ -815,7 +823,7 @@ export default function TransfersPage() {
                   {toWhId && toLocations.length === 0 && (
                     <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 mt-0.5" />
-                      <span>Gudang tujuan belum memiliki rak penyimpanan. Buat minimal 1 rak agar penerimaan transfer berhasil.</span>
+                      <span>Gudang tujuan belum memiliki rak penyimpanan. Saat diterima, barang otomatis masuk ke rak default (DEFAULT-kode gudang). Tambahkan rak di menu Gudang &amp; Stok jika ingin penempatan spesifik.</span>
                     </div>
                   )}
                 </div>
@@ -884,7 +892,9 @@ export default function TransfersPage() {
                   <button
                     type="button"
                     onClick={handleAddLineItem}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] min-h-[36px]"
+                    disabled={!fromWhId}
+                    title={!fromWhId ? "Pilih Gudang Asal terlebih dahulu" : undefined}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     + Tambah Baris
@@ -894,7 +904,9 @@ export default function TransfersPage() {
                 <div className="space-y-2 max-h-56 overflow-y-auto border border-slate-200 rounded-xl p-2 bg-slate-50">
                   {lineItems.length === 0 ? (
                     <div className="text-center py-6 text-xs text-slate-400">
-                      Belum ada barang. Klik &quot;+ Tambah Baris&quot; untuk memasukkan barang.
+                      {fromWhId
+                        ? 'Belum ada barang. Klik "+ Tambah Baris" untuk memasukkan barang.'
+                        : "Pilih Gudang Asal terlebih dahulu."}
                     </div>
                   ) : (
                     lineItems.map((item, idx) => (
@@ -921,7 +933,9 @@ export default function TransfersPage() {
                         {sourceLocations.length > 0 && (
                           <div className="w-full sm:w-36">
                             <select
-                              value={item.sourceLocationId ?? ""}
+                              value={effectiveSourceLoc(item) ?? ""}
+                              required
+                              aria-label="Rak asal"
                               onChange={(e) =>
                                 handleUpdateLineItem(idx, "sourceLocationId", e.target.value || undefined)
                               }

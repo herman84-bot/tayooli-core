@@ -289,6 +289,46 @@ func (u *Usecase) CreateLocation(ctx context.Context, tenantID, userID uuid.UUID
 	return loc, nil
 }
 
+// defaultReceivingLocation picks the putaway rack for transfer items without an
+// explicit destination: the first INTERNAL rack of the warehouse, otherwise a
+// "DEFAULT-<warehouse code>" rack that is created (or reused) on demand, so a
+// warehouse with zero racks no longer blocks receiving.
+func (u *Usecase) defaultReceivingLocation(ctx context.Context, tenantID, warehouseID uuid.UUID) (*domain.WarehouseLocation, error) {
+	locs, err := u.repo.ListLocations(ctx, tenantID, &warehouseID)
+	if err != nil {
+		return nil, fmt.Errorf("defaultReceivingLocation: list: %w", err)
+	}
+	for i := range locs {
+		if locs[i].Type == domain.LocationTypeInternal || locs[i].Type == "" {
+			return &locs[i], nil
+		}
+	}
+
+	wh, err := u.repo.GetWarehouseByID(ctx, tenantID, warehouseID)
+	if err != nil {
+		return nil, err
+	}
+	code := "DEFAULT-" + wh.Code
+	if existing, err := u.repo.GetLocationByCode(ctx, tenantID, &warehouseID, code); err == nil {
+		return existing, nil
+	}
+	now := time.Now().UTC()
+	loc := &domain.WarehouseLocation{
+		ID:          uuid.New(),
+		TenantID:    tenantID,
+		WarehouseID: &warehouseID,
+		Code:        code,
+		Name:        "Rak Default " + wh.Name,
+		Type:        domain.LocationTypeInternal,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := u.repo.CreateLocation(ctx, loc); err != nil {
+		return nil, fmt.Errorf("defaultReceivingLocation: create: %w", err)
+	}
+	return loc, nil
+}
+
 func (u *Usecase) ListLocations(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.WarehouseLocation, error) {
 	if warehouseID != nil {
 		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
@@ -462,10 +502,13 @@ func (u *Usecase) CreateTransfer(ctx context.Context, tenantID, userID uuid.UUID
 		if itemReq.ProductID == uuid.Nil || itemReq.RequestedQty.LessThanOrEqual(decimal.Zero) {
 			return nil, domain.ErrInvalidInput
 		}
-		if itemReq.SourceLocationID != nil {
-			if err := u.validateLocationWarehouse(ctx, tenantID, *itemReq.SourceLocationID, req.FromWarehouseID); err != nil {
-				return nil, err
-			}
+		// Without a source rack the transfer can never be dispatched; reject now
+		// instead of persisting a broken draft (e.g. TR-TEST-CHECK in prod).
+		if itemReq.SourceLocationID == nil {
+			return nil, domain.ErrSourceLocationRequired
+		}
+		if err := u.validateLocationWarehouse(ctx, tenantID, *itemReq.SourceLocationID, req.FromWarehouseID); err != nil {
+			return nil, err
 		}
 		if itemReq.DestLocationID != nil {
 			if err := u.validateLocationWarehouse(ctx, tenantID, *itemReq.DestLocationID, req.ToWarehouseID); err != nil {
@@ -627,7 +670,7 @@ func (u *Usecase) DispatchTransfer(ctx context.Context, tenantID, userID uuid.UU
 	// 1. Validate locations scoping & source location presence
 	for _, item := range items {
 		if item.SourceLocationID == nil {
-			return nil, fmt.Errorf("%w: source location not specified for product %s", domain.ErrLocationNotFound, item.ProductID)
+			return nil, fmt.Errorf("%w: product %s", domain.ErrSourceLocationRequired, item.ProductID)
 		}
 		if err := u.validateLocationWarehouse(ctx, tenantID, *item.SourceLocationID, t.FromWarehouseID); err != nil {
 			return nil, err
@@ -702,11 +745,11 @@ func (u *Usecase) ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUI
 				return nil, err
 			}
 		} else if defaultTargetLocID == nil {
-			locs, err := u.repo.ListLocations(ctx, tenantID, &t.ToWarehouseID)
-			if err != nil || len(locs) == 0 {
-				return nil, fmt.Errorf("%w: destination warehouse has no locations configured", domain.ErrLocationNotFound)
+			loc, err := u.defaultReceivingLocation(ctx, tenantID, t.ToWarehouseID)
+			if err != nil {
+				return nil, err
 			}
-			defaultTargetLocID = &locs[0].ID
+			defaultTargetLocID = &loc.ID
 		}
 	}
 

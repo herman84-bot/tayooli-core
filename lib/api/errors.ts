@@ -12,6 +12,41 @@ interface ApiErrorEnvelope {
   message?: string
 }
 
+const nonBlank = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
+
+/**
+ * Ubah payload error API apa pun menjadi string yang aman ditampilkan.
+ * Tidak pernah menghasilkan "[object Object]": nilai non-string diabaikan
+ * dan jatuh ke `fallback`.
+ */
+export function extractErrorMessage(
+  payload: unknown,
+  fallback = 'Terjadi kesalahan pada sistem.'
+): string {
+  if (nonBlank(payload)) return payload
+  if (!payload || typeof payload !== 'object') return fallback
+
+  const data = payload as Record<string, unknown>
+  const err = data.error
+  if (err && typeof err === 'object' && !Array.isArray(err)) {
+    const e = err as Record<string, unknown>
+    if (nonBlank(e.message)) return e.message
+    if (nonBlank(e.code)) return e.code
+  }
+  if (nonBlank(err)) return err
+  if (nonBlank(data.message)) return data.message
+
+  const errors = data.errors
+  if (errors && typeof errors === 'object') {
+    const parts = (Array.isArray(errors) ? errors : Object.values(errors))
+      .flat()
+      .map((e) => (nonBlank(e) ? e : e && typeof e === 'object' && nonBlank((e as { message?: unknown }).message) ? (e as { message: string }).message : ''))
+      .filter(Boolean)
+    if (parts.length) return parts.join(', ')
+  }
+  return fallback
+}
+
 /**
  * Ekstrak pesan error yang bisa dibaca manusia dari respons fetch /api/v1/*.
  * Menangani envelope objek backend Go (error.message), string biasa, dan
@@ -22,19 +57,7 @@ export async function extractApiErrorMessage(
   fallback: string
 ): Promise<string> {
   try {
-    const body = (await res.json()) as ApiErrorEnvelope
-    if (typeof body.error === 'string' && body.error.trim()) {
-      return body.error
-    }
-    if (body.error && typeof body.error === 'object') {
-      const msg = body.error.message
-      if (typeof msg === 'string' && msg.trim()) {
-        return msg
-      }
-    }
-    if (typeof body.message === 'string' && body.message.trim()) {
-      return body.message
-    }
+    return extractErrorMessage((await res.json()) as ApiErrorEnvelope, fallback)
   } catch {
     // Body bukan JSON — jatuh ke pesan fallback di bawah.
   }

@@ -213,6 +213,46 @@ func TestGetSummary_OK(t *testing.T) {
 	}
 }
 
+func TestGetSummary_ExposesCrossModuleSections(t *testing.T) {
+	s := fakeDashboardSummary()
+	s.WMS.TotalStockValue = decimal.NewFromInt(9_278_000)
+	s.POS.AverageBasketSize = decimal.NewFromInt(43_540)
+	s.SalesOrders = domain.SalesOrderDashStats{Total: 3, Confirmed: 2, Pending: 1}
+	s.Financial = domain.FinancialOverview{
+		TotalRevenue:   decimal.NewFromInt(3_087_080),
+		NetCashBalance: decimal.NewFromInt(-1_412_920),
+	}
+	h := handler.NewDashboardHandler(&mockDashboardUsecase{
+		getSummaryFn: func(context.Context, uuid.UUID) (*domain.DashboardSummary, error) { return s, nil },
+	})
+	rr := httptest.NewRecorder()
+	h.GetSummary(rr, withTenant(httptest.NewRequest(http.MethodGet, "/api/v1/dashboard/summary", nil), uuid.New()))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var body struct {
+		Financial map[string]any `json:"financial_overview"`
+		Sales     map[string]any `json:"sales_orders"`
+		POS       map[string]any `json:"pos"`
+		WMS       map[string]any `json:"wms"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.Financial["total_revenue"] != "3087080" || body.Financial["net_cash_balance"] != "-1412920" {
+		t.Errorf("financial_overview wrong: %v", body.Financial)
+	}
+	if body.Sales["pending"].(float64) != 1 || body.Sales["confirmed"].(float64) != 2 {
+		t.Errorf("sales_orders wrong: %v", body.Sales)
+	}
+	if body.POS["average_basket_size"] != "43540" {
+		t.Errorf("average_basket_size wrong: %v", body.POS["average_basket_size"])
+	}
+	if body.WMS["total_stock_value"] != "9278000" {
+		t.Errorf("total_stock_value wrong: %v", body.WMS["total_stock_value"])
+	}
+}
+
 func TestGetSummary_Unauthorized(t *testing.T) {
 	uc := &mockDashboardUsecase{}
 	h := handler.NewDashboardHandler(uc)

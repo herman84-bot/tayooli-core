@@ -85,6 +85,7 @@ type posStatsView struct {
 	TodayOrdersCount int                  `json:"today_orders_count"`
 	TotalRevenue     string               `json:"total_revenue"`
 	TotalOrdersCount int                  `json:"total_orders_count"`
+	AverageBasket    string               `json:"average_basket_size"`
 	RecentOrders     []posRecentOrderView `json:"recent_orders"`
 }
 
@@ -101,7 +102,24 @@ type wmsStatsView struct {
 	TotalWarehouses    int                `json:"total_warehouses"`
 	TotalLocations     int                `json:"total_locations"`
 	TodayMovements     int                `json:"today_movements"`
+	TotalStockValue    string             `json:"total_stock_value"`
 	LowStockItems      []lowStockItemView `json:"low_stock_items"`
+}
+
+type salesOrderStatsView struct {
+	Total     int `json:"total"`
+	Confirmed int `json:"confirmed"`
+	Pending   int `json:"pending"`
+}
+
+type financialOverviewView struct {
+	TotalRevenue       string `json:"total_revenue"`
+	CashInflow         string `json:"cash_inflow"`
+	AccountsReceivable string `json:"accounts_receivable"`
+	TotalExpense       string `json:"total_expense"`
+	CashOutflow        string `json:"cash_outflow"`
+	AccountsPayable    string `json:"accounts_payable"`
+	NetCashBalance     string `json:"net_cash_balance"`
 }
 
 type customerStatsView struct {
@@ -127,6 +145,8 @@ type dashboardSummaryView struct {
 	WMS            wmsStatsView          `json:"wms"`
 	Customers      customerStatsView     `json:"customers"`
 	SalesInvoices  salesInvoiceStatsView `json:"sales_invoices"`
+	SalesOrders    salesOrderStatsView   `json:"sales_orders"`
+	Financial      financialOverviewView `json:"financial_overview"`
 }
 
 func toDashboardSummaryView(s *domain.DashboardSummary) dashboardSummaryView {
@@ -181,6 +201,7 @@ func toDashboardSummaryView(s *domain.DashboardSummary) dashboardSummaryView {
 		TodayOrdersCount: s.POS.TodayOrdersCount,
 		TotalRevenue:     s.POS.TotalRevenue.String(),
 		TotalOrdersCount: s.POS.TotalOrdersCount,
+		AverageBasket:    s.POS.AverageBasketSize.String(),
 		RecentOrders:     make([]posRecentOrderView, len(s.POS.RecentOrders)),
 	}
 	for i, o := range s.POS.RecentOrders {
@@ -200,6 +221,7 @@ func toDashboardSummaryView(s *domain.DashboardSummary) dashboardSummaryView {
 		TotalWarehouses:    s.WMS.TotalWarehouses,
 		TotalLocations:     s.WMS.TotalLocations,
 		TodayMovements:     s.WMS.TodayMovements,
+		TotalStockValue:    s.WMS.TotalStockValue.String(),
 		LowStockItems:      make([]lowStockItemView, len(s.WMS.LowStockItems)),
 	}
 	for i, item := range s.WMS.LowStockItems {
@@ -218,6 +240,23 @@ func toDashboardSummaryView(s *domain.DashboardSummary) dashboardSummaryView {
 		PaidAmount:         s.SalesInvoices.PaidAmount.String(),
 		AccountsReceivable: s.SalesInvoices.AccountsReceivable.String(),
 		TotalCount:         s.SalesInvoices.TotalCount,
+	}
+
+	v.SalesOrders = salesOrderStatsView{
+		Total:     s.SalesOrders.Total,
+		Confirmed: s.SalesOrders.Confirmed,
+		Pending:   s.SalesOrders.Pending,
+	}
+
+	f := s.Financial
+	v.Financial = financialOverviewView{
+		TotalRevenue:       f.TotalRevenue.String(),
+		CashInflow:         f.CashInflow.String(),
+		AccountsReceivable: f.AccountsReceivable.String(),
+		TotalExpense:       f.TotalExpense.String(),
+		CashOutflow:        f.CashOutflow.String(),
+		AccountsPayable:    f.AccountsPayable.String(),
+		NetCashBalance:     f.NetCashBalance.String(),
 	}
 
 	return v

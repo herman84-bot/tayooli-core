@@ -170,8 +170,10 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusConflict, "conflict")
 	case errors.Is(err, domain.ErrWarehouseNotFound):
 		RespondError(w, r, http.StatusNotFound, "warehouse not found")
+	case errors.Is(err, domain.ErrSourceLocationRequired):
+		RespondError(w, r, http.StatusUnprocessableEntity, "Item transfer belum memiliki lokasi rak asal. Lengkapi data rak sebelum pengiriman.")
 	case errors.Is(err, domain.ErrLocationNotFound):
-		RespondError(w, r, http.StatusNotFound, "location not found")
+		RespondError(w, r, http.StatusNotFound, "Lokasi rak tidak ditemukan di gudang ini. Periksa rak asal/tujuan atau tambahkan rak di menu Warehouse.")
 	case errors.Is(err, domain.ErrBarcodeNotFound):
 		RespondError(w, r, http.StatusNotFound, "barcode not found")
 	case errors.Is(err, domain.ErrTransferNotFound):

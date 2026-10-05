@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Logo } from '@/components/brand/Logo'
 import { DISABLE_BILLING } from '@/lib/config/demo'
+import { extractApiErrorMessage } from '@/lib/api/errors'
 
 export default function WorkspacePage() {
   const router = useRouter()
@@ -29,8 +30,7 @@ export default function WorkspacePage() {
         body: JSON.stringify({ company_name: companyName.trim() }),
       })
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Gagal membuat workspace')
+        throw new Error(await extractApiErrorMessage(res, 'Gagal membuat workspace'))
       }
       if (DISABLE_BILLING) {
         router.push('/dashboard')

@@ -1,3 +1,5 @@
+import { extractErrorMessage } from "@/lib/api/errors"
+
 const BASE = "/api/v1"
 
 /** Default timeout for API requests (ms). */
@@ -26,16 +28,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
       if (contentType.includes("application/json")) {
         const body = await res.json().catch(() => null)
-        // Backend error envelopes come in two shapes:
-        //   1. Structured: { error: { code, message, details } }  (handler.RespondError)
-        //   2. Flat:       { error: "message" } or { message: "message" }
-        // Guard against the structured object leaking into Error() and
-        // stringifying to the literal text "[object Object]".
-        if (body?.error && typeof body.error === "object") {
-          message = body.error.message || body.error.code || ""
-        } else {
-          message = body?.error || body?.message || ""
-        }
+        // Handles { error: { code, message } }, { error: "..." }, { message },
+        // { errors } — never lets an object stringify to "[object Object]".
+        message = extractErrorMessage(body, "")
       } else {
         // Backend handlers (net/http.Error) send plain text bodies, e.g.
         // "conflict: SKU sudah digunakan atau produk memiliki riwayat mutasi/stok"

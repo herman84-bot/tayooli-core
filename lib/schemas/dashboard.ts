@@ -69,6 +69,7 @@ export const POSStatsSchema = z.object({
   today_orders_count: safeCount.default(0),
   total_revenue: amountString.default('0'),
   total_orders_count: safeCount.default(0),
+  average_basket_size: amountString.default('0'),
   recent_orders: z.array(POSRecentOrderSchema).default([]),
 })
 export type POSStats = z.infer<typeof POSStatsSchema>
@@ -87,6 +88,7 @@ export const WMSStatsSchema = z.object({
   total_warehouses: safeCount.default(0),
   total_locations: safeCount.default(0),
   today_movements: safeCount.default(0),
+  total_stock_value: amountString.default('0'),
   low_stock_items: z.array(LowStockItemSchema).default([]),
 })
 export type WMSStats = z.infer<typeof WMSStatsSchema>
@@ -104,6 +106,29 @@ export const SalesInvoiceStatsSchema = z.object({
 })
 export type SalesInvoiceStats = z.infer<typeof SalesInvoiceStatsSchema>
 
+export const SalesOrderStatsSchema = z.object({
+  total: safeCount.default(0),
+  confirmed: safeCount.default(0),
+  pending: safeCount.default(0),
+})
+
+export const FinancialOverviewSchema = z.object({
+  total_revenue: amountString.default('0'),
+  cash_inflow: amountString.default('0'),
+  accounts_receivable: amountString.default('0'),
+  total_expense: amountString.default('0'),
+  cash_outflow: amountString.default('0'),
+  accounts_payable: amountString.default('0'),
+  net_cash_balance: amountString.default('0'),
+})
+export type FinancialOverview = z.infer<typeof FinancialOverviewSchema>
+
+const EMPTY_SALES_ORDERS = { total: 0, confirmed: 0, pending: 0 }
+const EMPTY_FINANCIAL: FinancialOverview = {
+  total_revenue: '0', cash_inflow: '0', accounts_receivable: '0',
+  total_expense: '0', cash_outflow: '0', accounts_payable: '0', net_cash_balance: '0',
+}
+
 export const DashboardSummarySchema = z.object({
   invoices: InvoiceStatsSchema,
   payments: PaymentStatsSchema,
@@ -116,6 +141,9 @@ export const DashboardSummarySchema = z.object({
   wms: WMSStatsSchema,
   customers: CustomerStatsSchema,
   sales_invoices: SalesInvoiceStatsSchema,
+  // .default keeps the UI working against a backend deployed before these fields existed.
+  sales_orders: SalesOrderStatsSchema.default(EMPTY_SALES_ORDERS),
+  financial_overview: FinancialOverviewSchema.default(EMPTY_FINANCIAL),
 })
 export type DashboardSummary = z.infer<typeof DashboardSummarySchema>
 
@@ -132,8 +160,10 @@ export const EMPTY_DASHBOARD_SUMMARY: DashboardSummary = {
   goods_receipts: { total: 0 },
   monthly_trend: [],
   top_vendors: [],
-  pos: { today_revenue: '0', today_orders_count: 0, total_revenue: '0', total_orders_count: 0, recent_orders: [] },
-  wms: { total_skus: 0, total_physical_units: '0', total_warehouses: 0, total_locations: 0, today_movements: 0, low_stock_items: [] },
+  pos: { today_revenue: '0', today_orders_count: 0, total_revenue: '0', total_orders_count: 0, average_basket_size: '0', recent_orders: [] },
+  wms: { total_skus: 0, total_physical_units: '0', total_warehouses: 0, total_locations: 0, today_movements: 0, total_stock_value: '0', low_stock_items: [] },
   customers: { active: 0 },
   sales_invoices: { total_invoiced: '0', paid_amount: '0', accounts_receivable: '0', total_count: 0 },
+  sales_orders: EMPTY_SALES_ORDERS,
+  financial_overview: EMPTY_FINANCIAL,
 }

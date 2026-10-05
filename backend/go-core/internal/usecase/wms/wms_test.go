@@ -2418,3 +2418,59 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		assert.True(t, mappingA.Multiplier.Equal(decimal.NewFromInt(24)), "Tenant A multiplier remains unaffected by Tenant B")
 	})
 }
+
+// Regression for prod transfer TR-20261004-957: destination warehouse had zero
+// racks, so receive returned 404 "location not found" (rendered as [object Object]).
+func TestTransferLocationResilience(t *testing.T) {
+	repo := newMockWMSRepo()
+	usecase := uc.New(repo)
+	ctx := context.Background()
+	tenantID, adminID, approverID := uuid.New(), uuid.New(), uuid.New()
+	whSource, whTarget, productID, locSourceID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	repo.warehouses[whSource] = domain.Warehouse{ID: whSource, TenantID: tenantID, Code: "WH0001", Name: "Gudang Cipondoh"}
+	repo.warehouses[whTarget] = domain.Warehouse{ID: whTarget, TenantID: tenantID, Code: "WH-JKT", Name: "Gudang Utama Jakarta"}
+	repo.locations[locSourceID] = domain.WarehouseLocation{ID: locSourceID, TenantID: tenantID, WarehouseID: &whSource, Code: "RAK-01", Name: "Rak 01", Type: domain.LocationTypeInternal}
+	repo.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, locSourceID, productID)] = decimal.NewFromInt(50)
+
+	t.Run("create rejects item without source location", func(t *testing.T) {
+		_, err := usecase.CreateTransfer(ctx, tenantID, adminID, "admin", uc.CreateTransferRequest{
+			FromWarehouseID: whSource, ToWarehouseID: whTarget, TransferNumber: "TR-NO-SRC",
+			Items: []uc.CreateTransferItemRequest{{ProductID: productID, RequestedQty: decimal.NewFromInt(1)}},
+		})
+		assert.ErrorIs(t, err, domain.ErrSourceLocationRequired)
+	})
+
+	t.Run("dispatch of legacy item without source location returns ErrSourceLocationRequired", func(t *testing.T) {
+		tr := &domain.StockTransfer{ID: uuid.New(), TenantID: tenantID, TransferNumber: "TR-TEST-CHECK", FromWarehouseID: whSource, ToWarehouseID: whTarget, Status: domain.TransferStatusApproved, RequestedBy: adminID}
+		require.NoError(t, repo.CreateTransfer(ctx, tr, []domain.StockTransferItem{{ID: uuid.New(), TenantID: tenantID, TransferID: tr.ID, ProductID: productID, RequestedQty: decimal.NewFromInt(1)}}))
+		_, err := usecase.DispatchTransfer(ctx, tenantID, adminID, "admin", tr.ID)
+		assert.ErrorIs(t, err, domain.ErrSourceLocationRequired)
+	})
+
+	t.Run("receive into warehouse with zero racks auto-creates DEFAULT location", func(t *testing.T) {
+		tr, err := usecase.CreateTransfer(ctx, tenantID, adminID, "admin", uc.CreateTransferRequest{
+			FromWarehouseID: whSource, ToWarehouseID: whTarget, TransferNumber: "TR-NO-RACK",
+			Items: []uc.CreateTransferItemRequest{{ProductID: productID, RequestedQty: decimal.NewFromInt(4), SourceLocationID: &locSourceID}},
+		})
+		require.NoError(t, err)
+		_, err = usecase.SubmitTransfer(ctx, tenantID, adminID, "admin", tr.ID)
+		require.NoError(t, err)
+		_, err = usecase.ApproveTransfer(ctx, tenantID, approverID, "admin", tr.ID)
+		require.NoError(t, err)
+		_, err = usecase.DispatchTransfer(ctx, tenantID, adminID, "admin", tr.ID)
+		require.NoError(t, err)
+
+		received, err := usecase.ReceiveTransfer(ctx, tenantID, adminID, "admin", tr.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.TransferStatusReceived, received.Status)
+
+		def, err := repo.GetLocationByCode(ctx, tenantID, &whTarget, "DEFAULT-WH-JKT")
+		require.NoError(t, err, "default location must be created")
+		assert.Equal(t, whTarget, *def.WarehouseID)
+		assert.Equal(t, domain.LocationTypeInternal, def.Type)
+		stock, err := repo.GetStockByLocation(ctx, tenantID, def.ID, productID)
+		require.NoError(t, err)
+		assert.True(t, stock.Equal(decimal.NewFromInt(4)), "received qty lands in default location, got %s", stock)
+	})
+}

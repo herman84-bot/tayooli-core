@@ -21,6 +21,29 @@ type DashboardSummary struct {
 	WMS            WMSDashStats     `json:"wms"`
 	Customers      CustomerStats    `json:"customers"`
 	SalesInvoices  SalesInvoiceDashStats `json:"sales_invoices"`
+	SalesOrders    SalesOrderDashStats   `json:"sales_orders"`
+	// Financial is derived by the usecase from the raw stats above.
+	Financial FinancialOverview `json:"financial_overview"`
+}
+
+// SalesOrderDashStats holds Order-to-Cash sales order counts.
+type SalesOrderDashStats struct {
+	Total     int `json:"total"`
+	Confirmed int `json:"confirmed"`
+	Pending   int `json:"pending"`
+}
+
+// FinancialOverview combines sales (OTC + POS) and procurement (P2P) money flows.
+// Revenue is sourced from sales_invoices only, because every POS checkout also
+// writes a PAID "INV-POS" sales invoice; summing pos_orders too would double count.
+type FinancialOverview struct {
+	TotalRevenue       decimal.Decimal `json:"total_revenue"`
+	CashInflow         decimal.Decimal `json:"cash_inflow"`
+	AccountsReceivable decimal.Decimal `json:"accounts_receivable"`
+	TotalExpense       decimal.Decimal `json:"total_expense"`
+	CashOutflow        decimal.Decimal `json:"cash_outflow"`
+	AccountsPayable    decimal.Decimal `json:"accounts_payable"`
+	NetCashBalance     decimal.Decimal `json:"net_cash_balance"`
 }
 
 // POSDashStats holds aggregated POS (kasir) metrics for the dashboard.
@@ -29,6 +52,7 @@ type POSDashStats struct {
 	TodayOrdersCount  int                `json:"today_orders_count"`
 	TotalRevenue      decimal.Decimal    `json:"total_revenue"`
 	TotalOrdersCount  int                `json:"total_orders_count"`
+	AverageBasketSize decimal.Decimal    `json:"average_basket_size"`
 	RecentOrders      []POSRecentOrder   `json:"recent_orders"`
 }
 
@@ -49,7 +73,10 @@ type WMSDashStats struct {
 	TotalWarehouses    int             `json:"total_warehouses"`
 	TotalLocations     int             `json:"total_locations"`
 	TodayMovements     int             `json:"today_movements"`
-	LowStockItems      []LowStockItem  `json:"low_stock_items"`
+	// TotalStockValue = Σ(on-hand qty × product selling price). Products have no
+	// cost column, so this is a retail-price valuation, not a cost valuation.
+	TotalStockValue decimal.Decimal `json:"total_stock_value"`
+	LowStockItems   []LowStockItem  `json:"low_stock_items"`
 }
 
 // LowStockItem represents a product whose total stock is at or below the
