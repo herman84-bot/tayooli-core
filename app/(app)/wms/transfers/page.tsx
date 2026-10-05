@@ -91,6 +91,8 @@ export default function TransfersPage() {
 
   // Selected warehouse locations for source picking
   const { data: sourceLocations = [] } = useWarehouseLocations(fromWhId || null)
+  // Selected warehouse locations for destination putaway
+  const { data: toLocations = [] } = useWarehouseLocations(toWhId || null)
 
   // Filtered transfers
   const filteredTransfers = useMemo(() => {
@@ -287,8 +289,21 @@ export default function TransfersPage() {
       setModalError("Gudang asal dan tujuan tidak boleh sama.")
       return
     }
+    if (sourceLocations.length === 0) {
+      setModalError("Gudang asal belum memiliki lokasi rak penyimpanan. Buat minimal 1 rak di menu Gudang & Stok.")
+      return
+    }
+    if (toLocations.length === 0) {
+      setModalError("Gudang tujuan belum memiliki lokasi rak penyimpanan. Buat minimal 1 rak di menu Gudang & Stok sebelum mentransfer barang.")
+      return
+    }
     if (lineItems.length === 0) {
       setModalError("Minimal 1 barang harus dimasukkan ke dalam daftar transfer.")
+      return
+    }
+    const missingLoc = lineItems.some((item) => !item.sourceLocationId)
+    if (missingLoc) {
+      setModalError("Setiap barang wajib memiliki lokasi rak asal yang valid.")
       return
     }
 
@@ -770,6 +785,12 @@ export default function TransfersPage() {
                       </option>
                     ))}
                   </select>
+                  {fromWhId && sourceLocations.length === 0 && (
+                    <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 flex items-start gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-600 mt-0.5" />
+                      <span>Gudang asal belum memiliki lokasi rak. Silakan buat rak di menu Gudang &amp; Stok.</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -791,6 +812,12 @@ export default function TransfersPage() {
                         </option>
                       ))}
                   </select>
+                  {toWhId && toLocations.length === 0 && (
+                    <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600 mt-0.5" />
+                      <span>Gudang tujuan belum memiliki rak penyimpanan. Buat minimal 1 rak agar penerimaan transfer berhasil.</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
