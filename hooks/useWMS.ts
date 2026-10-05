@@ -18,6 +18,7 @@ import {
   StockOpnameItem,
   StockScrap,
   StockReceipt,
+  StockReceiptType,
   StockReceiptDetailResponse,
   StockReceiptInput,
   StockTransfer,
@@ -375,11 +376,14 @@ export function useCreateStockScrap() {
 /**
  * Fetch inbound goods receipts (Barang Masuk), optionally filtered by warehouse.
  */
-export function useStockReceipts(warehouseId?: string | null) {
+export function useStockReceipts(warehouseId?: string | null, receiptType?: StockReceiptType | null) {
   return useQuery<StockReceipt[]>({
-    queryKey: ["wms", "receipts", warehouseId ?? "all"],
+    queryKey: ["wms", "receipts", warehouseId ?? "all", receiptType ?? "all"],
     queryFn: async () => {
-      const res = await api.wms.receipts.list({ warehouseId: warehouseId || undefined })
+      const res = await api.wms.receipts.list({
+        warehouseId: warehouseId || undefined,
+        receipt_type: receiptType || undefined,
+      })
       return res.data ?? []
     },
     retry: 1,

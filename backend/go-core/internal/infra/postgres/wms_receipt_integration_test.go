@@ -234,7 +234,7 @@ func TestStockReceiptRealPostgres(t *testing.T) {
 
 	// List filter by status.
 	st := domain.StockReceiptStatusCancelled
-	list, err := uc.ListStockReceipts(ctx, tenantID, userID, "admin", &warehouseID, &st)
+	list, err := uc.ListStockReceipts(ctx, tenantID, userID, "admin", &warehouseID, &st, nil)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 }

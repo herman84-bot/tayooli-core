@@ -108,8 +108,12 @@ describe('Barang Masuk page', () => {
 
     await waitFor(() => expect(createMutateAsync).toHaveBeenCalledTimes(1))
     expect(createMutateAsync).toHaveBeenCalledWith({
+      receipt_type: 'PRODUCTION',
       warehouse_id: WH,
       dest_location_id: LOC,
+      from_name: 'CV Sumber Rejeki',
+      from_warehouse_id: undefined,
+      source_ref: undefined,
       supplier_name: 'CV Sumber Rejeki',
       supplier_ref: undefined,
       notes: undefined,

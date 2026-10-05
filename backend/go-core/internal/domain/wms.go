@@ -58,12 +58,13 @@ const (
 type LocationType string
 
 const (
-	LocationTypeInternal LocationType = "INTERNAL"
-	LocationTypeVendor   LocationType = "VENDOR"
-	LocationTypeCustomer LocationType = "CUSTOMER"
-	LocationTypeTransit  LocationType = "TRANSIT"
-	LocationTypeLoss     LocationType = "LOSS"
-	LocationTypeScrap    LocationType = "SCRAP"
+	LocationTypeInternal   LocationType = "INTERNAL"
+	LocationTypeVendor     LocationType = "VENDOR"
+	LocationTypeCustomer   LocationType = "CUSTOMER"
+	LocationTypeTransit    LocationType = "TRANSIT"
+	LocationTypeLoss       LocationType = "LOSS"
+	LocationTypeScrap      LocationType = "SCRAP"
+	LocationTypeProduction LocationType = "PRODUCTION"
 )
 
 // SKUMappingType represents the type of external mapping.
@@ -382,29 +383,44 @@ type StockScrap struct {
 	CreatedAt          time.Time       `json:"created_at"`
 }
 
+// StockReceiptType identifies where goods originated: PRODUCTION, TRANSFER, or VENDOR.
+type StockReceiptType string
+
+const (
+	StockReceiptTypeProduction StockReceiptType = "PRODUCTION" // Hasil Produksi (Dapur / Pabrik / Workshop)
+	StockReceiptTypeTransfer   StockReceiptType = "TRANSFER"   // Kiriman Transfer Antar-Gudang
+	StockReceiptTypeVendor     StockReceiptType = "VENDOR"     // Pembelian dari Pemasok Luar
+)
+
 // StockReceipt represents an inbound goods receipt header (Barang Masuk).
 // ItemCount / TotalAcceptedQty / TotalRejectedQty are computed aggregates.
 type StockReceipt struct {
-	ID               uuid.UUID          `json:"id"`
-	TenantID         uuid.UUID          `json:"tenant_id"`
-	ReceiptNumber    string             `json:"receipt_number"`
-	WarehouseID      uuid.UUID          `json:"warehouse_id"`
-	DestLocationID   uuid.UUID          `json:"dest_location_id"`
-	SupplierName     string             `json:"supplier_name"`
-	SupplierRef      *string            `json:"supplier_ref,omitempty"`
-	Notes            *string            `json:"notes,omitempty"`
-	Status           StockReceiptStatus `json:"status"`
-	CreatedBy        uuid.UUID          `json:"created_by"`
-	CreatedAt        time.Time          `json:"created_at"`
-	UpdatedAt        time.Time          `json:"updated_at"`
-	PostedBy         *uuid.UUID         `json:"posted_by,omitempty"`
-	PostedAt         *time.Time         `json:"posted_at,omitempty"`
-	CancelledBy      *uuid.UUID         `json:"cancelled_by,omitempty"`
-	CancelledAt      *time.Time         `json:"cancelled_at,omitempty"`
-	CancelReason     *string            `json:"cancel_reason,omitempty"`
-	ItemCount        int                `json:"item_count"`
-	TotalAcceptedQty decimal.Decimal    `json:"total_accepted_qty"`
-	TotalRejectedQty decimal.Decimal    `json:"total_rejected_qty"`
+	ID                uuid.UUID          `json:"id"`
+	TenantID          uuid.UUID          `json:"tenant_id"`
+	ReceiptNumber     string             `json:"receipt_number"`
+	ReceiptType       StockReceiptType   `json:"receipt_type"`
+	WarehouseID       uuid.UUID          `json:"warehouse_id"`
+	DestLocationID    uuid.UUID          `json:"dest_location_id"`
+	FromName          string             `json:"from_name"` // Universal source display name (Produksi / Gudang Asal / Supplier)
+	FromWarehouseID   *uuid.UUID         `json:"from_warehouse_id,omitempty"`
+	FromWarehouseName *string            `json:"from_warehouse_name,omitempty"`
+	SourceRef         *string            `json:"source_ref,omitempty"` // No. Batch / No. SPK / No. Transfer / Surat Jalan
+	TransferID        *uuid.UUID         `json:"transfer_id,omitempty"`
+	SupplierName      string             `json:"supplier_name,omitempty"` // Backward-compatible alias of FromName
+	SupplierRef       *string            `json:"supplier_ref,omitempty"`  // Backward-compatible alias of SourceRef
+	Notes             *string            `json:"notes,omitempty"`
+	Status            StockReceiptStatus `json:"status"`
+	CreatedBy         uuid.UUID          `json:"created_by"`
+	CreatedAt         time.Time          `json:"created_at"`
+	UpdatedAt         time.Time          `json:"updated_at"`
+	PostedBy          *uuid.UUID         `json:"posted_by,omitempty"`
+	PostedAt          *time.Time         `json:"posted_at,omitempty"`
+	CancelledBy       *uuid.UUID         `json:"cancelled_by,omitempty"`
+	CancelledAt       *time.Time         `json:"cancelled_at,omitempty"`
+	CancelReason      *string            `json:"cancel_reason,omitempty"`
+	ItemCount         int                `json:"item_count"`
+	TotalAcceptedQty  decimal.Decimal    `json:"total_accepted_qty"`
+	TotalRejectedQty  decimal.Decimal    `json:"total_rejected_qty"`
 }
 
 // StockReceiptItem represents a received product line.
@@ -551,11 +567,11 @@ type WMSRepository interface {
 	// UpdateDraftStockReceipt replaces header fields and all items in one tx; ErrStockReceiptNotDraft if not DRAFT.
 	UpdateDraftStockReceipt(ctx context.Context, rc *StockReceipt, items []StockReceiptItem) error
 	GetStockReceiptByID(ctx context.Context, tenantID, id uuid.UUID) (*StockReceipt, []StockReceiptItem, error)
-	ListStockReceipts(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *StockReceiptStatus) ([]StockReceipt, error)
+	ListStockReceipts(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *StockReceiptStatus, receiptType *StockReceiptType) ([]StockReceipt, error)
 	// PostStockReceipt atomically writes ledger movements and sets POSTED.
-	PostStockReceipt(ctx context.Context, tenantID, id, userID, vendorLocID, scrapLocID uuid.UUID) (*StockReceipt, error)
+	PostStockReceipt(ctx context.Context, tenantID, id, userID, sourceLocID, scrapLocID uuid.UUID) (*StockReceipt, error)
 	// CancelStockReceipt atomically cancels a DRAFT, or reverses a POSTED receipt's movements.
-	CancelStockReceipt(ctx context.Context, tenantID, id, userID, vendorLocID, scrapLocID uuid.UUID, reason string) (*StockReceipt, error)
+	CancelStockReceipt(ctx context.Context, tenantID, id, userID, defaultSourceLocID, scrapLocID uuid.UUID, reason string) (*StockReceipt, error)
 
 	// Marketplace Sales Orders & SKU Mappings
 	CreateMarketplaceBatch(ctx context.Context, batch *MarketplaceImportBatch) error

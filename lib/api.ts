@@ -615,14 +615,21 @@ export interface CreateStockScrapInput {
 }
 
 export type StockReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED"
+export type StockReceiptType = "PRODUCTION" | "TRANSFER" | "VENDOR"
 
 export interface StockReceipt {
   id: string
   tenant_id: string
   receipt_number: string
+  receipt_type: StockReceiptType
   warehouse_id: string
   dest_location_id: string
-  supplier_name: string
+  from_name: string
+  from_warehouse_id?: string
+  from_warehouse_name?: string
+  source_ref?: string
+  transfer_id?: string
+  supplier_name?: string
   supplier_ref?: string
   notes?: string
   status: StockReceiptStatus
@@ -662,9 +669,14 @@ export interface StockReceiptItemInput {
 }
 
 export interface StockReceiptInput {
+  receipt_type?: StockReceiptType
   warehouse_id: string
   dest_location_id: string
-  supplier_name: string
+  from_name?: string
+  from_warehouse_id?: string
+  source_ref?: string
+  transfer_id?: string
+  supplier_name?: string
   supplier_ref?: string
   notes?: string
   items: StockReceiptItemInput[]
@@ -1028,10 +1040,11 @@ export const api = {
         }),
     },
     receipts: {
-      list: (params?: { warehouseId?: string; status?: StockReceiptStatus }) => {
+      list: (params?: { warehouseId?: string; status?: StockReceiptStatus; receipt_type?: StockReceiptType }) => {
         const q = new URLSearchParams()
         if (params?.warehouseId) q.set("warehouse_id", params.warehouseId)
         if (params?.status) q.set("status", params.status)
+        if (params?.receipt_type) q.set("receipt_type", params.receipt_type)
         const s = q.toString()
         return request<{ data: StockReceipt[] }>(`/wms/receipts${s ? `?${s}` : ""}`)
       },

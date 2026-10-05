@@ -58,8 +58,16 @@ func (h *WMSHandler) ListStockReceipts(w http.ResponseWriter, r *http.Request) {
 		st := domain.StockReceiptStatus(strings.ToUpper(s))
 		statusPtr = &st
 	}
+	var typePtr *domain.StockReceiptType
+	if t := strings.TrimSpace(r.URL.Query().Get("receipt_type")); t != "" {
+		tp := domain.StockReceiptType(strings.ToUpper(t))
+		typePtr = &tp
+	} else if t := strings.TrimSpace(r.URL.Query().Get("type")); t != "" {
+		tp := domain.StockReceiptType(strings.ToUpper(t))
+		typePtr = &tp
+	}
 
-	receipts, err := h.uc.ListStockReceipts(r.Context(), tenantID, userID, role, whIDPtr, statusPtr)
+	receipts, err := h.uc.ListStockReceipts(r.Context(), tenantID, userID, role, whIDPtr, statusPtr, typePtr)
 	if err != nil {
 		handleWMSError(w, r, err)
 		return

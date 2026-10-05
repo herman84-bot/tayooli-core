@@ -22,15 +22,21 @@ import (
 // -----------------------------------------------------------------------------
 
 const createStockReceiptSQL = `
-INSERT INTO stock_receipts (id, tenant_id, receipt_number, warehouse_id, dest_location_id, supplier_name, supplier_ref, notes, status, created_by, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+INSERT INTO stock_receipts (
+	id, tenant_id, receipt_number, receipt_type, warehouse_id, dest_location_id,
+	from_name, from_warehouse_id, source_ref, transfer_id, supplier_name, supplier_ref,
+	notes, status, created_by, created_at, updated_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`
 
 const createStockReceiptItemSQL = `
 INSERT INTO stock_receipt_items (id, tenant_id, receipt_id, product_id, expected_qty, accepted_qty, rejected_qty, reject_reason, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
 const stockReceiptColumns = `
-r.id, r.tenant_id, r.receipt_number, r.warehouse_id, r.dest_location_id, r.supplier_name, r.supplier_ref, r.notes,
+r.id, r.tenant_id, r.receipt_number, r.receipt_type, r.warehouse_id, r.dest_location_id,
+COALESCE(r.from_name, r.supplier_name, ''), r.from_warehouse_id, fw.name, r.source_ref, r.transfer_id,
+COALESCE(r.supplier_name, r.from_name, ''), r.supplier_ref, r.notes,
 r.status, r.created_by, r.created_at, r.updated_at, r.posted_by, r.posted_at, r.cancelled_by, r.cancelled_at, r.cancel_reason,
 (SELECT COUNT(*) FROM stock_receipt_items i WHERE i.receipt_id = r.id AND i.tenant_id = r.tenant_id),
 (SELECT COALESCE(SUM(i.accepted_qty), 0) FROM stock_receipt_items i WHERE i.receipt_id = r.id AND i.tenant_id = r.tenant_id),
@@ -46,14 +52,26 @@ ORDER BY i.created_at, i.id`
 
 func scanStockReceipt(s rowScanner) (*domain.StockReceipt, error) {
 	var rc domain.StockReceipt
-	var supRef, notes, postedBy, cancelledBy, cancelReason sql.NullString
+	var fromWhID, transferID, postedBy, cancelledBy sql.NullString
+	var fromWhName, sourceRef, supName, supRef, notes, cancelReason sql.NullString
 	var postedAt, cancelledAt sql.NullTime
 	if err := s.Scan(
-		&rc.ID, &rc.TenantID, &rc.ReceiptNumber, &rc.WarehouseID, &rc.DestLocationID, &rc.SupplierName, &supRef, &notes,
+		&rc.ID, &rc.TenantID, &rc.ReceiptNumber, &rc.ReceiptType, &rc.WarehouseID, &rc.DestLocationID,
+		&rc.FromName, &fromWhID, &fromWhName, &sourceRef, &transferID,
+		&supName, &supRef, &notes,
 		&rc.Status, &rc.CreatedBy, &rc.CreatedAt, &rc.UpdatedAt, &postedBy, &postedAt, &cancelledBy, &cancelledAt, &cancelReason,
 		&rc.ItemCount, &rc.TotalAcceptedQty, &rc.TotalRejectedQty,
 	); err != nil {
 		return nil, err
+	}
+	rc.FromWarehouseID = nullUUIDToPtr(fromWhID)
+	rc.FromWarehouseName = nullStringToPtr(fromWhName)
+	rc.SourceRef = nullStringToPtr(sourceRef)
+	rc.TransferID = nullUUIDToPtr(transferID)
+	if supName.Valid {
+		rc.SupplierName = supName.String
+	} else {
+		rc.SupplierName = rc.FromName
 	}
 	rc.SupplierRef = nullStringToPtr(supRef)
 	rc.Notes = nullStringToPtr(notes)
@@ -66,7 +84,10 @@ func scanStockReceipt(s rowScanner) (*domain.StockReceipt, error) {
 }
 
 func getStockReceiptTx(ctx context.Context, tx *sql.Tx, tenantID, id uuid.UUID, forUpdate bool) (*domain.StockReceipt, error) {
-	q := `SELECT ` + stockReceiptColumns + ` FROM stock_receipts r WHERE r.id = $1 AND r.tenant_id = $2`
+	q := `SELECT ` + stockReceiptColumns + `
+FROM stock_receipts r
+LEFT JOIN warehouses fw ON fw.id = r.from_warehouse_id AND fw.tenant_id = r.tenant_id
+WHERE r.id = $1 AND r.tenant_id = $2`
 	if forUpdate {
 		q += ` FOR UPDATE OF r`
 	}
@@ -149,10 +170,28 @@ func (r *WMSRepo) CreateStockReceipt(ctx context.Context, rc *domain.StockReceip
 	if rc.Status == "" {
 		rc.Status = domain.StockReceiptStatusDraft
 	}
+	if rc.ReceiptType == "" {
+		rc.ReceiptType = domain.StockReceiptTypeProduction
+	}
+	if rc.FromName == "" {
+		if rc.SupplierName != "" {
+			rc.FromName = rc.SupplierName
+		} else if rc.ReceiptType == domain.StockReceiptTypeProduction {
+			rc.FromName = "Hasil Produksi"
+		}
+	}
+	if rc.SupplierName == "" {
+		rc.SupplierName = rc.FromName
+	}
+	if rc.SourceRef == nil && rc.SupplierRef != nil {
+		rc.SourceRef = rc.SupplierRef
+	}
 
 	if _, err := tx.ExecContext(ctx, createStockReceiptSQL,
-		rc.ID, rc.TenantID, rc.ReceiptNumber, rc.WarehouseID, rc.DestLocationID, rc.SupplierName,
-		ptrToNullString(rc.SupplierRef), ptrToNullString(rc.Notes), rc.Status, rc.CreatedBy,
+		rc.ID, rc.TenantID, rc.ReceiptNumber, rc.ReceiptType, rc.WarehouseID, rc.DestLocationID,
+		rc.FromName, ptrToNullUUID(rc.FromWarehouseID), ptrToNullString(rc.SourceRef), ptrToNullUUID(rc.TransferID),
+		rc.SupplierName, ptrToNullString(rc.SupplierRef),
+		ptrToNullString(rc.Notes), rc.Status, rc.CreatedBy,
 		rc.CreatedAt, rc.UpdatedAt); err != nil {
 		if isUniqueViolation(err) {
 			return fmt.Errorf("WMSRepo.CreateStockReceipt: duplicate receipt number: %w", domain.ErrConflict)
@@ -186,12 +225,32 @@ func (r *WMSRepo) UpdateDraftStockReceipt(ctx context.Context, rc *domain.StockR
 	}
 
 	now := time.Now().UTC()
+	if rc.ReceiptType == "" {
+		rc.ReceiptType = domain.StockReceiptTypeProduction
+	}
+	if rc.FromName == "" {
+		if rc.SupplierName != "" {
+			rc.FromName = rc.SupplierName
+		} else if rc.ReceiptType == domain.StockReceiptTypeProduction {
+			rc.FromName = "Hasil Produksi"
+		}
+	}
+	if rc.SupplierName == "" {
+		rc.SupplierName = rc.FromName
+	}
+	if rc.SourceRef == nil && rc.SupplierRef != nil {
+		rc.SourceRef = rc.SupplierRef
+	}
+
 	if _, err := tx.ExecContext(ctx, `
 UPDATE stock_receipts
-SET warehouse_id = $3, dest_location_id = $4, supplier_name = $5, supplier_ref = $6, notes = $7, updated_at = $8
-WHERE id = $1 AND tenant_id = $2`,
-		rc.ID, rc.TenantID, rc.WarehouseID, rc.DestLocationID, rc.SupplierName,
-		ptrToNullString(rc.SupplierRef), ptrToNullString(rc.Notes), now); err != nil {
+SET receipt_type = $3, warehouse_id = $4, dest_location_id = $5, from_name = $6,
+    from_warehouse_id = $7, source_ref = $8, transfer_id = $9, supplier_name = $10,
+    supplier_ref = $11, notes = $12, updated_at = $13
+WHERE id = $1 AND tenant_id = $2 AND status = 'DRAFT'`,
+		rc.ID, rc.TenantID, rc.ReceiptType, rc.WarehouseID, rc.DestLocationID, rc.FromName,
+		ptrToNullUUID(rc.FromWarehouseID), ptrToNullString(rc.SourceRef), ptrToNullUUID(rc.TransferID),
+		rc.SupplierName, ptrToNullString(rc.SupplierRef), ptrToNullString(rc.Notes), now); err != nil {
 		return fmt.Errorf("WMSRepo.UpdateDraftStockReceipt: update header: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM stock_receipt_items WHERE receipt_id = $1 AND tenant_id = $2`, rc.ID, rc.TenantID); err != nil {
@@ -237,7 +296,7 @@ func (r *WMSRepo) GetStockReceiptByID(ctx context.Context, tenantID, id uuid.UUI
 	return rc, items, nil
 }
 
-func (r *WMSRepo) ListStockReceipts(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *domain.StockReceiptStatus) ([]domain.StockReceipt, error) {
+func (r *WMSRepo) ListStockReceipts(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *domain.StockReceiptStatus, receiptType *domain.StockReceiptType) ([]domain.StockReceipt, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.ListStockReceipts: begin tx: %w", err)
@@ -248,18 +307,23 @@ func (r *WMSRepo) ListStockReceipts(ctx context.Context, tenantID uuid.UUID, war
 		return nil, fmt.Errorf("WMSRepo.ListStockReceipts: set tenant: %w", err)
 	}
 
-	var statusArg sql.NullString
+	var statusArg, typeArg sql.NullString
 	if status != nil {
 		statusArg = sql.NullString{String: string(*status), Valid: true}
 	}
+	if receiptType != nil {
+		typeArg = sql.NullString{String: string(*receiptType), Valid: true}
+	}
 	query := `SELECT ` + stockReceiptColumns + `
 FROM stock_receipts r
+LEFT JOIN warehouses fw ON fw.id = r.from_warehouse_id AND fw.tenant_id = r.tenant_id
 WHERE r.tenant_id = $1
   AND ($2::uuid IS NULL OR r.warehouse_id = $2)
   AND ($3::varchar IS NULL OR r.status = $3)
+  AND ($4::varchar IS NULL OR r.receipt_type = $4)
 ORDER BY r.created_at DESC`
 
-	rows, err := tx.QueryContext(ctx, query, tenantID, ptrToNullUUID(warehouseID), statusArg)
+	rows, err := tx.QueryContext(ctx, query, tenantID, ptrToNullUUID(warehouseID), statusArg, typeArg)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.ListStockReceipts: query: %w", err)
 	}
@@ -318,7 +382,7 @@ ORDER BY created_at, id LIMIT 1`,
 // PostStockReceipt: DRAFT -> POSTED in a single transaction. The header row is
 // locked FOR UPDATE so concurrent/double posts serialize and the second one
 // sees POSTED and returns ErrStockReceiptNotDraft (no double ledger entries).
-func (r *WMSRepo) PostStockReceipt(ctx context.Context, tenantID, id, userID, vendorLocID, scrapLocID uuid.UUID) (*domain.StockReceipt, error) {
+func (r *WMSRepo) PostStockReceipt(ctx context.Context, tenantID, id, userID, sourceLocID, scrapLocID uuid.UUID) (*domain.StockReceipt, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.PostStockReceipt: begin tx: %w", err)
@@ -350,17 +414,24 @@ func (r *WMSRepo) PostStockReceipt(ctx context.Context, tenantID, id, userID, ve
 	now := time.Now().UTC()
 	for i, it := range items {
 		if it.AcceptedQty.GreaterThan(decimal.Zero) {
-			if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, it.ProductID, vendorLocID, rc.DestLocationID,
+			if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, it.ProductID, sourceLocID, rc.DestLocationID,
 				it.AcceptedQty, fmt.Sprintf("GR-IN-%s-%d", rc.ReceiptNumber, i+1), now); err != nil {
 				return nil, fmt.Errorf("WMSRepo.PostStockReceipt: accepted movement %d: %w", i, err)
 			}
 		}
 		if it.RejectedQty.GreaterThan(decimal.Zero) {
-			if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, it.ProductID, vendorLocID, scrapLocID,
+			if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, it.ProductID, sourceLocID, scrapLocID,
 				it.RejectedQty, fmt.Sprintf("GR-REJ-%s-%d", rc.ReceiptNumber, i+1), now); err != nil {
 				return nil, fmt.Errorf("WMSRepo.PostStockReceipt: rejected movement %d: %w", i, err)
 			}
 		}
+	}
+
+	if rc.TransferID != nil {
+		_, _ = tx.ExecContext(ctx, `
+UPDATE stock_transfers
+SET status = 'RECEIVED', received_at = $3, updated_at = $3
+WHERE id = $1 AND tenant_id = $2 AND status IN ('DISPATCHED', 'IN_TRANSIT')`, *rc.TransferID, tenantID, now)
 	}
 
 	if _, err := tx.ExecContext(ctx, `

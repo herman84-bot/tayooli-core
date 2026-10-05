@@ -24,12 +24,17 @@ type StockReceiptItemRequest struct {
 }
 
 type StockReceiptRequest struct {
-	WarehouseID    uuid.UUID                 `json:"warehouse_id"`
-	DestLocationID uuid.UUID                 `json:"dest_location_id"`
-	SupplierName   string                    `json:"supplier_name"`
-	SupplierRef    *string                   `json:"supplier_ref,omitempty"`
-	Notes          *string                   `json:"notes,omitempty"`
-	Items          []StockReceiptItemRequest `json:"items"`
+	ReceiptType     domain.StockReceiptType   `json:"receipt_type"` // "PRODUCTION", "TRANSFER", "VENDOR"
+	WarehouseID     uuid.UUID                 `json:"warehouse_id"`
+	DestLocationID  uuid.UUID                 `json:"dest_location_id"`
+	FromName        string                    `json:"from_name"`
+	FromWarehouseID *uuid.UUID                `json:"from_warehouse_id,omitempty"`
+	SourceRef       *string                   `json:"source_ref,omitempty"`
+	TransferID      *uuid.UUID                `json:"transfer_id,omitempty"`
+	SupplierName    string                    `json:"supplier_name,omitempty"`
+	SupplierRef     *string                   `json:"supplier_ref,omitempty"`
+	Notes           *string                   `json:"notes,omitempty"`
+	Items           []StockReceiptItemRequest `json:"items"`
 }
 
 func receiptInvalid(msg string) error {
@@ -55,9 +60,44 @@ func (u *Usecase) validateStockReceiptRequest(ctx context.Context, tenantID, use
 	if req.DestLocationID == uuid.Nil {
 		return nil, receiptInvalid("Lokasi tujuan wajib dipilih")
 	}
-	if strings.TrimSpace(req.SupplierName) == "" {
-		return nil, receiptInvalid("Nama pemasok wajib diisi")
+
+	fromName := strings.TrimSpace(req.FromName)
+	if fromName == "" {
+		fromName = strings.TrimSpace(req.SupplierName)
 	}
+
+	if req.ReceiptType == "" {
+		if strings.TrimSpace(req.SupplierName) != "" {
+			req.ReceiptType = domain.StockReceiptTypeVendor
+		} else if fromName == "" {
+			return nil, receiptInvalid("Nama pemasok wajib diisi")
+		} else {
+			req.ReceiptType = domain.StockReceiptTypeProduction
+		}
+	}
+	switch req.ReceiptType {
+	case domain.StockReceiptTypeProduction, domain.StockReceiptTypeTransfer, domain.StockReceiptTypeVendor:
+	default:
+		return nil, receiptInvalid("Tipe penerimaan tidak valid (pilih: PRODUCTION, TRANSFER, atau VENDOR)")
+	}
+
+	if req.ReceiptType == domain.StockReceiptTypeProduction {
+		if fromName == "" {
+			fromName = "Hasil Produksi"
+		}
+	} else if req.ReceiptType == domain.StockReceiptTypeTransfer {
+		if req.FromWarehouseID != nil && *req.FromWarehouseID == req.WarehouseID {
+			return nil, receiptInvalid("Gudang pengirim (asal) tidak boleh sama dengan gudang penerima (tujuan)")
+		}
+		if fromName == "" && req.FromWarehouseID == nil {
+			return nil, receiptInvalid("Gudang pengirim atau asal transfer wajib ditentukan")
+		}
+	} else if req.ReceiptType == domain.StockReceiptTypeVendor {
+		if fromName == "" {
+			return nil, receiptInvalid("Nama pemasok wajib diisi")
+		}
+	}
+
 	if len(req.Items) == 0 {
 		return nil, receiptInvalid("Penerimaan harus memiliki minimal satu barang")
 	}
@@ -125,17 +165,34 @@ func (u *Usecase) CreateStockReceipt(ctx context.Context, tenantID, userID uuid.
 	if err != nil {
 		return nil, nil, err
 	}
+	fromName := strings.TrimSpace(req.FromName)
+	if fromName == "" {
+		fromName = strings.TrimSpace(req.SupplierName)
+	}
+	if req.ReceiptType == domain.StockReceiptTypeProduction && fromName == "" {
+		fromName = "Hasil Produksi"
+	}
+	sourceRef := trimPtr(req.SourceRef)
+	if sourceRef == nil {
+		sourceRef = trimPtr(req.SupplierRef)
+	}
+
 	rc := &domain.StockReceipt{
-		ID:             uuid.New(),
-		TenantID:       tenantID,
-		ReceiptNumber:  generateReceiptNumber(),
-		WarehouseID:    req.WarehouseID,
-		DestLocationID: req.DestLocationID,
-		SupplierName:   strings.TrimSpace(req.SupplierName),
-		SupplierRef:    trimPtr(req.SupplierRef),
-		Notes:          trimPtr(req.Notes),
-		Status:         domain.StockReceiptStatusDraft,
-		CreatedBy:      userID,
+		ID:              uuid.New(),
+		TenantID:        tenantID,
+		ReceiptNumber:   generateReceiptNumber(),
+		ReceiptType:     req.ReceiptType,
+		WarehouseID:     req.WarehouseID,
+		DestLocationID:  req.DestLocationID,
+		FromName:        fromName,
+		FromWarehouseID: req.FromWarehouseID,
+		SourceRef:       sourceRef,
+		TransferID:      req.TransferID,
+		SupplierName:    fromName,
+		SupplierRef:     sourceRef,
+		Notes:           trimPtr(req.Notes),
+		Status:          domain.StockReceiptStatusDraft,
+		CreatedBy:       userID,
 	}
 	if err := u.repo.CreateStockReceipt(ctx, rc, items); err != nil {
 		return nil, nil, fmt.Errorf("CreateStockReceipt: %w", err)
@@ -159,14 +216,33 @@ func (u *Usecase) UpdateStockReceipt(ctx context.Context, tenantID, userID uuid.
 	if err != nil {
 		return nil, nil, err
 	}
+	fromName := strings.TrimSpace(req.FromName)
+	if fromName == "" {
+		fromName = strings.TrimSpace(req.SupplierName)
+	}
+	if req.ReceiptType == domain.StockReceiptTypeProduction && fromName == "" {
+		fromName = "Hasil Produksi"
+	}
+	sourceRef := trimPtr(req.SourceRef)
+	if sourceRef == nil {
+		sourceRef = trimPtr(req.SupplierRef)
+	}
+
 	rc := &domain.StockReceipt{
-		ID:             receiptID,
-		TenantID:       tenantID,
-		WarehouseID:    req.WarehouseID,
-		DestLocationID: req.DestLocationID,
-		SupplierName:   strings.TrimSpace(req.SupplierName),
-		SupplierRef:    trimPtr(req.SupplierRef),
-		Notes:          trimPtr(req.Notes),
+		ID:              receiptID,
+		TenantID:        tenantID,
+		ReceiptNumber:   existing.ReceiptNumber,
+		ReceiptType:     req.ReceiptType,
+		WarehouseID:     req.WarehouseID,
+		DestLocationID:  req.DestLocationID,
+		FromName:        fromName,
+		FromWarehouseID: req.FromWarehouseID,
+		SourceRef:       sourceRef,
+		TransferID:      req.TransferID,
+		SupplierName:    fromName,
+		SupplierRef:     sourceRef,
+		Notes:           trimPtr(req.Notes),
+		Status:          domain.StockReceiptStatusDraft,
 	}
 	// Repo re-checks DRAFT under a row lock, so a concurrent post cannot slip through.
 	if err := u.repo.UpdateDraftStockReceipt(ctx, rc, items); err != nil {
@@ -189,7 +265,7 @@ func (u *Usecase) GetStockReceipt(ctx context.Context, tenantID, userID uuid.UUI
 	return rc, items, nil
 }
 
-func (u *Usecase) ListStockReceipts(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.StockReceiptStatus) ([]domain.StockReceipt, error) {
+func (u *Usecase) ListStockReceipts(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.StockReceiptStatus, receiptType *domain.StockReceiptType) ([]domain.StockReceipt, error) {
 	if status != nil {
 		switch *status {
 		case domain.StockReceiptStatusDraft, domain.StockReceiptStatusPosted, domain.StockReceiptStatusCancelled:
@@ -197,11 +273,18 @@ func (u *Usecase) ListStockReceipts(ctx context.Context, tenantID, userID uuid.U
 			return nil, receiptInvalid("Status penerimaan tidak dikenal")
 		}
 	}
+	if receiptType != nil {
+		switch *receiptType {
+		case domain.StockReceiptTypeProduction, domain.StockReceiptTypeTransfer, domain.StockReceiptTypeVendor:
+		default:
+			return nil, receiptInvalid("Tipe penerimaan tidak dikenal")
+		}
+	}
 	if warehouseID != nil {
 		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
 			return nil, err
 		}
-		list, err := u.repo.ListStockReceipts(ctx, tenantID, warehouseID, status)
+		list, err := u.repo.ListStockReceipts(ctx, tenantID, warehouseID, status, receiptType)
 		if err != nil {
 			return nil, err
 		}
@@ -219,7 +302,7 @@ func (u *Usecase) ListStockReceipts(ctx context.Context, tenantID, userID uuid.U
 	for _, w := range accessibleWHs {
 		whSet[w.ID] = true
 	}
-	all, err := u.repo.ListStockReceipts(ctx, tenantID, nil, status)
+	all, err := u.repo.ListStockReceipts(ctx, tenantID, nil, status, receiptType)
 	if err != nil {
 		return nil, err
 	}
@@ -232,18 +315,28 @@ func (u *Usecase) ListStockReceipts(ctx context.Context, tenantID, userID uuid.U
 	return result, nil
 }
 
-// systemReceiptLocations resolves @VENDOR and @SCRAP before the posting tx is opened
-// (GetOrCreateSystemLocation runs in its own transaction).
-func (u *Usecase) systemReceiptLocations(ctx context.Context, tenantID uuid.UUID) (uuid.UUID, uuid.UUID, error) {
-	vendorLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeVendor)
+// systemReceiptLocations resolves source virtual location (@PRODUCTION, @TRANSIT, or @VENDOR)
+// and scrap virtual location (@SCRAP) before the posting tx is opened.
+func (u *Usecase) systemReceiptLocations(ctx context.Context, tenantID uuid.UUID, rType domain.StockReceiptType) (uuid.UUID, uuid.UUID, error) {
+	var srcLocType domain.LocationType
+	switch rType {
+	case domain.StockReceiptTypeProduction:
+		srcLocType = domain.LocationTypeProduction
+	case domain.StockReceiptTypeTransfer:
+		srcLocType = domain.LocationTypeTransit
+	default:
+		srcLocType = domain.LocationTypeVendor
+	}
+
+	srcLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, srcLocType)
 	if err != nil {
-		return uuid.Nil, uuid.Nil, fmt.Errorf("stock receipt: get virtual vendor loc: %w", err)
+		return uuid.Nil, uuid.Nil, fmt.Errorf("stock receipt: get virtual %s loc: %w", srcLocType, err)
 	}
 	scrapLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeScrap)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, fmt.Errorf("stock receipt: get virtual scrap loc: %w", err)
 	}
-	return vendorLoc.ID, scrapLoc.ID, nil
+	return srcLoc.ID, scrapLoc.ID, nil
 }
 
 func (u *Usecase) PostStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, error) {
@@ -257,11 +350,11 @@ func (u *Usecase) PostStockReceipt(ctx context.Context, tenantID, userID uuid.UU
 	if existing.Status != domain.StockReceiptStatusDraft {
 		return nil, domain.ErrStockReceiptNotDraft
 	}
-	vendorID, scrapID, err := u.systemReceiptLocations(ctx, tenantID)
+	sourceLocID, scrapID, err := u.systemReceiptLocations(ctx, tenantID, existing.ReceiptType)
 	if err != nil {
 		return nil, err
 	}
-	return u.repo.PostStockReceipt(ctx, tenantID, receiptID, userID, vendorID, scrapID)
+	return u.repo.PostStockReceipt(ctx, tenantID, receiptID, userID, sourceLocID, scrapID)
 }
 
 func (u *Usecase) CancelStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID, reason string) (*domain.StockReceipt, error) {
@@ -279,9 +372,9 @@ func (u *Usecase) CancelStockReceipt(ctx context.Context, tenantID, userID uuid.
 	if existing.Status == domain.StockReceiptStatusCancelled {
 		return nil, domain.ErrStockReceiptAlreadyCancelled
 	}
-	vendorID, scrapID, err := u.systemReceiptLocations(ctx, tenantID)
+	defaultSourceLocID, scrapID, err := u.systemReceiptLocations(ctx, tenantID, existing.ReceiptType)
 	if err != nil {
 		return nil, err
 	}
-	return u.repo.CancelStockReceipt(ctx, tenantID, receiptID, userID, vendorID, scrapID, reason)
+	return u.repo.CancelStockReceipt(ctx, tenantID, receiptID, userID, defaultSourceLocID, scrapID, reason)
 }

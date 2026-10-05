@@ -53,6 +53,8 @@ func (m *mockWMSRepo) UpdateDraftStockReceipt(ctx context.Context, rc *domain.St
 		return domain.ErrStockReceiptNotDraft
 	}
 	cur.WarehouseID, cur.DestLocationID = rc.WarehouseID, rc.DestLocationID
+	cur.ReceiptType, cur.FromName = rc.ReceiptType, rc.FromName
+	cur.FromWarehouseID, cur.SourceRef, cur.TransferID = rc.FromWarehouseID, rc.SourceRef, rc.TransferID
 	cur.SupplierName, cur.SupplierRef, cur.Notes = rc.SupplierName, rc.SupplierRef, rc.Notes
 	for i := range items {
 		items[i].ID = uuid.New()
@@ -80,11 +82,11 @@ func (m *mockWMSRepo) GetStockReceiptByID(ctx context.Context, tenantID, id uuid
 	return &cp, items, nil
 }
 
-func (m *mockWMSRepo) ListStockReceipts(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *domain.StockReceiptStatus) ([]domain.StockReceipt, error) {
+func (m *mockWMSRepo) ListStockReceipts(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *domain.StockReceiptStatus, receiptType *domain.StockReceiptType) ([]domain.StockReceipt, error) {
 	m.initReceipts()
 	var list []domain.StockReceipt
 	for id, rc := range m.stockReceipts {
-		if rc.TenantID != tenantID || (warehouseID != nil && rc.WarehouseID != *warehouseID) || (status != nil && rc.Status != *status) {
+		if rc.TenantID != tenantID || (warehouseID != nil && rc.WarehouseID != *warehouseID) || (status != nil && rc.Status != *status) || (receiptType != nil && rc.ReceiptType != *receiptType) {
 			continue
 		}
 		cp, _, _ := m.GetStockReceiptByID(ctx, tenantID, id)
@@ -383,32 +385,141 @@ func TestStockReceiptLifecycle(t *testing.T) {
 
 	t.Run("list filters by status and warehouse scope", func(t *testing.T) {
 		posted := domain.StockReceiptStatusPosted
-		list, err := usecase.ListStockReceipts(ctx, tenantID, staffID, "warehouse", nil, &posted)
+		list, err := usecase.ListStockReceipts(ctx, tenantID, staffID, "warehouse", nil, &posted, nil)
 		require.NoError(t, err)
 		require.Len(t, list, 1)
 
-		all, err := usecase.ListStockReceipts(ctx, tenantID, staffID, "warehouse", &whID, nil)
+		all, err := usecase.ListStockReceipts(ctx, tenantID, staffID, "warehouse", &whID, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, all, 3)
 
-		_, err = usecase.ListStockReceipts(ctx, tenantID, outsiderID, "warehouse", &whID, nil)
+		_, err = usecase.ListStockReceipts(ctx, tenantID, outsiderID, "warehouse", &whID, nil, nil)
 		assert.ErrorIs(t, err, domain.ErrUnauthorizedWarehouse)
 
-		outsiderList, err := usecase.ListStockReceipts(ctx, tenantID, outsiderID, "warehouse", nil, nil)
+		outsiderList, err := usecase.ListStockReceipts(ctx, tenantID, outsiderID, "warehouse", nil, nil, nil)
 		require.NoError(t, err)
 		assert.Empty(t, outsiderList)
 
 		bad := domain.StockReceiptStatus("BOGUS")
-		_, err = usecase.ListStockReceipts(ctx, tenantID, staffID, "warehouse", nil, &bad)
+		_, err = usecase.ListStockReceipts(ctx, tenantID, staffID, "warehouse", nil, &bad, nil)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 	})
 
 	t.Run("not found and cross-tenant", func(t *testing.T) {
 		_, err := usecase.PostStockReceipt(ctx, tenantID, staffID, "warehouse", uuid.New())
 		assert.ErrorIs(t, err, domain.ErrStockReceiptNotFound)
-		list, _ := usecase.ListStockReceipts(ctx, tenantID, staffID, "warehouse", &whID, nil)
+		list, _ := usecase.ListStockReceipts(ctx, tenantID, staffID, "warehouse", &whID, nil, nil)
 		_, _, err = usecase.GetStockReceipt(ctx, uuid.New(), staffID, "admin", list[0].ID)
 		assert.ErrorIs(t, err, domain.ErrStockReceiptNotFound)
+	})
+
+	t.Run("multi-source inbound: production output and branch transfer", func(t *testing.T) {
+		// 1. Production receipt to primary warehouse
+		prodReq := uc.StockReceiptRequest{
+			ReceiptType:    domain.StockReceiptTypeProduction,
+			WarehouseID:    whID,
+			DestLocationID: binLoc,
+			FromName:       "Dapur Pusat / Lini Produksi A",
+			SourceRef:      strp("BATCH-202610-001"),
+			Items: []uc.StockReceiptItemRequest{
+				{ProductID: prodA, ExpectedQty: decPtr(50), AcceptedQty: dec(48), RejectedQty: dec(2), RejectReason: strp("Cacat cetakan")},
+			},
+		}
+		prodRc, items, err := usecase.CreateStockReceipt(ctx, tenantID, staffID, "warehouse", prodReq)
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptTypeProduction, prodRc.ReceiptType)
+		assert.Equal(t, "Dapur Pusat / Lini Produksi A", prodRc.FromName)
+		assert.Equal(t, "BATCH-202610-001", *prodRc.SourceRef)
+		require.Len(t, items, 1)
+
+		postedProd, err := usecase.PostStockReceipt(ctx, tenantID, staffID, "warehouse", prodRc.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptStatusPosted, postedProd.Status)
+
+		prodLoc, _ := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeProduction)
+		scrapLoc, _ := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeScrap)
+		// Check that source location is @PRODUCTION
+		var foundProdAccepted, foundProdScrap bool
+		for _, m := range repo.stockMovements {
+			if m.ReferenceID == prodRc.ID {
+				if m.DestLocationID == binLoc {
+					assert.Equal(t, prodLoc.ID, m.SourceLocationID)
+					assert.True(t, m.Quantity.Equal(dec(48)))
+					foundProdAccepted = true
+				}
+				if m.DestLocationID == scrapLoc.ID {
+					assert.Equal(t, prodLoc.ID, m.SourceLocationID)
+					assert.True(t, m.Quantity.Equal(dec(2)))
+					foundProdScrap = true
+				}
+			}
+		}
+		assert.True(t, foundProdAccepted, "accepted movement must source from @PRODUCTION")
+		assert.True(t, foundProdScrap, "rejected movement must source from @PRODUCTION")
+
+		// 2. Transfer receipt validation: same warehouse rejected
+		sameWhReq := uc.StockReceiptRequest{
+			ReceiptType:     domain.StockReceiptTypeTransfer,
+			WarehouseID:     whID,
+			DestLocationID:  binLoc,
+			FromWarehouseID: &whID, // Same warehouse
+			FromName:        "Transfer Internal",
+			Items: []uc.StockReceiptItemRequest{
+				{ProductID: prodB, AcceptedQty: dec(10), RejectedQty: dec(0)},
+			},
+		}
+		_, _, err = usecase.CreateStockReceipt(ctx, tenantID, staffID, "warehouse", sameWhReq)
+		assertInvalid(t, err, "tidak boleh sama")
+
+		// 3. Valid branch transfer receipt: from whID into otherWhID
+		transferReq := uc.StockReceiptRequest{
+			ReceiptType:     domain.StockReceiptTypeTransfer,
+			WarehouseID:     otherWhID,
+			DestLocationID:  otherLoc,
+			FromWarehouseID: &whID,
+			FromName:        "Gudang Pusat",
+			SourceRef:       strp("TR-202610-099"),
+			Items: []uc.StockReceiptItemRequest{
+				{ProductID: prodB, AcceptedQty: dec(20), RejectedQty: dec(0)},
+			},
+		}
+		transferRc, _, err := usecase.CreateStockReceipt(ctx, tenantID, staffID, "admin", transferReq)
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptTypeTransfer, transferRc.ReceiptType)
+		assert.Equal(t, &whID, transferRc.FromWarehouseID)
+
+		postedTr, err := usecase.PostStockReceipt(ctx, tenantID, staffID, "admin", transferRc.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptStatusPosted, postedTr.Status)
+
+		transitLocObj, _ := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeTransit)
+		var foundTransitAccepted bool
+		for _, m := range repo.stockMovements {
+			if m.ReferenceID == transferRc.ID {
+				assert.Equal(t, transitLocObj.ID, m.SourceLocationID)
+				assert.Equal(t, otherLoc, m.DestLocationID)
+				assert.True(t, m.Quantity.Equal(dec(20)))
+				foundTransitAccepted = true
+			}
+		}
+		assert.True(t, foundTransitAccepted, "transfer receipt must source from @TRANSIT")
+
+		// 4. Test filtering by receipt_type
+		typeProd := domain.StockReceiptTypeProduction
+		prodList, err := usecase.ListStockReceipts(ctx, tenantID, staffID, "warehouse", &whID, nil, &typeProd)
+		require.NoError(t, err)
+		assert.NotEmpty(t, prodList)
+		for _, item := range prodList {
+			assert.Equal(t, domain.StockReceiptTypeProduction, item.ReceiptType)
+		}
+
+		typeTr := domain.StockReceiptTypeTransfer
+		trList, err := usecase.ListStockReceipts(ctx, tenantID, staffID, "admin", &otherWhID, nil, &typeTr)
+		require.NoError(t, err)
+		assert.NotEmpty(t, trList)
+		for _, item := range trList {
+			assert.Equal(t, domain.StockReceiptTypeTransfer, item.ReceiptType)
+		}
 	})
 }
 

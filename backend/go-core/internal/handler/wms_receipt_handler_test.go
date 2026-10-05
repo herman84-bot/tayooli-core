@@ -40,9 +40,9 @@ func (m *mockWMSUsecase) GetStockReceipt(ctx context.Context, tenantID, userID u
 	return nil, nil, nil
 }
 
-func (m *mockWMSUsecase) ListStockReceipts(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.StockReceiptStatus) ([]domain.StockReceipt, error) {
+func (m *mockWMSUsecase) ListStockReceipts(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.StockReceiptStatus, receiptType *domain.StockReceiptType) ([]domain.StockReceipt, error) {
 	if m.listStockReceiptsFn != nil {
-		return m.listStockReceiptsFn(ctx, tenantID, userID, role, warehouseID, status)
+		return m.listStockReceiptsFn(ctx, tenantID, userID, role, warehouseID, status, receiptType)
 	}
 	return nil, nil
 }
@@ -178,7 +178,7 @@ func TestWMSStockReceiptHandlers(t *testing.T) {
 	t.Run("GET /wms/receipts returns data envelope", func(t *testing.T) {
 		var gotStatus *domain.StockReceiptStatus
 		mock := &mockWMSUsecase{
-			listStockReceiptsFn: func(ctx context.Context, tid, uid uuid.UUID, r string, wh *uuid.UUID, st *domain.StockReceiptStatus) ([]domain.StockReceipt, error) {
+			listStockReceiptsFn: func(ctx context.Context, tid, uid uuid.UUID, r string, wh *uuid.UUID, st *domain.StockReceiptStatus, tp *domain.StockReceiptType) ([]domain.StockReceipt, error) {
 				gotStatus = st
 				return nil, nil
 			},
