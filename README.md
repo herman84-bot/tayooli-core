@@ -116,6 +116,18 @@ docker compose ps
 
 ---
 
+## 💻 Menjalankan Frontend Secara Lokal
+Untuk menjalankan frontend secara lokal:
+```bash
+npm run dev
+# Aplikasi siap diakses di http://localhost:3000
+```
+> **PENTING UNTUK PENGEMBANG & AI AGENT:**
+> - Port aplikasi frontend Tayooli di lokal adalah **`http://localhost:3000`**.
+> - Jangan gunakan port **`3080`** (port 3080 adalah port antarmuka DeepSeek Harness GUI, bukan aplikasi Tayooli).
+
+---
+
 ## 🧪 Pengujian & Verifikasi Lokal
 
 Untuk menjalankan pengujian unit secara lokal:

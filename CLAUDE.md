@@ -196,21 +196,33 @@ Rules:
 
 ---
 
-## Production VM & Cloud Server Guide (GCP)
+## Environment Ports & Endpoints (CRITICAL FOR AI AGENTS)
+- **Local Frontend Next.js:** ALWAYS run and test on `http://localhost:3000` (`npm run dev` explicitly runs on port 3000).
+- **DO NOT USE Port 3080 for Tayooli:** Port 3080 is the DeepSeek Harness GUI (`http://127.0.0.1:3080/`), NOT the Tayooli ERP web application. Never point Playwright or curl to 3080 expecting the ERP interface.
+- **Local Backend Go API:** `http://localhost:8081`
+- **Zeabur Cloud (Production):**
+  - Frontend: `https://tayooli.my.id` (and alias `https://tayooli-frontend.zeabur.app`)
+  - Backend: `https://tayooli-backend.zeabur.app`
+- **GCP Server (Legacy VM):**
+  - Only accessible via IP: `http://104.197.178.237`
+  - Repo: `Erp-Like-PAPER-ID` (DO NOT TOUCH or modify GCP when working on `tayooli-core`).
 
-### Server Information
+---
+
+## Production Cloud & Infrastructure Guide (Zeabur PaaS & GCP)
+
+### Zeabur PaaS (Current Primary Production)
+- **Production Domain:** `https://tayooli.my.id`
+- **Fallback URL:** `https://tayooli-frontend.zeabur.app`
+- **Backend API:** `https://tayooli-backend.zeabur.app`
+- **Frontend Port:** `3000`
+- **Backend Port:** `8081`
+
+### Legacy VM (GCP Backup)
 - **Instance Name:** `tayooli-server`
-- **Zone:** `us-central1-c`
-- **Project ID:** `mbg-waste-tracker-503014`
-- **External IP (Static):** `104.197.178.237` (reserved, tidak berubah saat restart)
-- **API Port:** `8081` (Firewall Rule: `allow-tayooli-api`)
-- **Frontend Port:** `3000` (Next.js production, via Nginx reverse proxy)
-- **Nginx:** Port `80` → `443` HTTPS redirect, self-signed SSL cert
-- **Backend Directory:** `/opt/tayooli`
-- **Systemd Service:** `tayooli-backend.service`
-- **Database:** PostgreSQL 15 (`tayooli_erp`, user: `tayooli_app`)
-- **Kafka:** KRaft mode (port 9092/9093)
-- **Systemd Services:** `tayooli-backend`, `tayooli-frontend`, `kafka`, `nginx`
+- **External IP:** `104.197.178.237` (Akses langsung via IP)
+- **API Port:** `8081`
+- **Frontend Port:** `3000` (via Nginx reverse proxy)
 
 ### Server Management & Operations via gcloud / SSH
 
