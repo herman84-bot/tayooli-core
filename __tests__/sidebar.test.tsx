@@ -28,6 +28,9 @@ describe('Sidebar Navigation - 12 Clean Core Modules Hierarchy', () => {
     // 2. Products (/products)
     expect(screen.getByRole('link', { name: /^Products$/i })).toHaveAttribute('href', '/products')
 
+    // 2b. Barang Masuk / inbound (/wms/inbound)
+    expect(screen.getByRole('link', { name: /^Barang Masuk$/i })).toHaveAttribute('href', '/wms/inbound')
+
     // 3. Warehouse & Stock (/wms)
     expect(screen.getByRole('link', { name: /^Warehouse & Stock$/i })).toHaveAttribute('href', '/wms')
 

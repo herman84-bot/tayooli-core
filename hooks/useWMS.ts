@@ -17,6 +17,9 @@ import {
   StockOpname,
   StockOpnameItem,
   StockScrap,
+  StockReceipt,
+  StockReceiptDetailResponse,
+  StockReceiptInput,
   StockTransfer,
   TransferDetailResponse,
   Warehouse,
@@ -363,6 +366,82 @@ export function useCreateStockScrap() {
   return useMutation({
     mutationFn: (data: CreateStockScrapInput) => api.wms.scraps.create(data),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wms", "scraps"] })
+      qc.invalidateQueries({ queryKey: ["wms", "locations"] })
+    },
+  })
+}
+
+/**
+ * Fetch inbound goods receipts (Barang Masuk), optionally filtered by warehouse.
+ */
+export function useStockReceipts(warehouseId?: string | null) {
+  return useQuery<StockReceipt[]>({
+    queryKey: ["wms", "receipts", warehouseId ?? "all"],
+    queryFn: async () => {
+      const res = await api.wms.receipts.list({ warehouseId: warehouseId || undefined })
+      return res.data ?? []
+    },
+    retry: 1,
+  })
+}
+
+/**
+ * Fetch one goods receipt with its items.
+ */
+export function useStockReceipt(id: string | null) {
+  return useQuery<StockReceiptDetailResponse>({
+    queryKey: ["wms", "receipts", "detail", id],
+    queryFn: () => api.wms.receipts.get(id as string),
+    enabled: !!id,
+    retry: 1,
+  })
+}
+
+function invalidateReceipts(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["wms", "receipts"] })
+}
+
+/** Create a DRAFT receipt (stock not changed yet). */
+export function useCreateStockReceipt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: StockReceiptInput) => api.wms.receipts.create(data),
+    onSuccess: () => invalidateReceipts(qc),
+  })
+}
+
+/** Replace a DRAFT receipt's header and items. */
+export function useUpdateStockReceipt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: StockReceiptInput }) =>
+      api.wms.receipts.update(id, data),
+    onSuccess: () => invalidateReceipts(qc),
+  })
+}
+
+/** Confirm a receipt: writes stock movements and adds stock. */
+export function usePostStockReceipt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.wms.receipts.post(id),
+    onSuccess: () => {
+      invalidateReceipts(qc)
+      qc.invalidateQueries({ queryKey: ["wms", "scraps"] })
+      qc.invalidateQueries({ queryKey: ["wms", "locations"] })
+    },
+  })
+}
+
+/** Cancel a receipt; a confirmed one is reversed with counter movements. */
+export function useCancelStockReceipt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.wms.receipts.cancel(id, reason),
+    onSuccess: () => {
+      invalidateReceipts(qc)
       qc.invalidateQueries({ queryKey: ["wms", "scraps"] })
       qc.invalidateQueries({ queryKey: ["wms", "locations"] })
     },

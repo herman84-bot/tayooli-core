@@ -58,6 +58,13 @@ type mockWMSUsecase struct {
 	createStockScrapFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateStockScrapRequest) (*domain.StockScrap, error)
 	listStockScrapsFn  func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockScrap, error)
 
+	createStockReceiptFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.StockReceiptRequest) (*domain.StockReceipt, []domain.StockReceiptItem, error)
+	updateStockReceiptFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID, req uc.StockReceiptRequest) (*domain.StockReceipt, []domain.StockReceiptItem, error)
+	getStockReceiptFn    func(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, []domain.StockReceiptItem, error)
+	listStockReceiptsFn  func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.StockReceiptStatus) ([]domain.StockReceipt, error)
+	postStockReceiptFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, error)
+	cancelStockReceiptFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID, reason string) (*domain.StockReceipt, error)
+
 	listStockMovementsFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, productID, locationID *uuid.UUID, limit int) ([]domain.StockMovement, error)
 	listStockSummaryFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockSummary, error)
 

@@ -5,7 +5,7 @@
 > 2. **BATASAN REPOSITORI**:
 >    - Repositori induk (`Erp-Like-PAPER-ID`) berada di Google Cloud Platform (GCP) VM (`104.197.178.237`). **JANGAN PERNAH MENYENTUH ATAU MENGUBAH REPOSITORI INDUK ATAU SERVER GCP.**
 >    - Repositori ini (`tayooli-core`) berjalan di **Zeabur PaaS** dengan domain resmi **`https://tayooli.my.id`** (`https://tayooli-frontend.zeabur.app`).
-> 3. **12 FITUR BERSIH**: Aplikasi ini HANYA memiliki 12 modul inti (Dashboard, Products, Warehouse & Stock, Surat Jalan DO, Marketplace, Transfers, Opname, Scrap, Scanner, POS, Settings, Help & Support). Dilarang mengembalikan modul enterprise lama (P2P, O2C, CoA, Jurnal) ke antarmuka pengguna!
+> 3. **13 FITUR BERSIH**: Aplikasi ini HANYA memiliki 13 modul inti (Dashboard, Products, Barang Masuk, Warehouse & Stock, Surat Jalan DO, Marketplace, Transfers, Opname, Scrap, Scanner, POS, Settings, Help & Support). Dilarang mengembalikan modul enterprise lama (P2P, O2C, CoA, Jurnal) ke antarmuka pengguna!
 > 4. **PORT TESTING LOKAL**: Selalu gunakan **Port 3000** (`http://localhost:3000`). **DILARANG MENGGUNAKAN PORT 3080** (Port 3080 adalah DeepSeek Harness GUI).
 > 5. Baca selengkapnya panduan detail di: **`AI_ONBOARDING_GUIDE.md`** & **`ARCHITECTURE.md`**.
 
@@ -20,7 +20,7 @@ You are the **CTO of Tayooli ERP Core**. When the user submits a development tas
 - **Database:** PostgreSQL 15 (Row-Level Security for multi-tenancy).
 - **Hosting/PaaS:** Zeabur PaaS (Frontend: `tayooli-frontend`, Backend: `tayooli-backend`, Custom Domain: `tayooli.my.id`).
 
-## 12 Core Modules Hierarchy (STRICT)
+## 13 Core Modules Hierarchy (STRICT)
 ```text
 OVERVIEW
  1. Dashboard                 -> /dashboard
@@ -28,19 +28,20 @@ OVERVIEW
 INVENTORY
  2. Products                  -> /products
 
-WAREHOUSE & POS
- 3. Warehouse & Stock         -> /wms
- 4. Surat Jalan (DO)          -> /wms/delivery-orders
- 5. Marketplace Omnichannel   -> /wms/marketplace
- 6. Stock Transfers           -> /wms/transfers
- 7. Stock Opname              -> /wms/opname
- 8. Barang Rusak / Scrap      -> /wms/scrap
- 9. Barcode Scanner           -> /wms/scanner
- 10. Point of Sale            -> /pos
+WAREHOUSE & POS  (urutan mengikuti alur barang: masuk -> simpan -> keluar)
+ 3. Barang Masuk (Inbound)    -> /wms/inbound
+ 4. Warehouse & Stock         -> /wms
+ 5. Surat Jalan (DO)          -> /wms/delivery-orders
+ 6. Marketplace Omnichannel   -> /wms/marketplace
+ 7. Stock Transfers           -> /wms/transfers
+ 8. Stock Opname              -> /wms/opname
+ 9. Barang Rusak / Scrap      -> /wms/scrap
+ 10. Barcode Scanner          -> /wms/scanner
+ 11. Point of Sale            -> /pos
 
 ACCOUNT
- 11. Settings                 -> /settings
- 12. Help & Support           -> /help
+ 12. Settings                 -> /settings
+ 13. Help & Support           -> /help
 ```
 
 ---

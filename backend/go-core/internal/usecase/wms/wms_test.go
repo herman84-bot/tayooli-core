@@ -38,6 +38,9 @@ type mockWMSRepo struct {
 	stockScraps     map[uuid.UUID]*domain.StockScrap
 	marketplaceBatches map[uuid.UUID]*domain.MarketplaceImportBatch
 	marketplaceOrders  map[uuid.UUID]*domain.MarketplaceOrder
+	// Stock receipts (lazily initialised in wms_receipt_test.go)
+	stockReceipts map[uuid.UUID]*domain.StockReceipt
+	receiptItems  map[uuid.UUID][]domain.StockReceiptItem
 }
 
 func newMockWMSRepo() *mockWMSRepo {

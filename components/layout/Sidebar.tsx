@@ -9,6 +9,7 @@ import {
   Box,
   Warehouse,
   Truck,
+  PackagePlus,
   ClipboardCheck,
   FileCheck,
   ShoppingBag,
@@ -55,6 +56,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'Warehouse & POS',
     items: [
+      { href: '/wms/inbound', label: 'Barang Masuk', icon: PackagePlus },
       { href: '/wms', label: 'Warehouse & Stock', icon: Warehouse, exact: true },
       { href: '/wms/delivery-orders', label: 'Surat Jalan (DO)', icon: FileCheck },
       { href: '/wms/marketplace', label: 'Marketplace Omnichannel', icon: ShoppingBag },

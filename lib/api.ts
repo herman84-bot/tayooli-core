@@ -614,6 +614,67 @@ export interface CreateStockScrapInput {
   scrap_number?: string
 }
 
+export type StockReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED"
+
+export interface StockReceipt {
+  id: string
+  tenant_id: string
+  receipt_number: string
+  warehouse_id: string
+  dest_location_id: string
+  supplier_name: string
+  supplier_ref?: string
+  notes?: string
+  status: StockReceiptStatus
+  created_by: string
+  created_at: string
+  updated_at: string
+  posted_by?: string
+  posted_at?: string
+  cancelled_by?: string
+  cancelled_at?: string
+  cancel_reason?: string
+  item_count: number
+  total_accepted_qty: string | number
+  total_rejected_qty: string | number
+}
+
+export interface StockReceiptItem {
+  id: string
+  tenant_id: string
+  receipt_id: string
+  product_id: string
+  product_name: string
+  product_sku: string
+  expected_qty?: string | number
+  accepted_qty: string | number
+  rejected_qty: string | number
+  reject_reason?: string
+  created_at: string
+}
+
+export interface StockReceiptItemInput {
+  product_id: string
+  expected_qty?: number
+  accepted_qty: number
+  rejected_qty: number
+  reject_reason?: string
+}
+
+export interface StockReceiptInput {
+  warehouse_id: string
+  dest_location_id: string
+  supplier_name: string
+  supplier_ref?: string
+  notes?: string
+  items: StockReceiptItemInput[]
+}
+
+export interface StockReceiptDetailResponse {
+  receipt: StockReceipt
+  items: StockReceiptItem[]
+}
+
 export type MarketplaceChannel =
   | "SHOPEE"
   | "TOKOPEDIA"
@@ -964,6 +1025,33 @@ export const api = {
         request<StockScrap>("/wms/scraps", {
           method: "POST",
           body: JSON.stringify(data),
+        }),
+    },
+    receipts: {
+      list: (params?: { warehouseId?: string; status?: StockReceiptStatus }) => {
+        const q = new URLSearchParams()
+        if (params?.warehouseId) q.set("warehouse_id", params.warehouseId)
+        if (params?.status) q.set("status", params.status)
+        const s = q.toString()
+        return request<{ data: StockReceipt[] }>(`/wms/receipts${s ? `?${s}` : ""}`)
+      },
+      get: (id: string) => request<StockReceiptDetailResponse>(`/wms/receipts/${id}`),
+      create: (data: StockReceiptInput) =>
+        request<StockReceiptDetailResponse>("/wms/receipts", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: StockReceiptInput) =>
+        request<StockReceiptDetailResponse>(`/wms/receipts/${id}`, {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }),
+      post: (id: string) =>
+        request<StockReceipt>(`/wms/receipts/${id}/post`, { method: "POST" }),
+      cancel: (id: string, reason: string) =>
+        request<StockReceipt>(`/wms/receipts/${id}/cancel`, {
+          method: "POST",
+          body: JSON.stringify({ reason }),
         }),
     },
     marketplace: {

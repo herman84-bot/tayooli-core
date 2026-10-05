@@ -28,6 +28,30 @@ var (
 	ErrBatchNotFound            = errors.New("marketplace import batch not found")
 	ErrMarketplaceOrderNotFound = errors.New("marketplace order not found")
 	ErrSKUMappingNotFound       = errors.New("sku mapping not found")
+
+	// Stock receipts (Barang Masuk)
+	ErrStockReceiptNotFound         = errors.New("stock receipt not found")
+	ErrStockReceiptNotDraft         = errors.New("stock receipt is not in DRAFT status")
+	ErrStockReceiptAlreadyCancelled = errors.New("stock receipt is already cancelled")
+	ErrStockReceiptStockConsumed    = errors.New("received stock has already been used and cannot be reversed")
+)
+
+// StockReceiptValidationError carries a user-facing (Indonesian) validation message.
+// It unwraps to ErrInvalidInput so generic callers still treat it as a 400.
+type StockReceiptValidationError struct {
+	Msg string
+}
+
+func (e *StockReceiptValidationError) Error() string { return e.Msg }
+func (e *StockReceiptValidationError) Unwrap() error { return ErrInvalidInput }
+
+// StockReceiptStatus represents inbound goods receipt lifecycle.
+type StockReceiptStatus string
+
+const (
+	StockReceiptStatusDraft     StockReceiptStatus = "DRAFT"
+	StockReceiptStatusPosted    StockReceiptStatus = "POSTED"
+	StockReceiptStatusCancelled StockReceiptStatus = "CANCELLED"
 )
 
 // LocationType represents the nature of a warehouse location.
@@ -358,6 +382,46 @@ type StockScrap struct {
 	CreatedAt          time.Time       `json:"created_at"`
 }
 
+// StockReceipt represents an inbound goods receipt header (Barang Masuk).
+// ItemCount / TotalAcceptedQty / TotalRejectedQty are computed aggregates.
+type StockReceipt struct {
+	ID               uuid.UUID          `json:"id"`
+	TenantID         uuid.UUID          `json:"tenant_id"`
+	ReceiptNumber    string             `json:"receipt_number"`
+	WarehouseID      uuid.UUID          `json:"warehouse_id"`
+	DestLocationID   uuid.UUID          `json:"dest_location_id"`
+	SupplierName     string             `json:"supplier_name"`
+	SupplierRef      *string            `json:"supplier_ref,omitempty"`
+	Notes            *string            `json:"notes,omitempty"`
+	Status           StockReceiptStatus `json:"status"`
+	CreatedBy        uuid.UUID          `json:"created_by"`
+	CreatedAt        time.Time          `json:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at"`
+	PostedBy         *uuid.UUID         `json:"posted_by,omitempty"`
+	PostedAt         *time.Time         `json:"posted_at,omitempty"`
+	CancelledBy      *uuid.UUID         `json:"cancelled_by,omitempty"`
+	CancelledAt      *time.Time         `json:"cancelled_at,omitempty"`
+	CancelReason     *string            `json:"cancel_reason,omitempty"`
+	ItemCount        int                `json:"item_count"`
+	TotalAcceptedQty decimal.Decimal    `json:"total_accepted_qty"`
+	TotalRejectedQty decimal.Decimal    `json:"total_rejected_qty"`
+}
+
+// StockReceiptItem represents a received product line.
+type StockReceiptItem struct {
+	ID           uuid.UUID        `json:"id"`
+	TenantID     uuid.UUID        `json:"tenant_id"`
+	ReceiptID    uuid.UUID        `json:"receipt_id"`
+	ProductID    uuid.UUID        `json:"product_id"`
+	ProductName  string           `json:"product_name"`
+	ProductSKU   string           `json:"product_sku"`
+	ExpectedQty  *decimal.Decimal `json:"expected_qty,omitempty"`
+	AcceptedQty  decimal.Decimal  `json:"accepted_qty"`
+	RejectedQty  decimal.Decimal  `json:"rejected_qty"`
+	RejectReason *string          `json:"reject_reason,omitempty"`
+	CreatedAt    time.Time        `json:"created_at"`
+}
+
 // ResolvedProduct represents the resolved master product from a barcode, SKU, or external mapping.
 type ResolvedProduct struct {
 	ProductID   uuid.UUID       `json:"product_id"`
@@ -481,6 +545,17 @@ type WMSRepository interface {
 	// Stock Scrap
 	CreateStockScrap(ctx context.Context, scrap *StockScrap) error
 	ListStockScraps(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID) ([]StockScrap, error)
+
+	// Stock Receipts (Barang Masuk)
+	CreateStockReceipt(ctx context.Context, rc *StockReceipt, items []StockReceiptItem) error
+	// UpdateDraftStockReceipt replaces header fields and all items in one tx; ErrStockReceiptNotDraft if not DRAFT.
+	UpdateDraftStockReceipt(ctx context.Context, rc *StockReceipt, items []StockReceiptItem) error
+	GetStockReceiptByID(ctx context.Context, tenantID, id uuid.UUID) (*StockReceipt, []StockReceiptItem, error)
+	ListStockReceipts(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *StockReceiptStatus) ([]StockReceipt, error)
+	// PostStockReceipt atomically writes ledger movements and sets POSTED.
+	PostStockReceipt(ctx context.Context, tenantID, id, userID, vendorLocID, scrapLocID uuid.UUID) (*StockReceipt, error)
+	// CancelStockReceipt atomically cancels a DRAFT, or reverses a POSTED receipt's movements.
+	CancelStockReceipt(ctx context.Context, tenantID, id, userID, vendorLocID, scrapLocID uuid.UUID, reason string) (*StockReceipt, error)
 
 	// Marketplace Sales Orders & SKU Mappings
 	CreateMarketplaceBatch(ctx context.Context, batch *MarketplaceImportBatch) error

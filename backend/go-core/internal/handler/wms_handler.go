@@ -64,6 +64,14 @@ type WMSUsecase interface {
 	CreateStockScrap(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateStockScrapRequest) (*domain.StockScrap, error)
 	ListStockScraps(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockScrap, error)
 
+	// Stock Receipts (Barang Masuk)
+	CreateStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.StockReceiptRequest) (*domain.StockReceipt, []domain.StockReceiptItem, error)
+	UpdateStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID, req uc.StockReceiptRequest) (*domain.StockReceipt, []domain.StockReceiptItem, error)
+	GetStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, []domain.StockReceiptItem, error)
+	ListStockReceipts(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.StockReceiptStatus) ([]domain.StockReceipt, error)
+	PostStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, error)
+	CancelStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID, reason string) (*domain.StockReceipt, error)
+
 	// Stock movements & Ledger
 	ListStockMovements(ctx context.Context, tenantID, userID uuid.UUID, role string, productID, locationID *uuid.UUID, limit int) ([]domain.StockMovement, error)
 	ListStockSummary(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockSummary, error)
@@ -117,6 +125,14 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Get("/scraps", h.ListStockScraps)
 		r.Post("/scraps", h.CreateStockScrap)
 
+		// Stock Receipts (Barang Masuk)
+		r.Get("/receipts", h.ListStockReceipts)
+		r.Post("/receipts", h.CreateStockReceipt)
+		r.Get("/receipts/{id}", h.GetStockReceipt)
+		r.Put("/receipts/{id}", h.UpdateStockReceipt)
+		r.Post("/receipts/{id}/post", h.PostStockReceipt)
+		r.Post("/receipts/{id}/cancel", h.CancelStockReceipt)
+
 		// Stock movements & Ledger
 		r.Get("/movements", h.ListStockMovements)
 		r.Get("/stock", h.ListStockSummary)
@@ -136,9 +152,22 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 
 func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 	var maxBytesErr *http.MaxBytesError
+	var receiptValErr *domain.StockReceiptValidationError
 	switch {
 	case errors.As(err, &maxBytesErr):
 		RespondError(w, r, http.StatusRequestEntityTooLarge, "request entity too large")
+	case errors.As(err, &receiptValErr):
+		RespondError(w, r, http.StatusBadRequest, receiptValErr.Msg)
+	case errors.Is(err, domain.ErrStockReceiptNotFound):
+		RespondError(w, r, http.StatusNotFound, "Penerimaan barang tidak ditemukan")
+	case errors.Is(err, domain.ErrStockReceiptNotDraft):
+		RespondError(w, r, http.StatusConflict, "Penerimaan sudah dikonfirmasi atau dibatalkan dan tidak bisa diubah")
+	case errors.Is(err, domain.ErrStockReceiptAlreadyCancelled):
+		RespondError(w, r, http.StatusConflict, "Penerimaan sudah dibatalkan sebelumnya")
+	case errors.Is(err, domain.ErrStockReceiptStockConsumed):
+		RespondError(w, r, http.StatusUnprocessableEntity, "Penerimaan tidak bisa dibatalkan karena sebagian barang sudah terpakai, dipindahkan, atau terjual")
+	case errors.Is(err, domain.ErrConflict):
+		RespondError(w, r, http.StatusConflict, "conflict")
 	case errors.Is(err, domain.ErrWarehouseNotFound):
 		RespondError(w, r, http.StatusNotFound, "warehouse not found")
 	case errors.Is(err, domain.ErrLocationNotFound):

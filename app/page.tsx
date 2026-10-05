@@ -215,17 +215,17 @@ function HeroMockup() {
 
 function StatsBand() {
   const stats = [
-    { value: "< 2 dtk", label: "transaksi kasir selesai dan struk thermal tercetak" },
-    { value: "100%", label: "sinkronisasi saldo unit fisik antar gudang dan cabang" },
-    { value: "4 kanal", label: "integrasi marketplace (Tokopedia, Shopee, TikTok, Lazada)" },
-    { value: "12 modul", label: "operasional mandiri tanpa ketergantungan modul enterprise" },
+    { value: "Multi-Gudang", label: "pencatatan mutasi fisik antar gudang, rak, dan transit" },
+    { value: "Kasir POS", label: "cetak nota thermal 58mm/80mm, QRIS, dan hitung kembalian" },
+    { value: "Omnichannel", label: "impor dan pemetaan pesanan marketplace ke stok fisik" },
+    { value: "13 Modul", label: "alur barang masuk, stok, kasir, hingga kirim dalam satu alur" },
   ]
   return (
     <section className="py-12 sm:py-14">
       <div className={`${container} grid grid-cols-2 gap-x-8 gap-y-8 sm:gap-y-10 lg:grid-cols-4`}>
         {stats.map((s) => (
           <div key={s.value}>
-            <div className="text-3xl font-bold tracking-tight text-primary sm:text-4xl font-mono">{s.value}</div>
+            <div className="text-2xl font-bold tracking-tight text-primary sm:text-3xl font-mono">{s.value}</div>
             <p className="mt-1.5 max-w-[220px] text-xs leading-relaxed text-muted-foreground sm:text-sm">
               {s.label}
             </p>
@@ -352,7 +352,7 @@ function FeaturesSection() {
           <FeatureRow
             eyebrowLabel="Kasir Cepat & Struk"
             title="Kasir POS toko dengan barcode scanner"
-            desc="Layani transaksi pelanggan dalam hitungan detik. Scan barcode kemasan, hitung kembalian otomatis, dan cetak struk thermal 58mm atau 80mm."
+            desc="Layani transaksi pelanggan dengan cepat. Scan barcode kemasan, hitung kembalian otomatis, dan cetak struk thermal 58mm atau 80mm."
             bullets={[
               "Mendukung scan barcode via kamera HP/laptop dan scanner USB/Bluetooth",
               "Pilihan pembayaran fleksibel: Tunai, QRIS, dan Kartu Debit",
@@ -554,45 +554,42 @@ function HowItWorks() {
   )
 }
 
-function Testimonials() {
+function OperationalScenarios() {
   const items = [
     {
-      quote:
-        "Dulu kasir sering antre lama saat pembeli ramai karena harus cari harga manual. Pakai scanner barcode Tayooli, transaksi selesai dalam hitungan detik dan struk langsung keluar.",
-      name: "Rina Puspitasari",
-      role: "Manajer Toko, Ritel Sembako Modern",
+      title: "Toko Ritel & Grosir Fisik",
+      desc: "Kasir melayani transaksi cepat dengan barcode scanner, menerima pembayaran tunai atau QRIS, mencetak nota belanja thermal, dan memotong stok toko secara langsung.",
+      role: "Fokus: Kecepatan kasir & akurasi kas",
     },
     {
-      quote:
-        "Pengiriman ke agen distributor sekarang rapi dengan Surat Jalan resmi. Sopir bawa dokumen bertanda tangan lengkap dan stok gudang otomatis terpotong.",
-      name: "Budi Santoso",
-      role: "Kepala Gudang, CV Niaga Sejahtera",
+      title: "Gudang & Distribusi Barang",
+      desc: "Menerima barang masuk dari pemasok, memisahkan barang rusak ke lokasi scrap, transfer antar cabang, dan menerbitkan Surat Jalan (DO) resmi pengiriman.",
+      role: "Fokus: Kontrol fisik & dokumen jalan",
     },
     {
-      quote:
-        "Sangat terbantu dengan fitur Stock Opname dan transfer cabang. Selisih barang langsung ketahuan dan tidak ada lagi pesanan marketplace yang dibatalkan karena kehabisan stok.",
-      name: "Dewi Lestari",
-      role: "Pemilik Usaha, Grosir Berkah Mandiri",
+      title: "Penjualan Toko & Marketplace",
+      desc: "Mengimpor pesanan penjualan multi-platform, memetakan SKU marketplace ke barang internal, dan audit fisik berkala lewat modul Stock Opname.",
+      role: "Fokus: Pencegahan selisih rak & stok minus",
     },
   ]
   return (
     <section className="py-16 sm:py-20">
       <div className={container}>
         <div className="max-w-2xl">
-          <p className={eyebrow}>Pengalaman Pengguna</p>
-          <h2 className={`${sectionTitle} mt-3`}>Diandalkan pelaku usaha toko &amp; gudang.</h2>
+          <p className={eyebrow}>Skenario Penggunaan</p>
+          <h2 className={`${sectionTitle} mt-3`}>Cocok untuk berbagai model operasional fisik.</h2>
         </div>
-        <div className="mt-12 grid gap-8 sm:gap-6 md:grid-cols-3">
+        <div className="mt-12 grid gap-6 md:grid-cols-3">
           {items.map((t) => (
-            <blockquote key={t.name} className="flex flex-col">
-              <p className="flex-1 text-sm leading-relaxed text-foreground/80 sm:text-base">
-                “{t.quote}”
+            <div key={t.title} className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-card">
+              <h3 className="text-base font-semibold text-foreground">{t.title}</h3>
+              <p className="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
+                {t.desc}
               </p>
-              <figcaption className="mt-5 pt-4">
-                <div className="text-sm font-semibold text-foreground">{t.name}</div>
-                <div className="mt-0.5 text-xs text-muted-foreground">{t.role}</div>
-              </figcaption>
-            </blockquote>
+              <div className="mt-5 border-t border-border pt-4 text-xs font-medium text-primary">
+                {t.role}
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -827,7 +824,7 @@ export default async function LandingPage() {
       <ProblemSection />
       <FeaturesSection />
       <HowItWorks />
-      <Testimonials />
+      <OperationalScenarios />
       <PricingSection />
       <Faq />
       <FinalCta />

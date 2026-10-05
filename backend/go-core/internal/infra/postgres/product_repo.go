@@ -55,7 +55,7 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 }
 
 const getProductByID = `
-SELECT id, tenant_id, name, description, sku, price, created_at, updated_at
+SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, created_at, updated_at
 FROM products WHERE id = $1 AND tenant_id = $2`
 
 func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.Product, error) {
@@ -86,7 +86,7 @@ func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dom
 }
 
 const listProductsByTenantPaged = `
-SELECT id, tenant_id, name, description, sku, price, created_at, updated_at
+SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, created_at, updated_at
 FROM products WHERE tenant_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3`
@@ -147,7 +147,7 @@ func (r *ProductRepo) ListByIDs(ctx context.Context, tenantID uuid.UUID, ids []u
 	}
 
 	query := fmt.Sprintf(`
-SELECT id, tenant_id, name, description, sku, price, created_at, updated_at
+SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, created_at, updated_at
 FROM products WHERE tenant_id = $1 AND id IN (%s)`, strings.Join(placeholders, ", "))
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -189,7 +189,7 @@ FROM products WHERE tenant_id = $1 AND id IN (%s)`, strings.Join(placeholders, "
 }
 
 const getProductBySKU = `
-SELECT id, tenant_id, name, description, sku, price, created_at, updated_at
+SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, created_at, updated_at
 FROM products WHERE tenant_id = $1 AND LOWER(TRIM(sku)) = LOWER(TRIM($2))`
 
 func (r *ProductRepo) GetBySKU(ctx context.Context, tenantID uuid.UUID, sku string) (*domain.Product, error) {
