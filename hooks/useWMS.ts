@@ -196,6 +196,22 @@ export function useRejectTransfer() {
 }
 
 /**
+ * Cancel a DRAFT stock transfer (moves status to CANCELLED). No stock ever
+ * moved for a draft, so nothing is reversed in the ledger — the record is kept
+ * for audit instead of being hard-deleted.
+ */
+export function useCancelTransfer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.wms.transfers.cancel(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ["wms", "transfers"] })
+      qc.invalidateQueries({ queryKey: ["wms", "transfers", id] })
+    },
+  })
+}
+
+/**
  * Dispatch an approved transfer (moves status to IN_TRANSIT).
  */
 export function useDispatchTransfer() {

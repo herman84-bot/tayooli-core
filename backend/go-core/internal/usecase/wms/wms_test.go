@@ -1206,6 +1206,42 @@ func TestStockTransferApprovalFlow(t *testing.T) {
 		_, err := usecase.DispatchTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
 		assert.ErrorIs(t, err, domain.ErrInvalidTransferStatus, "DRAFT transfer must be submitted and approved before dispatch")
 	})
+
+	t.Run("CancelTransfer: requester can cancel a DRAFT transfer", func(t *testing.T) {
+		tr := newDraftTransfer(t, "TR-CANCEL-001")
+
+		cancelled, err := usecase.CancelTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.TransferStatusCancelled, cancelled.Status)
+		assert.Equal(t, "TR-CANCEL-001", cancelled.TransferNumber)
+	})
+
+	t.Run("CancelTransfer: guardrail rejects anything past DRAFT", func(t *testing.T) {
+		tr := newDraftTransfer(t, "TR-CANCEL-002")
+		_, err := usecase.SubmitTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		require.NoError(t, err)
+
+		_, err = usecase.CancelTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		assert.ErrorIs(t, err, domain.ErrTransferNotDraft, "PENDING_APPROVAL transfer must not be cancellable")
+
+		// Cancelling twice must also fail (already CANCELLED, not DRAFT).
+		draft := newDraftTransfer(t, "TR-CANCEL-003")
+		_, err = usecase.CancelTransfer(ctx, tenantID, requesterID, "warehouse", draft.ID)
+		require.NoError(t, err)
+		_, err = usecase.CancelTransfer(ctx, tenantID, requesterID, "warehouse", draft.ID)
+		assert.ErrorIs(t, err, domain.ErrTransferNotDraft, "already cancelled transfer must not be cancellable again")
+	})
+
+	t.Run("CancelTransfer: a cancelled transfer can never be submitted or dispatched", func(t *testing.T) {
+		tr := newDraftTransfer(t, "TR-CANCEL-004")
+		_, err := usecase.CancelTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		require.NoError(t, err)
+
+		_, err = usecase.SubmitTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		assert.ErrorIs(t, err, domain.ErrInvalidTransferStatus)
+		_, err = usecase.DispatchTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		assert.ErrorIs(t, err, domain.ErrInvalidTransferStatus)
+	})
 }
 
 func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {

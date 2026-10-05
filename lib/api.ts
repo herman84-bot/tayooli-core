@@ -338,6 +338,7 @@ export type TransferStatus =
   | "IN_TRANSIT"
   | "RECEIVED"
   | "REJECTED"
+  | "CANCELLED"
 
 export interface StockTransfer {
   id: string
@@ -984,6 +985,11 @@ export const api = {
       receive: (id: string) =>
         request<StockTransfer>(`/wms/transfers/${id}/receive`, {
           method: "POST",
+        }),
+      // Cancel a DRAFT transfer. No stock moved, so nothing is reversed.
+      cancel: (id: string) =>
+        request<StockTransfer>(`/wms/transfers/${id}`, {
+          method: "DELETE",
         }),
     },
     deliveryOrders: {

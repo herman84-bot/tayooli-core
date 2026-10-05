@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   XCircle,
   Hourglass,
+  Ban,
 } from "lucide-react"
 import {
   useStockTransfers,
@@ -37,6 +38,7 @@ import {
   useRejectTransfer,
   useDispatchTransfer,
   useReceiveTransfer,
+  useCancelTransfer,
 } from "@/hooks/useWMS"
 import { useProducts } from "@/hooks/useProducts"
 import { useAuthStore } from "@/hooks/useAuth"
@@ -78,6 +80,7 @@ export default function TransfersPage() {
   const rejectMutation = useRejectTransfer()
   const dispatchMutation = useDispatchTransfer()
   const receiveMutation = useReceiveTransfer()
+  const cancelMutation = useCancelTransfer()
 
   // Form State for New Transfer
   const [fromWhId, setFromWhId] = useState("")
@@ -131,7 +134,7 @@ export default function TransfersPage() {
 
   // In-app Confirmation Modal & Toast State (replaces native confirm/alert)
   const [confirmModal, setConfirmModal] = useState<{
-    type: "submit" | "approve" | "dispatch" | "receive"
+    type: "submit" | "approve" | "dispatch" | "receive" | "cancel"
     transferId: string
     title: string
     message: string
@@ -190,12 +193,24 @@ export default function TransfersPage() {
     })
   }
 
+  const requestCancel = (transferId: string) => {
+    setConfirmModal({
+      type: "cancel",
+      transferId,
+      title: "Batalkan Draft Transfer",
+      message:
+        "Batalkan draft transfer ini? Status menjadi CANCELLED dan tidak bisa diajukan lagi. Karena masih draft, stok gudang tidak pernah berubah.",
+      actionLabel: "Batalkan Draft",
+    })
+  }
+
   const isActionPending =
     submitMutation.isPending ||
     approveMutation.isPending ||
     rejectMutation.isPending ||
     dispatchMutation.isPending ||
-    receiveMutation.isPending
+    receiveMutation.isPending ||
+    cancelMutation.isPending
 
   const handleConfirmAction = async () => {
     if (!confirmModal) return
@@ -210,6 +225,9 @@ export default function TransfersPage() {
       } else if (type === "dispatch") {
         await dispatchMutation.mutateAsync(transferId)
         setToast({ type: "success", message: "Armada transfer berhasil dikirim (IN_TRANSIT)." })
+      } else if (type === "cancel") {
+        await cancelMutation.mutateAsync(transferId)
+        setToast({ type: "success", message: "Draft transfer dibatalkan (CANCELLED)." })
       } else {
         await receiveMutation.mutateAsync(transferId)
         setToast({ type: "success", message: "Barang transfer berhasil diterima di gudang tujuan." })
@@ -359,6 +377,17 @@ export default function TransfersPage() {
         <div className="flex items-center gap-1.5 w-full max-w-md px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">
           <XCircle className="w-3.5 h-3.5 shrink-0" />
           <span className="text-[11px] font-bold uppercase tracking-wider">Ditolak</span>
+        </div>
+      )
+    }
+
+    // CANCELLED is a terminal branch like REJECTED, but neutral (not an error):
+    // the requester discarded the draft before any stock moved.
+    if (status === "CANCELLED") {
+      return (
+        <div className="flex items-center gap-1.5 w-full max-w-md px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-600">
+          <Ban className="w-3.5 h-3.5 shrink-0" />
+          <span className="text-[11px] font-bold uppercase tracking-wider">Dibatalkan</span>
         </div>
       )
     }
@@ -513,6 +542,7 @@ export default function TransfersPage() {
               { label: "In Transit", value: "IN_TRANSIT" },
               { label: "Received", value: "RECEIVED" },
               { label: "Ditolak", value: "REJECTED" },
+              { label: "Dibatalkan", value: "CANCELLED" },
             ].map((tab) => (
               <button
                 key={tab.value}
@@ -560,6 +590,7 @@ export default function TransfersPage() {
               const isDraft = transfer.status === "DRAFT"
               const isPendingApproval = transfer.status === "PENDING_APPROVAL"
               const isRejected = transfer.status === "REJECTED"
+              const isCancelled = transfer.status === "CANCELLED"
 
               // Segregation of duties: the person who requested the transfer can
               // never be the one who approves/rejects it, even if they hold an
@@ -634,6 +665,17 @@ export default function TransfersPage() {
                       </div>
                     )}
 
+                    {/* Cancellation banner: the draft was discarded before any stock
+                        moved, so staff know nothing was deducted from either warehouse. */}
+                    {isCancelled && (
+                      <div className="flex items-start gap-2 text-xs bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-3 py-2 max-w-lg">
+                        <Ban className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>
+                          <strong>Dibatalkan:</strong> draft dibatalkan sebelum diajukan. Stok gudang tidak berubah.
+                        </span>
+                      </div>
+                    )}
+
                     {/* Approval transparency: who requested, and the current waiting state,
                         so there is never ambiguity about who needs to act next. */}
                     {isPendingApproval && (
@@ -666,15 +708,27 @@ export default function TransfersPage() {
                   <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                     {/* Action: Submit for approval (DRAFT -> PENDING_APPROVAL) */}
                     {isDraft && (
-                      <button
-                        type="button"
-                        onClick={() => requestSubmit(transfer.id)}
-                        disabled={isActionPending}
-                        className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-xs"
-                      >
-                        <ClipboardCheck className="w-4 h-4" />
-                        <span>Ajukan Persetujuan</span>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => requestSubmit(transfer.id)}
+                          disabled={isActionPending}
+                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-xs"
+                        >
+                          <ClipboardCheck className="w-4 h-4" />
+                          <span>Ajukan Persetujuan</span>
+                        </button>
+                        {/* Action: Discard the draft entirely (DRAFT -> CANCELLED) */}
+                        <button
+                          type="button"
+                          onClick={() => requestCancel(transfer.id)}
+                          disabled={isActionPending}
+                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 active:scale-95 transition-all"
+                        >
+                          <Ban className="w-4 h-4" />
+                          <span>Batalkan Draft</span>
+                        </button>
+                      </>
                     )}
 
                     {/* Action: Approve / Reject (PENDING_APPROVAL), only for approver roles

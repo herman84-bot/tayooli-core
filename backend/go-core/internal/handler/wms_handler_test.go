@@ -43,6 +43,7 @@ type mockWMSUsecase struct {
 	receiveTransferFn  func(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error)
 	getTransferFn      func(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, []domain.StockTransferItem, error)
 	listTransfersFn    func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockTransfer, error)
+	cancelTransferFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error)
 
 	createDeliveryOrderFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateDeliveryOrderRequest) (*domain.DeliveryOrder, error)
 	dispatchDeliveryOrderFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
@@ -191,6 +192,13 @@ func (m *mockWMSUsecase) GetTransfer(ctx context.Context, tenantID, userID uuid.
 func (m *mockWMSUsecase) ListTransfers(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockTransfer, error) {
 	if m.listTransfersFn != nil {
 		return m.listTransfersFn(ctx, tenantID, userID, role, warehouseID)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) CancelTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {
+	if m.cancelTransferFn != nil {
+		return m.cancelTransferFn(ctx, tenantID, userID, role, transferID)
 	}
 	return nil, nil
 }
@@ -1293,5 +1301,56 @@ func TestWMSHandlerEndpoints(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("DELETE /api/v1/wms/transfers/{id} cancels a draft with 200", func(t *testing.T) {
+		transferID := uuid.New()
+		mock := &mockWMSUsecase{
+			cancelTransferFn: func(ctx context.Context, tid, uid uuid.UUID, r string, id uuid.UUID) (*domain.StockTransfer, error) {
+				assert.Equal(t, transferID, id)
+				return &domain.StockTransfer{
+					ID:             id,
+					TenantID:       tid,
+					TransferNumber: "TR-CANCEL-001",
+					Status:         domain.TransferStatusCancelled,
+				}, nil
+			},
+		}
+		router := setupWMSTestRouter(mock)
+
+		req := withWMSAuth(httptest.NewRequest(http.MethodDelete, "/api/v1/wms/transfers/"+transferID.String(), nil), tenantID, userID, role)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var res domain.StockTransfer
+		require.NoError(t, json.NewDecoder(w.Body).Decode(&res))
+		assert.Equal(t, domain.TransferStatusCancelled, res.Status)
+	})
+
+	t.Run("DELETE /api/v1/wms/transfers/{id} returns 409 when not a draft", func(t *testing.T) {
+		transferID := uuid.New()
+		mock := &mockWMSUsecase{
+			cancelTransferFn: func(ctx context.Context, tid, uid uuid.UUID, r string, id uuid.UUID) (*domain.StockTransfer, error) {
+				return nil, domain.ErrTransferNotDraft
+			},
+		}
+		router := setupWMSTestRouter(mock)
+
+		req := withWMSAuth(httptest.NewRequest(http.MethodDelete, "/api/v1/wms/transfers/"+transferID.String(), nil), tenantID, userID, role)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		assert.Contains(t, w.Body.String(), "DRAFT")
+	})
+
+	t.Run("DELETE /api/v1/wms/transfers/{id} returns 400 on malformed id", func(t *testing.T) {
+		router := setupWMSTestRouter(&mockWMSUsecase{})
+		req := withWMSAuth(httptest.NewRequest(http.MethodDelete, "/api/v1/wms/transfers/not-a-uuid", nil), tenantID, userID, role)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 }

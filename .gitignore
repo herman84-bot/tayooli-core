@@ -42,3 +42,18 @@ test-results/
 # Merge conflict artifacts
 *.orig
 *.rej
+
+# Graphify AST cache output (regenerable tool artifact)
+graphify-out/
+
+# One-off QA/debug scripts. These are throwaway and frequently embed live
+# credentials, so they stay local. Durable smoke scripts are re-included below.
+scripts/*
+!scripts/_live-helpers.js
+!scripts/check-summary-once.js
+!scripts/final-verify-live.js
+!scripts/flows-with-login.js
+!scripts/probe-prod-auth.js
+!scripts/redeploy-service.js
+!scripts/verify-ui-dashboard-transfer.js
+!scripts/wait-for-financial-overview.js

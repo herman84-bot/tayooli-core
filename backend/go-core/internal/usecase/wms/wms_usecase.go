@@ -644,6 +644,33 @@ func (u *Usecase) RejectTransfer(ctx context.Context, tenantID, userID uuid.UUID
 	return t, nil
 }
 
+// CancelTransfer discards a DRAFT transfer. Only the requester (or another user
+// with write access to the source warehouse) may cancel, mirroring
+// SubmitTransfer's access rule. Cancelling never moves stock, so no ledger entry
+// is written — the transfer stays on record as CANCELLED for audit instead of
+// being hard-deleted.
+func (u *Usecase) CancelTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {
+	t, _, err := u.repo.GetTransferByID(ctx, tenantID, transferID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, t.FromWarehouseID); err != nil {
+		return nil, err
+	}
+
+	if t.Status != domain.TransferStatusDraft {
+		return nil, domain.ErrTransferNotDraft
+	}
+
+	if err := u.repo.UpdateTransferStatus(ctx, tenantID, t.ID, domain.TransferStatusCancelled, nil, nil, nil, nil); err != nil {
+		return nil, fmt.Errorf("CancelTransfer: update status: %w", err)
+	}
+
+	t.Status = domain.TransferStatusCancelled
+	return t, nil
+}
+
 // DispatchTransfer validates source stock and dispatches goods to transit location.
 // Moves stock: Source Location -> @TRANSIT.
 func (u *Usecase) DispatchTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {

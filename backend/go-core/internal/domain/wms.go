@@ -22,6 +22,10 @@ var (
 	ErrInvalidTransferStatus = errors.New("invalid stock transfer status transition")
 	ErrSelfApprovalForbidden = errors.New("requester cannot approve or reject their own transfer")
 	ErrRejectionReasonRequired = errors.New("rejection reason is required")
+	// ErrTransferNotDraft: cancel is only meaningful while the transfer is still
+	// a DRAFT. Once submitted/approved/dispatched it must go through reject or
+	// receive so the ledger stays consistent.
+	ErrTransferNotDraft = errors.New("only draft stock transfer can be cancelled")
 	ErrDeliveryOrderNotFound = errors.New("delivery order not found")
 	ErrTransferNotFound      = errors.New("stock transfer not found")
 	ErrOpnameNotFound        = errors.New("stock opname not found")
@@ -99,6 +103,9 @@ const (
 	TransferStatusInTransit       TransferStatus = "IN_TRANSIT"
 	TransferStatusReceived        TransferStatus = "RECEIVED"
 	TransferStatusRejected        TransferStatus = "REJECTED"
+	// TransferStatusCancelled: a DRAFT transfer discarded by its requester. No
+	// stock ever moved, so nothing is written to the ledger.
+	TransferStatusCancelled TransferStatus = "CANCELLED"
 )
 
 // DeliveryOrderStatus represents delivery order lifecycle.

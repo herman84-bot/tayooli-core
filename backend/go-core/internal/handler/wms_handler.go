@@ -46,6 +46,7 @@ type WMSUsecase interface {
 	ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error)
 	GetTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, []domain.StockTransferItem, error)
 	ListTransfers(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.StockTransfer, error)
+	CancelTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error)
 
 	// Delivery Orders
 	CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateDeliveryOrderRequest) (*domain.DeliveryOrder, error)
@@ -109,6 +110,7 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Post("/transfers/{id}/reject", h.RejectTransfer)
 		r.Post("/transfers/{id}/dispatch", h.DispatchTransfer)
 		r.Post("/transfers/{id}/receive", h.ReceiveTransfer)
+		r.Delete("/transfers/{id}", h.CancelTransfer)
 		r.Get("/delivery-orders", h.ListDeliveryOrders)
 		r.Post("/delivery-orders", h.CreateDeliveryOrder)
 		r.Get("/delivery-orders/{id}", h.GetDeliveryOrder)
@@ -178,6 +180,8 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusNotFound, "barcode not found")
 	case errors.Is(err, domain.ErrTransferNotFound):
 		RespondError(w, r, http.StatusNotFound, "stock transfer not found")
+	case errors.Is(err, domain.ErrTransferNotDraft):
+		RespondError(w, r, http.StatusConflict, "Hanya transfer berstatus DRAFT yang bisa dibatalkan. Transfer yang sudah diajukan atau diproses harus menunggu penolakan atau penerimaan.")
 	case errors.Is(err, domain.ErrDeliveryOrderNotFound):
 		RespondError(w, r, http.StatusNotFound, "delivery order not found")
 	case errors.Is(err, domain.ErrOpnameNotFound):
@@ -485,6 +489,32 @@ func (h *WMSHandler) RejectTransfer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	transfer, err := h.uc.RejectTransfer(r.Context(), tenantID, userID, role, transferID, req.Reason)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, transfer)
+}
+
+// CancelTransfer handles DELETE /api/v1/wms/transfers/{id}
+// Discards a DRAFT transfer. The record is kept with status CANCELLED so the
+// history stays auditable instead of vanishing from the list.
+func (h *WMSHandler) CancelTransfer(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	transferID, ok := parseUUIDParam(r, "id")
+	if !ok {
+		RespondError(w, r, http.StatusBadRequest, "invalid transfer id")
+		return
+	}
+
+	transfer, err := h.uc.CancelTransfer(r.Context(), tenantID, userID, role, transferID)
 	if err != nil {
 		handleWMSError(w, r, err)
 		return
