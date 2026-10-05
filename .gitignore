@@ -62,3 +62,4 @@ scripts/*
 !scripts/verify-cancel-deploy.js
 !scripts/cancel-transfer-draft.js
 !scripts/verify-cancel-feature.js
+!scripts/verify-cancel-ui.js
