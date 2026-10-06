@@ -95,4 +95,6 @@ Backend berjalan di port `8081`. Frontend secara bawaan telah dikonfigurasi untu
    git commit -m "feat/fix: deskripsi perubahan"
    git push origin main
    ```
-   Zeabur akan otomatis melakukan proses *build & deploy* secara mandiri.
+   Lalu buka dashboard Zeabur dan klik **Redeploy** pada service yang berubah (`tayooli-backend` dan/atau `tayooli-frontend`), atau jalankan `node scripts/redeploy-service.js backend|frontend`.
+
+   > ⚠️ **Auto-deploy saat push tidak teramati berjalan (Oktober 2026).** Tiga push ke `main` (`511be9c`, `13a20fa`, `e18515d`) tidak menghasilkan deployment baru di Zeabur selama periode pengamatan, sampai Redeploy diklik manual. Halaman Settings service tidak menampilkan toggle auto-deploy. Status webhook GitHub belum diperiksa (butuh akses admin repo). Selalu verifikasi URL live setelah deploy.
