@@ -103,3 +103,19 @@ Next.js 15 (App Router), Tailwind, Zustand/TanStack Query, komponen shadcn-style
 ---
 *Dokumen ini adalah intisari status terbaru. Update file ini jika ada fitur mayor yang selesai atau arsitektur yang berubah.*
 *Terakhir diperbarui: 2026-09-05 — Hardening operasional selesai.*
+
+## 🆕 2026-10-06 — Security Fix POS + Reset Password (Zeabur prod)
+- **POS tenant-leak fixed + `owner` role 403 fixed** (commit `ff1c554`):
+  hardcoded `DEFAULT_PRODUCTS` dihapus; tenant kosong dapat katalog kosong;
+  stok default 0; scan barcode asing ditolak; cache query dibersihkan saat
+  identitas auth berubah (`app/providers.tsx`).
+- **Email reset-password aktif di produksi**: env `BREVO_API_KEY` /
+  `BREVO_SENDER_EMAIL` / `BREVO_SENDER_NAME` diset di service backend Zeabur
+  (sender `noreply@tayooli.my.id`, verified). Diagnosis lengkap ada di
+  [`docs/production-runbook.md`](docs/production-runbook.md) §10.
+- **Tracer untuk "200 tapi email tidak sampai"**: endpoint forgot-password
+  sengaja selalu balas 200 (anti-enumeration); periksa log backend untuk
+  baris `[AUTH] forgot-password requested for non-existent email`.
+- Infrastruktur untuk 5 gudang: estimasi upgrade ada di
+  [`docs/zeabur-5-warehouse-upgrade-estimate.md`](docs/zeabur-5-warehouse-upgrade-estimate.md)
+  (belum disetujui klien).

@@ -50,6 +50,9 @@ Alur inti: Frontend memproksi `/api/v1/*` server-side ke Go API → Go publish e
 | `FRONTEND_ORIGIN` | Opsional | Whitelist CORS origin frontend |
 | `SENTRY_DSN` | Opsional | Error tracking |
 | `MATCH_AMOUNT_TOLERANCE_PCT` | Opsional | Toleransi 3-way match (default 2.0) |
+| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` | **WAJIB untuk reset-password** di produksi | Pengiriman email transaksional via Brevo HTTP API (`internal/infra/mailer`). Tanpa keduanya, mailer jalan dalam mode no-op (hanya log) dan tidak ada email yang dikirim — sementara endpoint tetap balas HTTP 200 |
+| `BREVO_SENDER_NAME` | Opsional | Nama pengirim tampilan (default `Tayooli ERP`) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Alternatif jika tidak pakai Brevo | Fallback SMTP standar bila Brevo tidak dikonfigurasi |
 
 ### 2.3 AI Worker (Python)
 
@@ -203,3 +206,22 @@ curl -sf -b /tmp/cj http://<api>/api/v1/invoices   # hanya data tenant sendiri
 1. **K8s:** `kubectl rollout undo deployment/tayooli-api -n tayooli-core` (atau apply image tag versi sebelumnya dari CI).
 2. **Compose:** `docker compose pull && docker compose up -d` dengan tag lama.
 3. **DB:** restore dari backup terakhir; migrasi ke depan bersifat idempotent, migrasi ke belakang TIDAK didukung (blok DOWN) — jangan drop kolom/table secara manual.
+
+---
+
+## 10. Troubleshooting: Email Reset Password Tidak Sampai
+
+Gejala: form forgot-password menampilkan "Link reset password telah dikirim" (HTTP 200), tapi email tidak pernah sampai.
+
+**Kode ini by design**: handler selalu balas 200 untuk mencegah enumeration email (`internal/handler/auth_handler.go`), dan pengiriman berjalan async di goroutine. Jadi UI tidak pernah menampilkan kegagalan kirim. Diagnosis dilakukan dari **log backend** (Zeabur → service backend → Logs):
+
+| Log backend | Arti | Tindakan |
+|---|---|---|
+| `[AUTH] forgot-password requested for non-existent email: <addr>` | Email tidak ada di tabel `users` (case-sensitive match setelah normalisasi lowercase). Mailer tidak pernah dipanggil | Pastikan email yang diketik = email registrasi; kalau belum punya akun, daftar dulu |
+| `[AUTH] failed to store password reset token ...` | Query DB gagal (mis. fungsi SECURITY DEFINER belum termigrasi) | Cek migrasi `019_password_reset_functions.sql` |
+| `[AUTH] failed to send password reset email to <addr>: <err>` | Mailer aktif tapi API Brevo/SMTP menolak | Cek nilai `BREVO_API_KEY`/`BREVO_SENDER_EMAIL`, status sender di dashboard Brevo, dan kuota plan |
+| `[AUTH] password reset email successfully dispatched to <addr>` | Backend sukses menyerahkan email ke Brevo | Cek folder Spam/Junk; cek status event di dashboard Brevo (tab Transactional → Logs) |
+
+Verifikasi end-to-end tanpa menebak: query event Brevo per-alamat (`GET /v3/smtp/statistics/events?email=<addr>`) — event `requests` → `delivered` membuktikan email keluar dari backend. Token reset berlaku 1 jam.
+
+**Insiden 2026-10-06**: env `BREVO_*` tidak pernah di-set di Zeabur → mailer no-op (terdeteksi: HTTP 200 tapi tidak ada event Brevo sama sekali). Var sudah ditambahkan via tab Variable → Edit Raw Variables, lalu redeploy. Nilai var tidak pernah dicatat di repo ini (rahasia), hanya namanya.

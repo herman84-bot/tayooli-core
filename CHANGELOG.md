@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- POS page no longer shows a hardcoded demo catalog (`DEFAULT_PRODUCTS`) to
+  new/empty tenants: it previously displayed invented products (fake
+  stock=50, fabricated barcodes) that looked like another tenant's data.
+  Empty tenants now get an empty catalog with a guided empty state, stock
+  defaults to 0, and unknown scanned barcodes are rejected instead of
+  creating fake products. Query cache is cleared on auth identity change
+  (logout / login as a different tenant). Regression tests:
+  `__tests__/pos-security.test.tsx` (3/3)
+  (commit `ff1c554`)
+- Product create/update/delete routes (`POST/PUT/PATCH/DELETE /api/v1/products`,
+  `POST /api/v1/inventory`) now include the `owner` role in `RequireRole`.
+  Newly registered tenants receive role `owner`, which was previously
+  rejected with HTTP 403 Permission Denied
+  (`backend/go-core/cmd/api/main.go`)
+
+### Fixed
+
+- **Password-reset emails now send in production.** The Brevo mailer env vars
+  (`BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`) were missing
+  on the Zeabur backend service, so `mailer.IsConfigured()` was false and the
+  mailer silently ran in no-op mode while the API still returned HTTP 200.
+  The vars are now set (sender `Tayooli ERP <noreply@tayooli.my.id>`,
+  domain authenticated with DKIM/DMARC) and documented in the runbook env
+  matrix.
+- Documented the forgot-password diagnostic: the endpoint intentionally
+  returns HTTP 200 even for unknown emails (anti-enumeration). To tell a
+  "never sent" case from a "wrong address" case, check the backend log for
+  `[AUTH] forgot-password requested for non-existent email: <address>` —
+  see `docs/production-runbook.md` §10.
+
 ### Added
 
 - Demo auth fallback for the Next.js preview: `app/api/v1/auth/*` route
