@@ -594,7 +594,9 @@ func main() {
 		r.Get("/products", productHandler.ListProducts)
 		r.Get("/products/{id}", productHandler.GetProduct)
 		r.Group(func(r chi.Router) {
-			r.Use(tenantMiddleware.RequireRole("admin", "accountant"))
+			// "owner" is the role every self-registered tenant gets
+			// (usecase/auth Register); without it new tenants get 403 on products.
+			r.Use(tenantMiddleware.RequireRole("owner", "admin", "accountant"))
 			r.Post("/products", productHandler.CreateProduct)
 			r.Put("/products/{id}", productHandler.UpdateProduct)
 			r.Patch("/products/{id}", productHandler.UpdateProduct)
@@ -604,7 +606,7 @@ func main() {
 		r.Get("/inventory", productHandler.ListInventory)
 		r.Get("/inventory/{id}", productHandler.GetInventory)
 		r.Group(func(r chi.Router) {
-			r.Use(tenantMiddleware.RequireRole("admin", "warehouse"))
+			r.Use(tenantMiddleware.RequireRole("owner", "admin", "warehouse"))
 			r.Post("/inventory", productHandler.CreateInventory)
 		})
 

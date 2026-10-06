@@ -2,7 +2,13 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth, useAuthStore } from '@/hooks/useAuth'
+
+/** Identity key: cache must never outlive the user/tenant that fetched it. */
+function identityKey(user: { id?: string; tenantId?: string; tenant_id?: string } | null): string {
+  if (!user) return ''
+  return `${user.id ?? ''}:${user.tenantId ?? user.tenant_id ?? ''}`
+}
 
 interface ProvidersProps {
   children: ReactNode
@@ -54,6 +60,21 @@ export default function Providers({ children }: ProvidersProps) {
         },
       }),
   )
+
+  // Drop every cached query whenever the signed-in identity changes
+  // (logout, login as another user/tenant). Without this, POS/products/stock
+  // fetched for tenant A stay visible to tenant B until staleTime expires.
+  useEffect(() => {
+    let prev = identityKey(useAuthStore.getState().user as never)
+    return useAuthStore.subscribe((state) => {
+      const next = identityKey(state.user as never)
+      if (next !== prev) {
+        prev = next
+        queryClient.cancelQueries()
+        queryClient.clear()
+      }
+    })
+  }, [queryClient])
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -67,84 +67,7 @@ interface ProductItem {
   vendorName?: string
 }
 
-const DEFAULT_PRODUCTS: ProductItem[] = [
-  {
-    id: "prod-001",
-    name: "Beras Premium Rojolele 10kg",
-    sku: "SKU-ROJO-10K",
-    barcode: "8991001001001",
-    price: 145000,
-    stock: 45,
-    category: "Sembako",
-  },
-  {
-    id: "prod-002",
-    name: "Minyak Goreng Sania 2L",
-    sku: "SKU-SANIA-2L",
-    barcode: "8999999123456",
-    price: 34000,
-    stock: 82,
-    category: "Sembako",
-  },
-  {
-    id: "prod-003",
-    name: "Gula Pasir Gulaku 1kg",
-    sku: "SKU-GULA-1K",
-    barcode: "8992002002002",
-    price: 17500,
-    stock: 120,
-    category: "Sembako",
-  },
-  {
-    id: "prod-004",
-    name: "Kecap Manis Bango 550ml",
-    sku: "SKU-BANGO-550",
-    barcode: "8993003003003",
-    price: 24500,
-    stock: 36,
-    category: "Makanan & Minuman",
-  },
-  {
-    id: "prod-005",
-    name: "Kopi Kapal Api Spesial Mix 10s",
-    sku: "SKU-KOPI-10S",
-    barcode: "8994004004004",
-    price: 15000,
-    stock: 64,
-    category: "Makanan & Minuman",
-    isConsignment: true,
-    vendorName: "CV Warkop Sejahtera",
-  },
-  {
-    id: "prod-006",
-    name: "Sabun Cuci Piring Sunlight 750ml",
-    sku: "SKU-SUNLIGHT-750",
-    barcode: "8995005005005",
-    price: 16000,
-    stock: 50,
-    category: "Kebersihan",
-  },
-  {
-    id: "prod-007",
-    name: "Keripik Singkong Balado 200g (Konsinyasi)",
-    sku: "SKU-KRP-SNG-200",
-    barcode: "8996006006006",
-    price: 18000,
-    stock: 25,
-    category: "Makanan & Minuman",
-    isConsignment: true,
-    vendorName: "UMKM Berkah Snack",
-  },
-  {
-    id: "prod-008",
-    name: "Deterjen Rinso Molto 770g",
-    sku: "SKU-RINSO-770",
-    barcode: "8997007007007",
-    price: 26500,
-    stock: 18,
-    category: "Kebersihan",
-  },
-]
+
 
 export default function POSPage() {
   const { data: dbProducts = [] } = useProducts()
@@ -162,20 +85,20 @@ export default function POSPage() {
     return map
   }, [wmsStock])
 
-  // Combined product catalog
+  // Product catalog — ONLY the signed-in tenant's real products.
+  // Never fall back to hardcoded/demo items or invented stock/price: a new or
+  // empty tenant must see an empty catalog, not data that looks like another
+  // tenant's (QA finding: "POS menampilkan data tenant lain").
   const catalog = useMemo<ProductItem[]>(() => {
-    if (dbProducts && dbProducts.length > 0) {
-      return dbProducts.map((p, idx) => ({
-        id: p.id,
-        name: p.name,
-        sku: p.sku,
-        barcode: (p as unknown as { barcode?: string }).barcode || `899000${idx + 10000}`,
-        price: Number(p.price) || 25000,
-        stock: stockByProduct.get(p.id) ?? 50,
-        category: "Umum",
-      }))
-    }
-    return DEFAULT_PRODUCTS
+    return (dbProducts ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      sku: p.sku,
+      barcode: (p as unknown as { barcode?: string }).barcode || "",
+      price: Number(p.price) || 0,
+      stock: stockByProduct.get(p.id) ?? 0,
+      category: "Umum",
+    }))
   }, [dbProducts, stockByProduct])
 
   // Current retail sales mode toggle
@@ -192,6 +115,7 @@ export default function POSPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("Semua")
   const [scanBarInput, setScanBarInput] = useState("")
+  const [scanError, setScanError] = useState<string | null>(null)
 
   // Modals & Payments
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -374,25 +298,18 @@ export default function POSPage() {
     const clean = barcode.trim()
     const found = catalog.find(
       (p) =>
-        p.barcode === clean ||
+        (p.barcode !== "" && p.barcode === clean) ||
         p.sku.toLowerCase() === clean.toLowerCase() ||
         p.name.toLowerCase().includes(clean.toLowerCase())
     )
 
     if (found) {
+      setScanError(null)
       addToCart(found)
     } else {
-      // Create on the fly demo item if unknown barcode scanned in retail
-      const generic: ProductItem = {
-        id: `scanned-${clean}`,
-        name: `Barang Barcode [${clean}]`,
-        sku: `SKU-${clean.slice(-6)}`,
-        barcode: clean,
-        price: 25000,
-        stock: 99,
-        category: "Umum",
-      }
-      addToCart(generic)
+      // Unknown code: do NOT invent a fake product (its non-UUID id would also
+      // make checkout fail). Tell the cashier instead.
+      setScanError(`Barang dengan kode "${clean}" tidak ditemukan di master produk.`)
     }
   }
 
@@ -582,14 +499,17 @@ export default function POSPage() {
         {/* ── LEFT COLUMN: Product Catalog & Search (Col 7 or 8) ── */}
         <div className="lg:col-span-7 xl:col-span-8 flex flex-col space-y-4">
           {/* Quick Barcode Scan Input Bar */}
-          <div className="bg-white p-3.5 rounded-xl border border-[#E2E8F0] shadow-xs">
+          <div className="bg-white p-3.5 rounded-xl border border-[#E2E8F0] shadow-xs space-y-2">
             <form onSubmit={handleScanBarSubmit} className="flex gap-2">
               <div className="relative flex-1">
                 <BarcodeIcon className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#2563EB]" />
                 <input
                   type="text"
                   value={scanBarInput}
-                  onChange={(e) => setScanBarInput(e.target.value)}
+                  onChange={(e) => {
+                    setScanBarInput(e.target.value)
+                    setScanError(null)
+                  }}
                   placeholder="Scan barcode dengan USB Scanner Gun atau ketik SKU..."
                   className="w-full pl-11 pr-4 min-h-[48px] text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-mono"
                 />
@@ -601,6 +521,12 @@ export default function POSPage() {
                 + Masuk Keranjang
               </button>
             </form>
+            {scanError && (
+              <div className="px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>{scanError}</span>
+              </div>
+            )}
           </div>
 
           {/* Search & Category Filter Chips */}
@@ -633,6 +559,23 @@ export default function POSPage() {
               ))}
             </div>
           </div>
+
+          {catalog.length === 0 && (
+            <div className="bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center space-y-2">
+              <Layers className="w-10 h-10 mx-auto text-slate-300" />
+              <div className="text-sm font-bold text-slate-700">Belum ada produk</div>
+              <p className="text-xs text-slate-500">
+                Tambahkan barang di master produk terlebih dahulu agar bisa dijual di kasir.
+              </p>
+              <Link
+                href="/products"
+                className="inline-flex items-center gap-1.5 mt-2 px-4 py-2 rounded-lg bg-[#2563EB] text-white text-xs font-bold hover:bg-[#1D4ED8]"
+              >
+                Buka Master Produk
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          )}
 
           {/* Products Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
