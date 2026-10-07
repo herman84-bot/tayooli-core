@@ -109,7 +109,7 @@ Standar operasional penerimaan barang dari kedatangan armada hingga siap jual:
      - *Weight Balancing:* Barang berat di ground level, barang ringan di level atas.
    - *Keluaran:* Terkonfirmasi *Putaway Complete*. SLA: $\le 30$ menit.
 6. **Tahap 6: Dispatch & Stock Release**
-   - *Aktivitas:* Sistem mengubah status stok dari *Unallocated/In-Transit* menjadi *Available Stock*. Dokumen PO/RO otomatis ditutup. Stok langsung siap dipesan oleh sistem penjualan/outbound.
+   - *Aktivitas:* Sistem mengubah status stok dari *Unallocated/In-Transit* menjadi *Available Stock*. Dokumen PO/RO otomatis ditutup. Stok langsung siap dipesan oleh sistem penjualan/outbound. Bila tenant mengaktifkan *Release Approval*, perubahan ke Available menunggu persetujuan Supervisor Warehouse (lihat PDF-06 di §3.6).
    - *Keluaran:* Stok Siap Jual (*Ready Stock*). SLA: Real-time.
 
 ---
@@ -207,6 +207,29 @@ Sumber: `RIVIEW TAYOLI.xlsx` (Sheet1, B2:F11), berisi 5 poin feedback. Setiap po
 - Pilihan terakhir diingat (`?mode=masuk|keluar` dan localStorage).
 - Link lama `/wms/inbound` dan `/wms/delivery-orders` otomatis dialihkan ke modul baru.
 - Semua label UI berbahasa Indonesia.
+
+---
+
+### 3.6 Audit Ulang PDF SOP vs PRD (2026-10-07)
+
+Kedua PDF dibaca ulang per halaman (Inbound 4 halaman, Outbound 4 halaman). Gambar di dalamnya hanya ikon 45x45 px dan garis hiasan, tanpa teks atau diagram, jadi semua isi ada di teks. Setiap poin dicocokkan dengan §3.1–3.3. Poin yang **belum ada atau belum lengkap**:
+
+| ID | Poin di PDF (halaman) | Kekurangan di PRD | Tindakan |
+| :--- | :--- | :--- | :--- |
+| **PDF-01** | Outbound tahap 1: "**SO & Free Item**" (Out hal. 1) | Free item / bonus tidak disebut sama sekali. | Baris Surat Jalan punya flag `is_free_item` (harga 0, tetap memotong stok per batch, tercetak "BONUS" di Surat Jalan & packing slip). Ikut pick, QC 100%, dan lacak batch. **Sprint 3.** |
+| **PDF-02** | Inbound tahap 3: "Inspeksi … (**sampling/full inspection**)" (In hal. 2) | Hanya disebut QC Pass/Reject/Quarantine, tanpa mode inspeksi. | `qc_inspections.inspection_mode` = `FULL` / `SAMPLING` + `sample_qty`. Default per kategori produk (CR-01). Bila sampel gagal, wajib naik ke FULL. **Sprint 2.** |
+| **PDF-03** | Outbound QC: "Laporan **Item Rusak**" + re-pick otomatis (Out hal. 2) | Re-pick dan Holding sudah ada, tetapi dokumen Laporan Item Rusak belum. | Rusak saat pick/QC → mutasi ke `QUARANTINE` (Holding) + dokumen Laporan Item Rusak (pakai template BAK) + task re-pick otomatis dari batch FEFO berikutnya. **Sprint 3.** |
+| **PDF-04** | Shortage saat picking: "alokasikan **alternatif lokasi bin terdekat**" (Out hal. 2) | Hanya Shortage Ticket. | Shortage Ticket + sistem langsung menawarkan rak lain dengan batch FEFO berikutnya. **Sprint 3.** |
+| **PDF-05** | Order Release: wave berdasarkan "**jenis SO/PO**" (Out hal. 2) selain rute & kurir (hal. 1) | Hanya jenis barang/kurir/rute. | Tambah pengelompokan per jenis order (Surat Jalan biasa, marketplace, transfer cabang). **Sprint 3.** |
+| **PDF-06** | Stock Release oleh **Supervisor Warehouse** dengan "**Release Approval**", SLA real-time (In hal. 4) | PRD bilang otomatis tanpa approval. **Bertentangan.** | Default: otomatis saat putaway selesai (SLA real-time). Opsi pengaturan tenant "Wajib approval supervisor sebelum Available". Pelaku tercatat (CR-05). **Sprint 1.** |
+| **PDF-07** | KPI header (In hal. 1, Out hal. 1): Dock-to-Stock < 2 jam, Receiving Accuracy 99,8%, PO Compliance 100%, Backlog 0%; Order-to-Dispatch < 1 jam, Picking Accuracy 99,9%, On-Time Shipment 100%, Backlog 0% | Hanya SLA per tahap. 8 KPI utama tidak ada. | Hitung dari timestamp transisi status (yang sudah wajib dicatat oleh CR-05) dan tampilkan di Dashboard bersama CR-04. **Sprint 4.** |
+| **PDF-08** | Audit inbound: **rekonsiliasi bulanan GRN vs PO/RO** (In hal. 4) | Tidak ada. | Laporan bulanan: dokumen acuan (RO / Surat Jalan pemasok) vs qty diterima per GR, selisih ditandai. **Sprint 4.** |
+| **PDF-09** | Audit outbound: **rekonsiliasi harian order terbit vs Surat Jalan bertanda tangan** (unshipped backlog) (Out hal. 4) | Tidak ada. | Laporan harian: order/Surat Jalan yang sudah dibuat tapi belum `SHIPPED` dengan TTD, beserta umurnya. **Sprint 4.** |
+
+**Poin yang sudah ada di PRD dan sudah dicek:** ASN, gate & tiket truk, dock/bay, inspeksi kemasan, gross count, tally sheet, blind count, batch & exp, BAK + foto + Blocked Stock, Discrepancy Report + TTD sopir sebelum truk pergi, GRN, LPN, putaway list, scan LPN lalu scan rak, velocity/FEFO/weight balancing, Available Stock, tutup RO, wave, picking list, rute terpendek, scan rak & SKU, troli, Holding Area, Shortage Ticket, QC 100% scan, packing slip, bahan kemas, AWB 100x150, staging per rute/kota/ekspedisi, verifikasi koli, loading scan, LIFO, TTD sopir & supervisor, Bill of Lading, Goods Issue, matriks peran/SLA.
+
+**Benturan yang harus dicatat (bukan gap PRD):**
+- PDF memakai istilah **Sales Order (SO)** dan **PO/RO**. Menurut aturan 12 modul, menu SO/PO tidak ditampilkan. Penerapannya: "SO" diwakili oleh Surat Jalan / order marketplace / order POS, dan "PO/RO" diwakili oleh nomor dokumen acuan pemasok di form Barang Masuk (teks + lampiran), tanpa modul P2P.
 
 ---
 
@@ -492,6 +515,7 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 
 ### SPRINT 1: Fondasi Batch, Expiry Date & 2-Step Inbound (Staging &rarr; Putaway)
 - [ ] **DB-01:** Buat migrasi SQL `033_wms_batches_and_staging_locations.sql` (tabel `stock_batches`, tipe `STAGING_INBOUND`, dan kolom `batch_id`).
+- [ ] **PDF-06:** Setting tenant "Wajib approval supervisor sebelum stok Available" (default: otomatis), dengan pelaku tercatat.
 - [ ] **KO-1a (DB):** Backfill batch `LEGACY` untuk stok dan mutasi lama, lalu `stock_movements.batch_id SET NOT NULL` dan tambah index lacak.
 - [ ] **KO-1b (BE):** Semua jalur mutasi (receipt, putaway, transfer, DO, POS, marketplace, opname, scrap) mengisi `batch_id`. Barang tanpa nomor batch mendapat batch `AUTO-<GR>-<baris>`.
 - [ ] **KO-1c (BE):** Endpoint `GET /api/v1/wms/trace/batch/{id}`, `GET /api/v1/wms/trace/receipt/{id}` (lacak maju), dan `GET /api/v1/wms/trace/delivery-order/{id}` (lacak mundur).
@@ -520,6 +544,7 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [ ] **BE-05:** Mutasi barang rusak otomatis dialokasikan ke lokasi `@QUARANTINE` bukan langsung `@SCRAP`.
 - [ ] **FE-04:** Halaman khusus `/wms/inbound/qc` untuk pemeriksaan mutu per SKU (Blind Count & Expire Date).
 - [ ] **FE-05:** Komponen cetak dokumen resmi Berita Acara Kerusakan (BAK) berformat A4 dengan bukti foto cacat.
+- [ ] **PDF-02:** Mode inspeksi QC `FULL`/`SAMPLING` + `sample_qty`, default per kategori; sampel gagal → wajib FULL.
 - [ ] **TEST-02:** Pengujian Go untuk isolasi stok karantina dan pembuatan dokumen BAK.
 - [ ] **DEPLOY-02:** Push commit, verifikasi CI dan produksi Zeabur.
 
@@ -536,6 +561,9 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [ ] **CR-04c (FE):** Hapus blok P2P di Dashboard ("Pembelian Vendor (Procure-to-Pay)", "Faktur Vendor", "Vendor Teratas"). Temuan dari screenshot klien, melanggar aturan 13 modul.
 - [ ] **CR-04b (FE):** Kartu "Barang Keluar", tabel Top 10 Produk Keluar, dan Top 10 Toko/Customer di Dashboard.
 - [ ] **CR-05b (FE):** Kolom "Dibuat oleh / Disetujui oleh" di tabel Barang Masuk, Surat Jalan, Transfer, Opname, Scrap + panel "Riwayat Aktivitas" di detail dokumen.
+- [ ] **PDF-01:** Free item / bonus di baris Surat Jalan (`is_free_item`, harga 0, tetap potong stok per batch, tercetak "BONUS").
+- [ ] **PDF-03/04:** Rusak saat pick/QC → Quarantine + Laporan Item Rusak + re-pick otomatis. Shortage → Shortage Ticket + saran rak alternatif (batch FEFO berikutnya).
+- [ ] **PDF-05:** Wave dikelompokkan per jenis order (Surat Jalan, marketplace, transfer) selain rute/kurir.
 - [ ] **TEST-03:** Pengujian otomatis alokasi FEFO dan pencegahan salah kirim barang di meja kemas.
 - [ ] **DEPLOY-03:** Push commit, verifikasi CI dan produksi Zeabur.
 
@@ -544,6 +572,9 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [ ] **BE-08:** Endpoint penerbitan manifest kurir dan endpoint validasi pemuatan armada (*Loading Scan*).
 - [ ] **FE-09:** Halaman konsolidasi manifest `/wms/outbound/manifests` dengan kanvas tanda tangan sopir kurir.
 - [ ] **FE-10:** Mode pemindaian loading truk sebelum status Surat Jalan final berubah menjadi `SHIPPED`.
+- [ ] **PDF-07:** 8 KPI utama SOP (Dock-to-Stock, Receiving Accuracy, PO Compliance, Backlog Inbound; Order-to-Dispatch, Picking Accuracy, On-Time Shipment, Backlog Outbound) di Dashboard, dihitung dari timestamp transisi status.
+- [ ] **PDF-08:** Laporan rekonsiliasi bulanan dokumen acuan pemasok (RO/SJ) vs qty GR.
+- [ ] **PDF-09:** Laporan rekonsiliasi harian Surat Jalan terbit vs SHIPPED + TTD (unshipped backlog + umur).
 - [ ] **TEST-04:** Pengujian mutasi ledger Goods Issue saat manifest ditutup.
 - [ ] **DEPLOY-04:** Push commit, verifikasi CI dan produksi Zeabur.
 
