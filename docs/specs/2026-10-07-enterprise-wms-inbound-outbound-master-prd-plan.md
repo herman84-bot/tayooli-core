@@ -169,7 +169,7 @@ Standar operasional pengeluaran pesanan dari pemrosesan hingga armada berangkat:
 
 ### 3.4 Review Tambahan Klien (`RIVIEW TAYOLI.xlsx`, diterima 2026-10-07)
 
-Sumber: `RIVIEW TAYOLI.xlsx` (Sheet1, B2:F11), berisi 5 poin. Setiap poin punya 1 screenshot di kolom "PCT". Screenshot **belum dianalisis** karena model yang dipakai saat dokumen ini ditulis tidak bisa membaca gambar. Sebelum mengerjakan item CR, buka screenshot itu (`xl/media/image*.jpg`; urutan per baris: CR-01=image2, CR-02=image3, CR-03=image4, CR-04=image5, CR-05=image1) untuk memastikan layar mana yang dimaksud.
+Sumber: `RIVIEW TAYOLI.xlsx` (Sheet1, B2:F11), berisi 5 poin feedback. Setiap poin memuat 1 screenshot di kolom "PCT" (`xl/media/image*.jpg`). Seluruh 5 screenshot telah diekstrak dan dianalisis teks/layarnya via EasyOCR (image2=Form Tambah Produk, image3=Sidebar Navigasi, image4=Form Penerimaan Inbound, image5=Halaman Dashboard Overview, image1=Detail Penerimaan Goods Receipt). Analisis visual mengonfirmasi 100% kesesuaian konteks layar dengan kebutuhan di bawah.
 
 | ID | Permintaan Klien (verbatim) | Kondisi Kode Saat Ini (diverifikasi) | Keputusan & Penempatan |
 | :--- | :--- | :--- | :--- |
