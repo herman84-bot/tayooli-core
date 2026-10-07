@@ -1,15 +1,15 @@
 import { test, expect } from '@playwright/test'
 
-test.describe('Authentication Flow', () => {
+test.describe('Authentication Flow (Tayooli Core)', () => {
   test('visit dashboard → redirect to login → login → redirect back', async ({ page }) => {
-    // Attempt to access protected route
+    // Attempt to access protected route unauthenticated
     await page.goto('/dashboard')
 
     // Should redirect to login
     await expect(page).toHaveURL('/login')
     await expect(page.getByRole('button', { name: 'Masuk' })).toBeVisible()
 
-    // Fill login form
+    // Fill login form with demo credentials
     await page.fill('#email', 'admin@test.com')
     await page.fill('#password', 'password123')
     await page.click('button[type="submit"]')
@@ -28,7 +28,7 @@ test.describe('Authentication Flow', () => {
 
     // Should show error message
     await expect(page.getByTestId('login-error')).toBeVisible()
-    await expect(page.getByTestId('login-error-text')).toHaveText(/Email atau kata sandi salah|Invalid credentials/)
+    await expect(page.getByTestId('login-error-text')).toHaveText(/Email atau kata sandi salah|Invalid credentials|invalid credentials/i)
     await expect(page).toHaveURL('/login')
   })
 
@@ -40,31 +40,41 @@ test.describe('Authentication Flow', () => {
     await page.click('button[type="submit"]')
     await expect(page).toHaveURL('/dashboard')
 
-    // Logout
-    await page.click('text=Logout')
+    // Logout via sidebar button (matches aria-label="Logout")
+    await page.getByRole('button', { name: 'Logout' }).first().click()
     await expect(page).toHaveURL('/login')
 
-    // Verify can't access protected routes
+    // Verify unauthenticated user cannot access protected routes
     await page.goto('/dashboard')
     await expect(page).toHaveURL('/login')
   })
 
-  test('authenticated user can access all protected routes', async ({ page }) => {
-    // Login
+  test('authenticated user can access core protected routes (/dashboard, /products, /pos, /settings)', async ({ page }) => {
+    // Login with demo credentials
     await page.goto('/login')
     await page.fill('#email', 'admin@test.com')
     await page.fill('#password', 'password123')
     await page.click('button[type="submit"]')
     await expect(page).toHaveURL('/dashboard')
 
-    // Access various protected routes
-    await page.goto('/dashboard/invoices')
-    await expect(page.getByRole('heading', { name: 'Invoices' })).toBeVisible()
+    // 1. /dashboard
+    await page.goto('/dashboard')
+    await expect(page).toHaveURL('/dashboard')
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
 
-    await page.goto('/approvals')
-    await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible()
+    // 2. /products
+    await page.goto('/products')
+    await expect(page).toHaveURL('/products')
+    await expect(page.getByRole('heading', { name: /Katalog Produk/i })).toBeVisible()
 
-    await page.goto('/dashboard/payment-orders')
-    await expect(page.getByRole('heading', { name: 'Payment Orders' })).toBeVisible()
+    // 3. /pos
+    await page.goto('/pos')
+    await expect(page).toHaveURL('/pos')
+    await expect(page.getByRole('heading', { name: /Point of Sale/i })).toBeVisible()
+
+    // 4. /settings
+    await page.goto('/settings')
+    await expect(page).toHaveURL('/settings')
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   })
 })

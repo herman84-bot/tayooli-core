@@ -203,3 +203,44 @@ func (r *PaymentGatewayRepo) UpdateTransactionStatus(ctx context.Context, tenant
 	}
 	return nil
 }
+
+// ConsumeTransaction atomically marks a settled payment as used by a sale.
+//
+// The WHERE clause on status='completed' is the whole point: only one caller
+// can flip completed -> consumed, so a single payment can never be redeemed
+// twice, even if two checkouts race. Any other state (pending, expired,
+// already consumed) reports ErrNotFound.
+func (r *PaymentGatewayRepo) ConsumeTransaction(ctx context.Context, tenantID uuid.UUID, orderID string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("PaymentGatewayRepo.ConsumeTransaction: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return fmt.Errorf("PaymentGatewayRepo.ConsumeTransaction: set tenant: %w", err)
+	}
+
+	const q = `
+		UPDATE payment_transactions
+		SET status = 'consumed', updated_at = NOW()
+		WHERE tenant_id = $1 AND order_id = $2 AND status = 'completed'`
+
+	res, err := tx.ExecContext(ctx, q, tenantID, orderID)
+	if err != nil {
+		return fmt.Errorf("PaymentGatewayRepo.ConsumeTransaction: exec: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("PaymentGatewayRepo.ConsumeTransaction: rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("PaymentGatewayRepo.ConsumeTransaction: commit: %w", err)
+	}
+	return nil
+}

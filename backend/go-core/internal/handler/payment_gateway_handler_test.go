@@ -68,6 +68,17 @@ func (m *mockPaymentGatewayRepo) UpdateTransactionStatus(ctx context.Context, te
 	return nil
 }
 
+// ConsumeTransaction mirrors the real repo: only a completed payment can be
+// flipped to consumed, so a second attempt fails with ErrNotFound.
+func (m *mockPaymentGatewayRepo) ConsumeTransaction(ctx context.Context, tenantID uuid.UUID, orderID string) error {
+	tx, ok := m.transactions[orderID]
+	if !ok || tx.Status != "completed" {
+		return domain.ErrNotFound
+	}
+	tx.Status = "consumed"
+	return nil
+}
+
 func TestPaymentGatewayHandler_GetConfig_NotFound(t *testing.T) {
 	repo := newMockPaymentGatewayRepo()
 	h := handler.NewPaymentGatewayHandler(repo)

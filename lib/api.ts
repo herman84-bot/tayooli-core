@@ -600,6 +600,55 @@ export interface POSOrder {
   created_at: string
 }
 
+export interface POSPaymentCharge {
+  order_id: string
+  provider: string
+  method: string
+  amount: number
+  status: string
+  /** True while the tenant has no gateway credentials (ADR-008 demo mode). */
+  demo: boolean
+  qr_string?: string
+  payment_link?: string
+  expires_at: string
+}
+
+export interface POSPaymentStatus {
+  order_id: string
+  status: "pending" | "completed" | "consumed" | "failed" | "expired"
+  amount: number
+  method: string
+  demo: boolean
+  completed_at?: string
+}
+
+export interface TenantPaymentConfigResponse {
+  provider: string
+  slug?: string
+  client_key?: string
+  hasCredentials: boolean
+  is_production?: boolean
+  is_active: boolean
+  settlement_bank_name?: string
+  settlement_bank_account?: string
+  settlement_holder_name?: string
+  gateway_fee_percent?: number
+}
+
+export interface UpsertPaymentConfigPayload {
+  provider: string
+  slug?: string
+  api_key?: string
+  server_key?: string
+  client_key?: string
+  is_production: boolean
+  is_active: boolean
+  settlement_bank_name?: string
+  settlement_bank_account?: string
+  settlement_holder_name?: string
+  gateway_fee_percent?: number
+}
+
 export interface CreateStockScrapInput {
   warehouse_id: string
   product_id: string
@@ -1128,6 +1177,7 @@ export const api = {
       customer_id?: string
       warehouse_id?: string
       sale_mode?: string
+      payment_order_id?: string
     }) =>
       request<{
         order_number: string
@@ -1149,5 +1199,25 @@ export const api = {
     orders: (limit?: number) =>
       request<{ data: POSOrder[] }>(`/pos/orders${limit ? `?limit=${limit}` : ""}`),
     order: (id: string) => request<POSOrder>(`/pos/orders/${id}`),
+    createPayment: (input: { amount: number; method: string }) =>
+      request<POSPaymentCharge>("/pos/payments", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    paymentStatus: (orderId: string) =>
+      request<POSPaymentStatus>(`/pos/payments/${encodeURIComponent(orderId)}/status`),
+    simulatePayment: (orderId: string) =>
+      request<{ status: string }>(`/pos/payments/${encodeURIComponent(orderId)}/simulate`, {
+        method: "POST",
+      }),
+  },
+  payments: {
+    getConfig: (provider: string = "midtrans") =>
+      request<TenantPaymentConfigResponse>(`/payments/configs?provider=${encodeURIComponent(provider)}`),
+    upsertConfig: (payload: UpsertPaymentConfigPayload) =>
+      request<{ message: string; provider: string }>("/payments/configs", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   },
 }

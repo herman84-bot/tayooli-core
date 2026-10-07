@@ -3,14 +3,36 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamMembers } from '@/hooks/useTeamMembers'
-import { Settings, Users, Building2, Shield, UserPlus, MoreHorizontal, Trash2, RefreshCw, Loader2 } from 'lucide-react'
+import { usePaymentConfig } from '@/hooks/usePaymentConfig'
+import {
+  Settings,
+  Users,
+  Building2,
+  Shield,
+  UserPlus,
+  MoreHorizontal,
+  Trash2,
+  RefreshCw,
+  Loader2,
+  CreditCard,
+  CheckCircle2,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  AlertCircle,
+  Info,
+  Lock,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type Tab = 'team' | 'profile'
+type Tab = 'team' | 'profile' | 'payments'
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'team', label: 'Tim', icon: Users },
   { id: 'profile', label: 'Perusahaan', icon: Building2 },
+  { id: 'payments', label: 'Metode Pembayaran', icon: CreditCard },
 ]
 
 type DisplayMember = { id: string; name: string; email: string; role: string; status: string }
@@ -336,6 +358,362 @@ export default function SettingsPage() {
       {/* Tab content */}
       {activeTab === 'team' && <TeamTab />}
       {activeTab === 'profile' && <ProfileTab />}
+      {activeTab === 'payments' && <PaymentsTab />}
+    </div>
+  )
+}
+
+function PaymentsTab() {
+  const [provider, setProvider] = useState<'midtrans' | 'pakasir'>('midtrans')
+  const { config, isLoading, saveConfig } = usePaymentConfig(provider)
+
+  const [serverKey, setServerKey] = useState('')
+  const [clientKey, setClientKey] = useState('')
+  const [slug, setSlug] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [isProduction, setIsProduction] = useState(false)
+  const [isActive, setIsActive] = useState(true)
+  const [bankName, setBankName] = useState('')
+  const [bankAccount, setBankAccount] = useState('')
+  const [holderName, setHolderName] = useState('')
+
+  const [showKey, setShowKey] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [copiedWebhook, setCopiedWebhook] = useState(false)
+
+  useEffect(() => {
+    if (config) {
+      setClientKey(config.client_key || '')
+      setSlug(config.slug || '')
+      setIsProduction(Boolean(config.is_production))
+      setIsActive(config.is_active ?? true)
+      setBankName(config.settlement_bank_name || '')
+      setBankAccount(config.settlement_bank_account || '')
+      setHolderName(config.settlement_holder_name || '')
+      setServerKey('')
+      setApiKey('')
+    }
+  }, [config, provider])
+
+  const handleCopyWebhook = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://tayooli.my.id'
+    const url = `${origin}/api/v1/webhooks/midtrans`
+    navigator.clipboard.writeText(url)
+    setCopiedWebhook(true)
+    setTimeout(() => setCopiedWebhook(false), 2500)
+  }
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaveSuccess(false)
+    try {
+      await saveConfig.mutateAsync({
+        provider,
+        server_key: serverKey ? serverKey.trim() : undefined,
+        client_key: clientKey ? clientKey.trim() : undefined,
+        slug: slug ? slug.trim() : undefined,
+        api_key: apiKey ? apiKey.trim() : undefined,
+        is_production: isProduction,
+        is_active: isActive,
+        settlement_bank_name: bankName ? bankName.trim() : undefined,
+        settlement_bank_account: bankAccount ? bankAccount.trim() : undefined,
+        settlement_holder_name: holderName ? holderName.trim() : undefined,
+        gateway_fee_percent: 0.7,
+      })
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 4000)
+    } catch {
+      // Error handled by saveConfig.error
+    }
+  }
+
+  const hasConfig = Boolean(config?.hasCredentials)
+  const isLive = hasConfig && config?.is_active
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-sm font-semibold text-foreground">Integrasi Payment Gateway (BYO Settlement)</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Hubungkan akun payment gateway Anda sendiri. Dana penjualan kasir (QRIS) langsung disalurkan oleh gateway ke rekening bank toko Anda (ADR-008 Model B).
+        </p>
+      </div>
+
+      {/* Provider Selector Tabs */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setProvider('midtrans')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg border transition-all',
+            provider === 'midtrans'
+              ? 'bg-primary/5 border-primary text-primary font-semibold shadow-xs'
+              : 'border-border bg-card text-muted-foreground hover:bg-muted'
+          )}
+        >
+          <span className="w-2 h-2 rounded-full bg-blue-500" />
+          Midtrans (QRIS & Core API)
+        </button>
+        <button
+          type="button"
+          onClick={() => setProvider('pakasir')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg border transition-all',
+            provider === 'pakasir'
+              ? 'bg-primary/5 border-primary text-primary font-semibold shadow-xs'
+              : 'border-border bg-card text-muted-foreground hover:bg-muted'
+          )}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          Pakasir (Fallback UMKM)
+        </button>
+      </div>
+
+      {/* Gateway Status Badge Banner */}
+      <div className={cn(
+        'p-3.5 rounded-xl border flex items-start gap-3',
+        isLive
+          ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
+          : 'bg-amber-50/60 border-amber-200 text-amber-900'
+      )}>
+        {isLive ? (
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+        ) : (
+          <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+        )}
+        <div className="text-xs">
+          <p className="font-semibold">
+            {isLive
+              ? `Gateway ${provider === 'midtrans' ? 'Midtrans' : 'Pakasir'} Aktif (${config?.is_production ? 'Live Production' : 'Sandbox Testing'})`
+              : 'Mode Demo Aktif'}
+          </p>
+          <p className="mt-0.5 leading-relaxed opacity-90">
+            {isLive
+              ? 'Pembayaran QRIS di kasir POS akan membuat tagihan riil dan dicek langsung ke sistem gateway.'
+              : 'Belum ada kredensial aktif. Kasir POS saat ini menjalankan simulasi pembayaran instan (Mode Demo) agar kasir dapat diuji tanpa uang riil.'}
+          </p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-xs text-muted-foreground">Memuat konfigurasi pembayaran...</span>
+        </div>
+      ) : (
+        <form onSubmit={handleSave} className="space-y-5 max-w-xl">
+          {/* Active Status & Environment */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border border-border bg-muted/20">
+            <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-foreground">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+              />
+              <span>Aktifkan Gateway Ini</span>
+            </label>
+
+            <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-foreground">
+              <input
+                type="checkbox"
+                checked={isProduction}
+                onChange={(e) => setIsProduction(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+              />
+              <span>Gunakan Mode Live (Production)</span>
+            </label>
+          </div>
+
+          {/* Credentials Inputs */}
+          {provider === 'midtrans' ? (
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-foreground">Server Key Midtrans</label>
+                  <a
+                    href="https://dashboard.midtrans.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-primary hover:underline flex items-center gap-1"
+                  >
+                    Buka Midtrans Dashboard <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={serverKey}
+                    onChange={(e) => setServerKey(e.target.value)}
+                    placeholder={hasConfig ? '•••••••••••••••• (tersimpan, isi jika ingin ubah)' : 'Contoh: SB-Mid-server-xxxx (Sandbox) atau Mid-server-xxxx'}
+                    className="w-full text-xs font-mono px-3 py-2 pr-10 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    title={showKey ? 'Sembunyikan' : 'Tampilkan'}
+                  >
+                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Didapat dari menu <em>Settings &gt; Access Keys</em> di dashboard Midtrans merchant Anda.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Client Key Midtrans</label>
+                <input
+                  type="text"
+                  value={clientKey}
+                  onChange={(e) => setClientKey(e.target.value)}
+                  placeholder="Contoh: SB-Mid-client-xxxx"
+                  className="w-full text-xs font-mono px-3 py-2 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Project Slug Pakasir</label>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  placeholder="Contoh: toko-berkah-jaya"
+                  className="w-full text-xs px-3 py-2 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">API Key Pakasir</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={hasConfig ? '•••••••••••••••• (tersimpan, isi jika ingin ubah)' : 'Masukkan API Key Pakasir'}
+                  className="w-full text-xs font-mono px-3 py-2 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Webhook notification helper */}
+          {provider === 'midtrans' && (
+            <div className="p-3 bg-muted/40 rounded-lg border border-border space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Lock className="h-3.5 w-3.5 text-primary" /> Webhook Notification URL
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyWebhook}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                >
+                  {copiedWebhook ? (
+                    <>
+                      <Check className="h-3 w-3 text-emerald-600" />
+                      <span className="text-emerald-600">Disalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      Salin URL
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Tempel URL berikut pada dashboard Midtrans (<em>Settings &gt; Configuration &gt; Payment Notification URL</em>) agar kasir menerima notifikasi lunas instan:
+              </p>
+              <div className="font-mono text-[11px] bg-background px-2.5 py-1.5 rounded border border-border select-all break-all">
+                {typeof window !== 'undefined' ? `${window.location.origin}/api/v1/webhooks/midtrans` : 'https://tayooli.my.id/api/v1/webhooks/midtrans'}
+              </div>
+            </div>
+          )}
+
+          {/* Settlement Bank Details */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <h3 className="text-xs font-semibold text-foreground">Rekening Bank Pencairan (Settlement)</h3>
+            <p className="text-[11px] text-muted-foreground">
+              Rekening tujuan di mana Midtrans mencairkan saldo QRIS Anda secara otomatis.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Nama Bank</label>
+                <input
+                  type="text"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                  placeholder="Contoh: BCA / Mandiri / BRI"
+                  className="w-full text-xs px-3 py-2 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Nomor Rekening</label>
+                <input
+                  type="text"
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                  placeholder="Contoh: 1234567890"
+                  className="w-full text-xs font-mono px-3 py-2 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1">Nama Pemilik Rekening</label>
+              <input
+                type="text"
+                value={holderName}
+                onChange={(e) => setHolderName(e.target.value)}
+                placeholder="Contoh: PT Toko Berkah Jaya / Budi Santoso"
+                className="w-full text-xs px-3 py-2 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+              />
+            </div>
+          </div>
+
+          {/* ADR-008 Assurance Callout */}
+          <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-lg text-blue-900 text-xs flex gap-2.5">
+            <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+            <div className="leading-relaxed text-[11px]">
+              <strong>Jaminan Keamanan Dana:</strong> Tayooli menerapkan model <em>Bring-Your-Own Settlement</em>. Kami tidak memotong, menyimpan, atau mengelola dana Anda. Seluruh pembayaran mengalir langsung dari pelanggan ke rekening Midtrans Anda.
+            </div>
+          </div>
+
+          {/* Feedback states */}
+          {saveSuccess && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <span>Pengaturan payment gateway berhasil disimpan!</span>
+            </div>
+          )}
+
+          {saveConfig.isError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <span>Gagal menyimpan pengaturan: {(saveConfig.error as Error)?.message || 'Terjadi kesalahan sistem.'}</span>
+            </div>
+          )}
+
+          {/* Submit button */}
+          <button
+            type="submit"
+            disabled={saveConfig.isPending}
+            className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {saveConfig.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menyimpan...
+              </>
+            ) : (
+              'Simpan Pengaturan Gateway'
+            )}
+          </button>
+        </form>
+      )}
     </div>
   )
 }

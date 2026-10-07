@@ -39,6 +39,9 @@ test-results/
 .claude/worktrees/
 *.png
 
+# Zeabur deployment UI captures & infrastructure audit data (not part of app code)
+screenshots/
+
 # Merge conflict artifacts
 *.orig
 *.rej

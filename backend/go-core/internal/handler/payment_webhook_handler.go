@@ -108,8 +108,10 @@ func (h *PaymentWebhookHandler) HandleMidtransWebhook(w http.ResponseWriter, r *
 		RespondError(w, r, http.StatusInternalServerError, "failed to load transaction")
 		return
 	}
-	if tx.Status == "completed" {
-		ack(w, "already completed")
+	// A payment already redeemed by a sale is final; re-marking it completed
+	// would resurrect a consumed status and let it fund a second sale.
+	if tx.Status == "completed" || tx.Status == "consumed" {
+		ack(w, "already "+tx.Status)
 		return
 	}
 

@@ -32,12 +32,15 @@ import {
   PlayCircle,
   Loader2,
   Percent,
+  Receipt,
+  Share2,
+  FileText,
 } from "lucide-react"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
 import { useProducts } from "@/hooks/useProducts"
-import { usePOSOrders, usePOSCheckout } from "@/hooks/usePOS"
+import { usePOSOrders, usePOSCheckout, usePOSCreatePayment, usePOSPaymentStatus, usePOSSimulatePayment } from "@/hooks/usePOS"
 import { useWMSStock } from "@/hooks/useWMSLedger"
-import type { POSOrder } from "@/lib/api"
+import type { POSOrder, POSPaymentCharge } from "@/lib/api"
 
 // Sale Mode
 type SaleMode = "JUAL_PUTUS" | "KONSINYASI"
@@ -121,10 +124,18 @@ export default function POSPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showClearCartModal, setShowClearCartModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [showReconciliationModal, setShowReconciliationModal] = useState(false)
+  const [receiptWidth, setReceiptWidth] = useState<"58mm" | "80mm">("80mm")
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "QRIS">("CASH")
   const [cashTendered, setCashTendered] = useState<number>(0)
   const [qrisDataUrl, setQrisDataUrl] = useState<string>("")
+  // The live QRIS intent created by the backend (null until the cashier picks
+  // QRIS). This is what the QR image encodes — never a fabricated payload.
+  const [qrisCharge, setQrisCharge] = useState<POSPaymentCharge | null>(null)
+  // Guards the auto-confirm effect so one settled payment triggers exactly one
+  // checkout, even across re-renders.
+  const autoConfirmRef = useRef<string | null>(null)
   const [isPaidSuccess, setIsPaidSuccess] = useState(false)
   const [receiptData, setReceiptData] = useState<{
     orderNumber: string
@@ -350,27 +361,59 @@ export default function POSPage() {
     return Math.max(0, cashTendered - grandTotal)
   }, [cashTendered, grandTotal])
 
-  // Open Payment Modal
+  // Open Payment Modal.
+  // Cash opens instantly. QRIS first creates a payment intent on the backend
+  // (real gateway QR, or demo mode when the tenant has no credentials) and
+  // renders the QR the server returned — there is no fabricated payload.
+  const createPayment = usePOSCreatePayment()
+  const simulatePayment = usePOSSimulatePayment()
+
+  const [activePaymentOrderId, setActivePaymentOrderId] = useState<string | null>(null)
+
+  const paymentStatus = usePOSPaymentStatus(activePaymentOrderId, {
+    enabled: paymentMethod === "QRIS" && activePaymentOrderId != null && !isPaidSuccess,
+  })
+
   const handleOpenPayment = async () => {
     if (cart.length === 0) return
     setCheckoutError(null)
     setCashTendered(grandTotal)
     setIsPaidSuccess(false)
+    setQrisCharge(null)
+    setActivePaymentOrderId(null)
+    setQrisDataUrl("")
 
-    // Generate dynamic QRIS
-    try {
-      const qrisPayload = `00020101021226670014ID.LINKAJA.WWW01189360091100216091230215ID10200216091230303UMI51440014ID.CO.QRIS.WWW0215ID10200216091230303UMI520454995303360540${grandTotal}5802ID5914TAYOOLI RETAIL6007JAKARTA61051294062070703A016304E85C`
-      const url = await QRCode.toDataURL(qrisPayload, { width: 280, margin: 1 })
-      setQrisDataUrl(url)
-    } catch {
-      // fallback
+    if (paymentMethod === "QRIS") {
+      try {
+        const charge = await createPayment.mutateAsync({ amount: grandTotal, method: "QRIS" })
+        setQrisCharge(charge)
+        setActivePaymentOrderId(charge.order_id)
+        const payload = charge.qr_string || charge.payment_link || charge.order_id
+        const url = await QRCode.toDataURL(payload, { width: 280, margin: 1 })
+        setQrisDataUrl(url)
+      } catch (err: any) {
+        setCheckoutError(
+          err?.message || "Gagal membuat QRIS. Coba lagi atau gunakan pembayaran tunai."
+        )
+      }
     }
 
     setShowPaymentModal(true)
   }
 
-  // Confirm Payment via Real Backend API
-  const handleConfirmPayment = async () => {
+  // Auto-confirm: once the gateway (or demo simulation) settles the payment,
+  // issue the receipt exactly once — the checkout claims the payment by its
+  // order id, and the backend consumes it so it can never mint two sales.
+  const handleConfirmPayment = async (settledOrderId?: string) => {
+    const orderId = settledOrderId ?? qrisCharge?.order_id
+    if (paymentMethod === "QRIS") {
+      if (!orderId) {
+        setCheckoutError("Pembayaran QRIS belum siap. Tunggu QR tampil lalu coba lagi.")
+        return
+      }
+      if (autoConfirmRef.current === orderId) return
+      autoConfirmRef.current = orderId
+    }
     setCheckoutError(null)
     try {
       const res = await posCheckout.mutateAsync({
@@ -386,6 +429,7 @@ export default function POSPage() {
             amount: paymentMethod === "CASH" ? cashTendered : grandTotal,
           },
         ],
+        payment_order_id: paymentMethod === "QRIS" ? orderId : undefined,
         tax: taxAmount,
         discount: discountAmount,
         sale_mode: globalSaleMode,
@@ -411,10 +455,98 @@ export default function POSPage() {
       setCart([])
       refetchOrders()
     } catch (err: any) {
+      if (paymentMethod === "QRIS") {
+        autoConfirmRef.current = null
+      }
       setCheckoutError(
         err?.message || "Gagal memproses pembayaran POS. Silakan periksa koneksi atau ketersediaan stok barang."
       )
     }
+  }
+
+  // When the polled status first hits a terminal value, drive the outcome
+  // without the cashier having to tap:
+  //   completed/consumed → write the sale (one payment, one sale),
+  //   expired/failed     → tell them the QR is no longer payable.
+  useEffect(() => {
+    const status = paymentStatus.data?.status
+    const orderId = paymentStatus.data?.order_id
+    if (!status || !orderId || showPaymentModal === false || isPaidSuccess) return
+    if (status === "completed" || status === "consumed") {
+      void handleConfirmPayment(orderId)
+    } else if (status === "expired" || status === "failed") {
+      setCheckoutError(
+        status === "expired"
+          ? "Waktu pembayaran QRIS habis. Buat QR baru."
+          : "Pembayaran QRIS gagal. Coba lagi atau gunakan tunai."
+      )
+      autoConfirmRef.current = null
+    }
+    // handleConfirmPayment intentionally not in deps (captures fresh cart)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentStatus.data?.status, paymentStatus.data?.order_id, showPaymentModal, isPaidSuccess])
+
+  // Kasir Z-Report Reconciliation Summary
+  const reconciliationData = useMemo(() => {
+    let cashTotal = 0
+    let qrisTotal = 0
+    let grandRevenue = 0
+    let cashCount = 0
+    let qrisCount = 0
+
+    const todayKey = new Date().toDateString()
+    const todayOrders = posOrders.filter(
+      (o) => new Date(o.created_at).toDateString() === todayKey
+    )
+
+    todayOrders.forEach((o) => {
+      const total = Number(o.total_amount) || 0
+      grandRevenue += total
+      const method = (o.payment_method || "").toUpperCase()
+      if (method === "CASH") {
+        cashTotal += total
+        cashCount++
+      } else {
+        qrisTotal += total
+        qrisCount++
+      }
+    })
+
+    return {
+      orders: todayOrders,
+      totalOrders: todayOrders.length,
+      cashTotal,
+      cashCount,
+      qrisTotal,
+      qrisCount,
+      grandRevenue,
+    }
+  }, [posOrders])
+
+  // Share Receipt via WhatsApp
+  const handleShareWhatsApp = () => {
+    if (!receiptData) return
+    const itemsList = receiptData.items
+      .map((i) => `• ${i.name} (${i.quantity}x) = Rp ${(i.price * i.quantity).toLocaleString("id-ID")}`)
+      .join("\n")
+    const text =
+      `*STRUK PEMBAYARAN TAYOOLI POS*\n` +
+      `No. Transaksi: ${receiptData.orderNumber}\n` +
+      `Waktu: ${receiptData.date}\n` +
+      `Metode: ${receiptData.method}\n` +
+      `--------------------------------\n` +
+      `${itemsList}\n` +
+      `--------------------------------\n` +
+      `Subtotal: Rp ${receiptData.subtotal.toLocaleString("id-ID")}\n` +
+      (receiptData.discount > 0 ? `Diskon: -Rp ${receiptData.discount.toLocaleString("id-ID")}\n` : "") +
+      `PPN: Rp ${receiptData.tax.toLocaleString("id-ID")}\n` +
+      `*TOTAL: Rp ${receiptData.total.toLocaleString("id-ID")}*\n` +
+      `Bayar: Rp ${receiptData.paid.toLocaleString("id-ID")}\n` +
+      `Kembali: Rp ${receiptData.change.toLocaleString("id-ID")}\n` +
+      `--------------------------------\n` +
+      `*Status: LUNAS*\n` +
+      `Terima kasih atas kunjungan Anda!`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank")
   }
 
   // Print Receipt
@@ -461,6 +593,17 @@ export default function POSPage() {
                   {posOrders.length}
                 </span>
               )}
+            </button>
+
+            {/* Rekonsiliasi Kasir (Z-Report) Button */}
+            <button
+              type="button"
+              onClick={() => setShowReconciliationModal(true)}
+              className="px-3 py-2 rounded-xl text-xs font-bold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition shadow-xs"
+              title="Laporan Rekonsiliasi Kasir & Penutupan Kas"
+            >
+              <Receipt className="w-4 h-4 text-emerald-600" />
+              <span>Rekonsiliasi Kas</span>
             </button>
 
             {/* Sales Mode Switcher (Jual Putus vs Konsinyasi) */}
@@ -973,7 +1116,7 @@ export default function POSPage() {
                     <button
                       type="button"
                       disabled={cashTendered < grandTotal || posCheckout.isPending}
-                      onClick={handleConfirmPayment}
+                      onClick={() => handleConfirmPayment()}
                       className="w-full min-h-[48px] rounded-xl font-bold text-sm bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {posCheckout.isPending ? (
@@ -1005,9 +1148,85 @@ export default function POSPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Live status: the server owns the truth, the cashier
+                        just watches it. No manual "mark as paid". */}
+                    <div
+                      className={`p-3 rounded-xl border text-xs flex items-center gap-2 justify-center font-semibold ${
+                        paymentStatus.data?.status === "completed" ||
+                        paymentStatus.data?.status === "consumed"
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                          : paymentStatus.data?.status === "expired" ||
+                              paymentStatus.data?.status === "failed"
+                            ? "bg-rose-50 border-rose-200 text-rose-800"
+                            : "bg-blue-50 border-blue-200 text-blue-800"
+                      }`}
+                    >
+                      {(paymentStatus.data?.status === "completed" ||
+                        paymentStatus.data?.status === "consumed") ? (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Pembayaran diterima — menyimpan transaksi...</span>
+                        </>
+                      ) : paymentStatus.data?.status === "expired" ||
+                        paymentStatus.data?.status === "failed" ? (
+                        <>
+                          <AlertCircle className="w-4 h-4" />
+                          <span>QRIS tidak lagi bisa dibayar</span>
+                        </>
+                      ) : (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Menunggu pembayaran masuk...</span>
+                        </>
+                      )}
+                    </div>
+
                     <p className="text-xs text-slate-500">
                       Scan dengan aplikasi BCA, Mandiri, GoPay, OVO, atau ShopeePay
                     </p>
+
+                    {qrisCharge && (
+                      <p className="text-[10px] text-slate-400 font-mono break-all">
+                        {qrisCharge.order_id} · Berlaku s/d{" "}
+                        {new Date(qrisCharge.expires_at).toLocaleTimeString("id-ID")}
+                      </p>
+                    )}
+
+                    {/* Demo mode: no merchant account is connected yet, so the
+                        cashier may simulate settlement. The backend refuses
+                        this as soon as the tenant configures real credentials. */}
+                    {qrisCharge?.demo && (
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-left space-y-2">
+                        <div className="text-[11px] font-bold text-amber-900 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4" />
+                          MODE DEMO — gateway pembayaran belum dikonfigurasi
+                        </div>
+                        <p className="text-[11px] text-amber-800">
+                          Hubungkan akun Midtrans milik Anda di Pengaturan → Pembayaran agar QRIS
+                          asli dan dana masuk langsung ke rekening Anda.
+                        </p>
+                        <button
+                          type="button"
+                          data-testid="pos-simulate-payment"
+                          disabled={simulatePayment.isPending || posCheckout.isPending}
+                          onClick={() => qrisCharge && simulatePayment.mutate(qrisCharge.order_id)}
+                          className="w-full min-h-[44px] rounded-lg font-bold text-xs bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {simulatePayment.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              <span>Menyimulasikan...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              <span>Simulasikan Pembayaran (Demo)</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
 
                     {checkoutError && (
                       <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 text-left">
@@ -1016,40 +1235,72 @@ export default function POSPage() {
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      disabled={posCheckout.isPending}
-                      onClick={handleConfirmPayment}
-                      className="w-full min-h-[48px] rounded-xl font-bold text-sm bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {posCheckout.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Menyimpan Transaksi...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          <span>Konfirmasi Pembayaran QRIS Berhasil</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={paymentStatus.isFetching}
+                        onClick={() => paymentStatus.refetch()}
+                        className="flex-1 min-h-[44px] rounded-xl font-bold text-xs border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        <span>Cek Status</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={createPayment.isPending}
+                        onClick={handleOpenPayment}
+                        className="flex-1 min-h-[44px] rounded-xl font-bold text-xs border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <QrCode className="w-4 h-4" />
+                        <span>Buat QR Baru</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </>
             ) : (
               /* ── RECEIPT / STRUK VIEW ── */
               <div className="space-y-4">
-                <div className="text-center pb-3 border-b border-slate-200">
-                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-2">
-                    <CheckCircle2 className="w-7 h-7" />
+                <div className="text-center pb-2 border-b border-slate-200">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-1.5">
+                    <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <h3 className="text-lg font-black text-slate-900">Pembayaran Berhasil!</h3>
-                  <p className="text-xs text-slate-500">Transaksi telah selesai dicatat ke dalam sistem</p>
+                  <h3 className="text-base font-black text-slate-900">Pembayaran Berhasil!</h3>
+                  <p className="text-xs text-slate-500">Transaksi telah dicatat & stok terpotong</p>
                 </div>
 
-                {/* 80mm Thermal Receipt Simulation */}
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-300 font-mono text-xs text-slate-800 space-y-2">
+                {/* Format Selector: 58mm vs 80mm */}
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="text-slate-500 font-medium">Format Kertas Thermal:</span>
+                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setReceiptWidth("58mm")}
+                      className={`px-2.5 py-1 rounded-md font-medium transition ${
+                        receiptWidth === "58mm" ? "bg-white text-slate-900 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      58mm (Mobile)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceiptWidth("80mm")}
+                      className={`px-2.5 py-1 rounded-md font-medium transition ${
+                        receiptWidth === "80mm" ? "bg-white text-slate-900 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      80mm (Desktop)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Thermal Receipt Box */}
+                <div
+                  id="thermal-receipt"
+                  className={`p-4 bg-white rounded-xl border border-slate-300 font-mono text-xs text-slate-800 space-y-2 mx-auto shadow-xs ${
+                    receiptWidth === "58mm" ? "max-w-[280px]" : "max-w-[360px]"
+                  }`}
+                >
                   <div className="text-center pb-2 border-b border-dashed border-slate-300">
                     <div className="font-extrabold text-sm">TAYOOLI RETAIL & WMS</div>
                     <div className="text-[10px] text-slate-500">Kav. Logistik Pergudangan No. 42</div>
@@ -1077,7 +1328,7 @@ export default function POSPage() {
                   <div className="border-t border-dashed border-slate-300 pt-2 space-y-1">
                     {receiptData?.items.map((item, idx) => (
                       <div key={idx} className="flex justify-between text-[11px]">
-                        <span className="truncate max-w-[180px]">
+                        <span className="truncate max-w-[170px]">
                           {item.name} x{item.quantity}
                         </span>
                         <span>Rp {(item.price * item.quantity).toLocaleString("id-ID")}</span>
@@ -1121,15 +1372,26 @@ export default function POSPage() {
                   </div>
                 </div>
 
-                {/* Print & New Order Actions */}
-                <div className="flex gap-2">
+                {/* Print, WhatsApp, and New Order Actions */}
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <button
                     type="button"
                     onClick={handlePrintReceipt}
-                    className="flex-1 min-h-[48px] rounded-xl font-bold text-sm bg-slate-100 hover:bg-slate-200 text-slate-800 flex items-center justify-center gap-2"
+                    className="flex-1 min-h-[44px] rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-900 text-white flex items-center justify-center gap-2 shadow-xs transition"
+                    title="Cetak struk ke printer thermal"
                   >
                     <Printer className="w-4 h-4" />
-                    <span>Cetak Struk (Print)</span>
+                    <span>Cetak Struk ({receiptWidth})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleShareWhatsApp}
+                    className="flex-1 min-h-[44px] rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 shadow-xs transition"
+                    title="Kirim rincian struk ke nomor WhatsApp pelanggan"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span>Kirim WhatsApp</span>
                   </button>
 
                   <button
@@ -1138,10 +1400,10 @@ export default function POSPage() {
                       setShowPaymentModal(false)
                       setIsPaidSuccess(false)
                     }}
-                    className="flex-1 min-h-[48px] rounded-xl font-bold text-sm bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center justify-center gap-2"
+                    className="min-h-[44px] px-4 rounded-xl font-bold text-xs bg-[#2563EB] hover:bg-[#1D4ED8] text-white flex items-center justify-center gap-2 shadow-xs transition"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    <span>Transaksi Baru</span>
+                    <span>Selesai</span>
                   </button>
                 </div>
               </div>
@@ -1269,6 +1531,189 @@ export default function POSPage() {
           </div>
         </div>
       )}
+
+      {/* ── MODAL: Rekonsiliasi Kasir & Tutup Shift (Z-Report) ── */}
+      {showReconciliationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Rekonsiliasi Kasir (Z-Report)</h3>
+                  <p className="text-xs text-slate-500">
+                    Laporan ringkasan kas, penjualan, dan penutupan shift kasir
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReconciliationModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div id="z-report" className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div className="text-[11px] text-slate-500">
+                Periode: hari ini ({new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })})
+              </div>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl border border-blue-100 bg-blue-50/40">
+                  <span className="text-[11px] font-semibold text-blue-700 uppercase tracking-wider">Total Omzet</span>
+                  <div className="font-mono text-lg font-black text-slate-900 mt-1">
+                    Rp {reconciliationData.grandRevenue.toLocaleString("id-ID")}
+                  </div>
+                  <span className="text-[10px] text-slate-500">{reconciliationData.totalOrders} total transaksi</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/40">
+                  <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Kas Fisik (CASH)</span>
+                  <div className="font-mono text-lg font-black text-slate-900 mt-1">
+                    Rp {reconciliationData.cashTotal.toLocaleString("id-ID")}
+                  </div>
+                  <span className="text-[10px] text-slate-500">{reconciliationData.cashCount} transaksi tunai di laci</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-indigo-100 bg-indigo-50/40">
+                  <span className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wider">QRIS / Midtrans</span>
+                  <div className="font-mono text-lg font-black text-slate-900 mt-1">
+                    Rp {reconciliationData.qrisTotal.toLocaleString("id-ID")}
+                  </div>
+                  <span className="text-[10px] text-slate-500">{reconciliationData.qrisCount} transaksi langsung ke bank</span>
+                </div>
+              </div>
+
+              {/* Rekonsiliasi Audit Notice */}
+              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-600 space-y-1">
+                <p className="font-semibold text-slate-800 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  Instruksi Pencocokan Kasir:
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  1. Hitung uang fisik di laci kasir: jumlahnya harus tepat <strong>Rp {reconciliationData.cashTotal.toLocaleString("id-ID")}</strong>.
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  2. Dana non-tunai QRIS sebesar <strong>Rp {reconciliationData.qrisTotal.toLocaleString("id-ID")}</strong> telah disalurkan langsung oleh Midtrans ke rekening bank toko Anda.
+                </p>
+              </div>
+
+              {/* Rincian Transaksi */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Daftar Transaksi Hari Ini</h4>
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] text-slate-500 uppercase font-semibold">
+                      <tr>
+                        <th className="px-3 py-2">No. Order</th>
+                        <th className="px-3 py-2">Metode</th>
+                        <th className="px-3 py-2">Waktu</th>
+                        <th className="px-3 py-2 text-right">Nominal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono">
+                      {reconciliationData.orders.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="text-center py-6 text-slate-400 font-sans">
+                            Belum ada transaksi hari ini
+                          </td>
+                        </tr>
+                      ) : (
+                        reconciliationData.orders.map((o) => (
+                          <tr key={o.id} className="hover:bg-slate-50/50">
+                            <td className="px-3 py-2 font-bold text-slate-800">{o.order_number}</td>
+                            <td className="px-3 py-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                (o.payment_method || "").toUpperCase() === "CASH"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-indigo-100 text-indigo-800"
+                              }`}>
+                                {o.payment_method}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-slate-500 font-sans text-[11px]">
+                              {new Date(o.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                            </td>
+                            <td className="px-3 py-2 text-right font-bold text-slate-900">
+                              Rp {Number(o.total_amount).toLocaleString("id-ID")}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">
+                Laporan digenerate otomatis oleh Tayooli POS
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak Z-Report</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReconciliationModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Global CSS for Clean Thermal Printer Output */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @media print {
+              body * {
+                visibility: hidden !important;
+              }
+              #thermal-receipt, #thermal-receipt *,
+              #z-report, #z-report * {
+                visibility: visible !important;
+              }
+              #z-report {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                overflow: visible !important;
+                max-height: none !important;
+                background: white !important;
+              }
+              #thermal-receipt {
+                position: fixed !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                max-width: 80mm !important;
+                margin: 0 !important;
+                padding: 4mm !important;
+                background: white !important;
+                color: black !important;
+                border: none !important;
+                box-shadow: none !important;
+              }
+            }
+          `,
+        }}
+      />
     </div>
   )
 }

@@ -37,7 +37,9 @@ type PaymentTransaction struct {
 	Amount      decimal.Decimal `json:"amount"`
 	Method      string          `json:"method"`
 	PaymentLink *string         `json:"payment_link,omitempty"`
-	Status      string          `json:"status"` // pending, completed, failed, expired
+	// Status: pending, completed (settled), consumed (settled and already used
+	// by a POS sale), failed, expired.
+	Status string `json:"status"`
 	IsDemo      bool            `json:"is_demo"`
 	CompletedAt *time.Time      `json:"completed_at,omitempty"`
 	CreatedAt   time.Time       `json:"created_at"`
@@ -51,4 +53,9 @@ type PaymentGatewayRepository interface {
 	CreateTransaction(ctx context.Context, tx *PaymentTransaction) error
 	GetTransactionByOrderID(ctx context.Context, tenantID uuid.UUID, orderID string) (*PaymentTransaction, error)
 	UpdateTransactionStatus(ctx context.Context, tenantID uuid.UUID, orderID, status string, completedAt *time.Time) error
+	// ConsumeTransaction atomically marks a settled payment as used by a sale.
+	// It must only succeed for a transaction in the "completed" state and must
+	// return ErrNotFound otherwise, so one payment can back at most one sale
+	// even when two requests arrive concurrently.
+	ConsumeTransaction(ctx context.Context, tenantID uuid.UUID, orderID string) error
 }

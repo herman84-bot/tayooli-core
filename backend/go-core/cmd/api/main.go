@@ -39,6 +39,7 @@ import (
 	paymentUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/payment"
 	poUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/po"
 	posUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/pos"
+	posPaymentUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/pospayment"
 	productUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/product"
 	salesInvoiceUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/sales_invoice"
 	salesOrderUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/sales_order"
@@ -204,6 +205,9 @@ func main() {
 	// Payment Gateways (ADR-008 per-tenant provider config & transactions)
 	paymentGatewayRepo := postgres.NewPaymentGatewayRepo(db)
 	paymentGatewayHandler := handler.NewPaymentGatewayHandler(paymentGatewayRepo)
+	// Midtrans webhook receiver (public route — signature checked inside).
+	// factory is nil: the real SDK client is built per tenant, BYO credentials.
+	paymentWebhookHandler := handler.NewPaymentWebhookHandler(paymentGatewayRepo, nil)
 
 	// O2C
 	customerRepo := postgres.NewCustomerRepo(db)
@@ -221,7 +225,10 @@ func main() {
 	// POS (Point of Sale)
 	posRepo := postgres.NewPOSRepo(db)
 	posUsecase := posUC.New(posRepo, productRepo, inventoryRepo, wmsRepo, customerRepo, salesOrderRepo, salesInvoiceRepo)
-	posHandler := handler.NewPOSHandler(posUsecase)
+	// Non-cash (QRIS) payments for POS sales: demo mode until a tenant adds
+	// their own gateway credentials (ADR-008 Model B).
+	posPaymentUsecase := posPaymentUC.New(paymentGatewayRepo, nil, cfg.AppURL)
+	posHandler := handler.NewPOSHandlerWithPayments(posUsecase, posPaymentUsecase)
 
 	// Accounting Module
 	accountRepo := accountingPostgres.NewAccountRepository(db)
@@ -492,6 +499,18 @@ func main() {
 		})
 	})
 
+	// Payment gateway webhooks - PUBLIC by design.
+	//
+	// The gateway has no user session, so these routes must stay outside
+	// TenantMiddleware (a static sibling of /api/v1 wins over the /api/v1
+	// subtree, same as /api/v1/auth above). The tenant is derived from the
+	// order_id embedded in the callback and every request is authenticated by
+	// its SHA512 signature plus a server-to-server status re-check, so an
+	// unauthenticated caller cannot mark anything paid.
+	r.Route("/api/v1/webhooks", func(r chi.Router) {
+		r.Post("/midtrans", paymentWebhookHandler.HandleMidtransWebhook)
+	})
+
 	// Core API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(tenantMiddleware.TenantMiddleware)
@@ -620,6 +639,12 @@ func main() {
 			r.Get("/history", posHandler.ListOrders)
 			r.Get("/orders/{id}", posHandler.GetOrder)
 			r.Get("/items", productHandler.ListProducts)
+			// Non-cash (QRIS) payments: create intent, poll, demo simulate.
+			// Demo simulate is only allowed while the tenant has no gateway
+			// credentials (ADR-008 Model B), so it cannot fake live payments.
+			r.Post("/payments", posHandler.CreatePayment)
+			r.Get("/payments/{orderId}/status", posHandler.PaymentStatus)
+			r.Post("/payments/{orderId}/simulate", posHandler.SimulatePayment)
 		})
 
 		// Approvals

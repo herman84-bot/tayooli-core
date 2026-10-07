@@ -32,6 +32,11 @@ type CheckoutRequest struct {
 	CustomerID  *uuid.UUID               `json:"customer_id,omitempty"`
 	WarehouseID *uuid.UUID               `json:"warehouse_id,omitempty"`
 	SaleMode    string                   `json:"sale_mode"` // DIRECT, KONSINYASI
+	// PaymentOrderID links this sale to a settled gateway payment (see
+	// usecase/pospayment). Empty for cash sales and for tenants without a
+	// gateway account. The HTTP layer verifies and consumes it before the
+	// sale is written.
+	PaymentOrderID string `json:"payment_order_id,omitempty"`
 }
 
 type CheckoutResponse struct {
