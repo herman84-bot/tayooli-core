@@ -63,8 +63,11 @@ func TestStockReceiptRealPostgres(t *testing.T) {
 	// Roll 028 back to "pending", then let the real runner apply it again.
 	for _, q := range []string{
 		`DROP TABLE stock_receipt_items`,
-		`DROP TABLE stock_receipts`,
-		`DELETE FROM schema_migrations WHERE filename = '028_wms_stock_receipts.sql'`,
+		// CASCADE: 033 adds stock_batches.source_receipt_id -> stock_receipts FK.
+		`DROP TABLE stock_receipts CASCADE`,
+		// 029 and 033 ALTER the 028 tables; dropping them also drops those columns,
+		// so both must be re-applied too or the schema is silently incomplete.
+		`DELETE FROM schema_migrations WHERE filename IN ('028_wms_stock_receipts.sql', '029_wms_receipt_source_types.sql', '033_wms_batches_staging_putaway.sql')`,
 	} {
 		_, err := admin.ExecContext(ctx, q)
 		require.NoError(t, err, q)
