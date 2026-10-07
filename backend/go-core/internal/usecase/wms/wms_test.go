@@ -1265,7 +1265,7 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		repo.stockLevels[locKey] = decimal.NewFromInt(2)
 
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: salesOrderID,
+			SalesOrderID: &salesOrderID,
 			WarehouseID:  whID,
 			DONumber:     "DO-FAIL-01",
 			Items: []uc.CreateDeliveryOrderItemRequest{
@@ -1291,7 +1291,7 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		repo.stockLevels[locKey] = decimal.NewFromInt(20)
 
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: salesOrderID,
+			SalesOrderID: &salesOrderID,
 			WarehouseID:  whID,
 			DONumber:     "DO-SUCCESS-01",
 			Items: []uc.CreateDeliveryOrderItemRequest{
@@ -1321,10 +1321,56 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrInvalidStatus)
 	})
 
+	// Regression: the 13-module app has no Sales Order screen, so a direct
+	// Surat Jalan (no SO) must be creatable and dispatchable.
+	t.Run("Direct Surat Jalan without Sales Order is created and dispatched", func(t *testing.T) {
+		locKey := fmt.Sprintf("%s:%s:%s", tenantID, locID, productID)
+		repo.stockLevels[locKey] = decimal.NewFromInt(5)
+
+		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", uc.CreateDeliveryOrderRequest{
+			WarehouseID: whID,
+			DONumber:    "DO-DIRECT-01",
+			Items:       []uc.CreateDeliveryOrderItemRequest{{ProductID: productID, Quantity: decimal.NewFromInt(2), LocationID: locID}},
+		})
+		require.NoError(t, err)
+		assert.Nil(t, do.SalesOrderID, "direct DO must not carry a Sales Order id")
+
+		shipped, err := usecase.DispatchDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.DeliveryOrderStatusShipped, shipped.Status)
+		stock, err := repo.GetStockByLocation(ctx, tenantID, locID, productID)
+		require.NoError(t, err)
+		assert.True(t, stock.Equal(decimal.NewFromInt(3)), "stock should be 3 after shipping 2")
+	})
+
+	t.Run("Zero UUID Sales Order is normalised to none", func(t *testing.T) {
+		zero := uuid.Nil
+		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", uc.CreateDeliveryOrderRequest{
+			SalesOrderID: &zero,
+			WarehouseID:  whID,
+			DONumber:     "DO-DIRECT-02",
+			Items:        []uc.CreateDeliveryOrderItemRequest{{ProductID: productID, Quantity: decimal.NewFromInt(1), LocationID: locID}},
+		})
+		require.NoError(t, err)
+		assert.Nil(t, do.SalesOrderID)
+	})
+
+	t.Run("Real Sales Order id is preserved", func(t *testing.T) {
+		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", uc.CreateDeliveryOrderRequest{
+			SalesOrderID: &salesOrderID,
+			WarehouseID:  whID,
+			DONumber:     "DO-WITH-SO-01",
+			Items:        []uc.CreateDeliveryOrderItemRequest{{ProductID: productID, Quantity: decimal.NewFromInt(1), LocationID: locID}},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, do.SalesOrderID)
+		assert.Equal(t, salesOrderID, *do.SalesOrderID)
+	})
+
 	t.Run("Force Delivery Order status to DRAFT on creation", func(t *testing.T) {
 		shippedStatus := domain.DeliveryOrderStatusShipped
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: salesOrderID,
+			SalesOrderID: &salesOrderID,
 			WarehouseID:  whID,
 			DONumber:     "DO-FORCE-DRAFT-01",
 			Status:       &shippedStatus, // Attempt to create as SHIPPED
@@ -1344,7 +1390,7 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 
 	t.Run("Reject dispatching CANCELLED or RETURNED delivery orders", func(t *testing.T) {
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: salesOrderID,
+			SalesOrderID: &salesOrderID,
 			WarehouseID:  whID,
 			DONumber:     "DO-STATUS-TEST-01",
 			Items: []uc.CreateDeliveryOrderItemRequest{
@@ -1383,7 +1429,7 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 
 		// CreateDeliveryOrder with LocationID belonging to otherWH
 		reqSpoof := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: salesOrderID,
+			SalesOrderID: &salesOrderID,
 			WarehouseID:  whID,
 			DONumber:     "DO-SPOOF-01",
 			Items: []uc.CreateDeliveryOrderItemRequest{
@@ -1399,7 +1445,7 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 
 		// Create legit DO, then tamper item location before dispatch
 		legitReq := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: salesOrderID,
+			SalesOrderID: &salesOrderID,
 			WarehouseID:  whID,
 			DONumber:     "DO-SPOOF-02",
 			Items: []uc.CreateDeliveryOrderItemRequest{
@@ -1425,7 +1471,7 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 	t.Run("Auditor cannot create or dispatch delivery order", func(t *testing.T) {
 		auditorID := uuid.New()
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: salesOrderID,
+			SalesOrderID: &salesOrderID,
 			WarehouseID:  whID,
 			DONumber:     "DO-AUD-01",
 			Items: []uc.CreateDeliveryOrderItemRequest{
@@ -1527,7 +1573,7 @@ func TestCrossTenantMultiTenancyIsolation(t *testing.T) {
 
 	// Delivery Order for Tenant B
 	doB, err := usecase.CreateDeliveryOrder(ctx, tenantB, userB, "admin", uc.CreateDeliveryOrderRequest{
-		SalesOrderID: uuid.New(),
+		SalesOrderID: ptrUUID(uuid.New()),
 		WarehouseID:  whB.ID,
 		DONumber:     "DO-TENANT-B-001",
 		Items: []uc.CreateDeliveryOrderItemRequest{
@@ -1670,7 +1716,7 @@ func TestCrossTenantMultiTenancyIsolation(t *testing.T) {
 
 		// CreateDeliveryOrder in Tenant B warehouse
 		_, err = usecase.CreateDeliveryOrder(ctx, tenantA, userA, "admin", uc.CreateDeliveryOrderRequest{
-			SalesOrderID: uuid.New(),
+			SalesOrderID: ptrUUID(uuid.New()),
 			WarehouseID:  whB.ID,
 			DONumber:     "DO-ROGUE-01",
 			Items: []uc.CreateDeliveryOrderItemRequest{
@@ -2510,3 +2556,5 @@ func TestTransferLocationResilience(t *testing.T) {
 		assert.True(t, stock.Equal(decimal.NewFromInt(4)), "received qty lands in default location, got %s", stock)
 	})
 }
+func ptrUUID(id uuid.UUID) *uuid.UUID { return &id }
+

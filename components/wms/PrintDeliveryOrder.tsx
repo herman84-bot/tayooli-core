@@ -241,7 +241,7 @@ export function PrintDeliveryOrder({
 
                   <span className="text-zinc-500">Ref. Sales Order</span>
                   <span className="col-span-2 font-mono font-bold text-zinc-900">
-                    : {deliveryOrder.sales_order_id}
+                    : {deliveryOrder.sales_order_id ?? "— (Surat Jalan langsung)"}
                   </span>
 
                   <span className="text-zinc-500">Gudang Asal</span>

@@ -322,7 +322,7 @@ type StockTransferItem struct {
 type DeliveryOrder struct {
 	ID             uuid.UUID           `json:"id"`
 	TenantID       uuid.UUID           `json:"tenant_id"`
-	SalesOrderID   uuid.UUID           `json:"sales_order_id"`
+	SalesOrderID   *uuid.UUID          `json:"sales_order_id"` // nil = direct Surat Jalan (no SO)
 	WarehouseID    uuid.UUID           `json:"warehouse_id"`
 	DONumber       string              `json:"do_number"`
 	Status         DeliveryOrderStatus `json:"status"`

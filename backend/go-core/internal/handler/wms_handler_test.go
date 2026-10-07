@@ -568,7 +568,7 @@ func TestWMSHandlerEndpoints(t *testing.T) {
 		router := setupWMSTestRouter(mock)
 
 		body := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: uuid.New(),
+			SalesOrderID: func() *uuid.UUID { id := uuid.New(); return &id }(),
 			WarehouseID:  uuid.New(),
 			DONumber:     "DO-100",
 			Items: []uc.CreateDeliveryOrderItemRequest{

@@ -33,6 +33,9 @@ import { PrintDeliveryOrder } from "@/components/wms/PrintDeliveryOrder"
 import { ExportModal, ExportButton, type ExportFilter } from "@/components/ui/ExportModal"
 import type { ExportColumn } from "@/lib/export"
 
+// Backend stores sales_order_id as a UUID FK; anything else is rejected with 400.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 interface LineItemDraft {
   productId: string
   productName: string
@@ -211,7 +214,7 @@ export default function DeliveryOrdersPage() {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000)
     const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, "")
     setDoNumber(`DO/${todayStr}/${randomSuffix}`)
-    setSalesOrderId(`so-${Math.random().toString(36).substring(2, 10)}`)
+    setSalesOrderId("")
     setModalWarehouseId(warehouses[0]?.id || "")
     setExpeditionName("JNE Trucking (JTR)")
     setTrackingNumber(`JTR${Math.floor(1000000000 + Math.random() * 9000000000)}`)
@@ -261,6 +264,11 @@ export default function DeliveryOrdersPage() {
       setModalError("Surat Jalan harus memiliki minimal 1 item barang.")
       return
     }
+    const soRef = salesOrderId.trim()
+    if (soRef && !UUID_RE.test(soRef)) {
+      setModalError("Ref. Sales Order harus berupa ID Sales Order yang valid, atau kosongkan untuk Surat Jalan langsung.")
+      return
+    }
 
     for (let i = 0; i < lineItems.length; i++) {
       const it = lineItems[i]
@@ -277,7 +285,7 @@ export default function DeliveryOrdersPage() {
     try {
       await createDoMutation.mutateAsync({
         warehouse_id: modalWarehouseId,
-        sales_order_id: salesOrderId || "SO-DIRECT",
+        sales_order_id: soRef || undefined,
         do_number: doNumber.trim(),
         expedition_name: expeditionName.trim() || undefined,
         tracking_number: trackingNumber.trim() || undefined,
@@ -687,14 +695,16 @@ export default function DeliveryOrdersPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-slate-700 font-semibold">Ref. Sales Order ID *</label>
+                  <label htmlFor="do-sales-order-ref" className="text-slate-700 font-semibold">
+                    Ref. Sales Order <span className="font-normal text-slate-400">(opsional)</span>
+                  </label>
                   <input
+                    id="do-sales-order-ref"
                     type="text"
-                    required
                     value={salesOrderId}
                     onChange={(e) => setSalesOrderId(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                    placeholder="e.g. SO-2026-0045"
+                    placeholder="Kosongkan untuk Surat Jalan langsung"
                   />
                 </div>
               </div>

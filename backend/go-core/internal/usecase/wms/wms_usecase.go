@@ -879,7 +879,7 @@ type CreateDeliveryOrderItemRequest struct {
 }
 
 type CreateDeliveryOrderRequest struct {
-	SalesOrderID   uuid.UUID                        `json:"sales_order_id"`
+	SalesOrderID   *uuid.UUID                       `json:"sales_order_id,omitempty"` // optional
 	WarehouseID    uuid.UUID                        `json:"warehouse_id"`
 	DONumber       string                           `json:"do_number"`
 	Status         *domain.DeliveryOrderStatus      `json:"status,omitempty"`
@@ -912,6 +912,10 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 	doNumber := strings.TrimSpace(req.DONumber)
 	if doNumber == "" {
 		doNumber = fmt.Sprintf("DO-%d", time.Now().UnixNano()/1e6)
+	}
+	// The zero UUID is not a real Sales Order; treat it as "no SO".
+	if req.SalesOrderID != nil && *req.SalesOrderID == uuid.Nil {
+		req.SalesOrderID = nil
 	}
 
 	// Force status to DRAFT on creation - do NOT accept SHIPPED or DELIVERED from request

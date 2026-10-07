@@ -1442,12 +1442,23 @@ func (r *WMSRepo) CreateDeliveryOrder(ctx context.Context, do *domain.DeliveryOr
 	}
 
 	_, err = tx.ExecContext(ctx, createDeliveryOrderSQL,
-		do.ID, do.TenantID, do.SalesOrderID, do.WarehouseID, do.DONumber,
+		do.ID, do.TenantID, ptrToNullUUID(do.SalesOrderID), do.WarehouseID, do.DONumber,
 		do.Status, ptrToNullString(do.ExpeditionName), ptrToNullString(do.TrackingNumber),
 		ptrToNullString(do.DriverName), ptrToNullString(do.VehiclePlate),
 		ptrToNullString(do.RecipientName), ptrToNullTime(do.ReceivedDate),
 		do.CreatedAt, do.UpdatedAt)
 	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) {
+			switch pqErr.Code {
+			case "23503": // FK violation: only blame the SO when that is the column that failed
+				if strings.Contains(pqErr.Constraint, "sales_order") || strings.Contains(pqErr.Detail, "sales_order_id") {
+					return &domain.StockReceiptValidationError{Msg: "Ref. Sales Order tidak ditemukan. Kosongkan jika Surat Jalan tanpa Sales Order."}
+				}
+			case "23505": // UNIQUE (tenant_id, do_number)
+				return &domain.StockReceiptValidationError{Msg: fmt.Sprintf("Nomor Surat Jalan %s sudah dipakai.", do.DONumber)}
+			}
+		}
 		return fmt.Errorf("WMSRepo.CreateDeliveryOrder: exec header: %w", err)
 	}
 
@@ -1498,11 +1509,11 @@ func (r *WMSRepo) GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UU
 
 	row := tx.QueryRowContext(ctx, getDeliveryOrderByIDSQL, id, tenantID)
 	var do domain.DeliveryOrder
-	var exp, trk, drv, veh, rec sql.NullString
+	var soID, exp, trk, drv, veh, rec sql.NullString
 	var recDate sql.NullTime
 
 	err = row.Scan(
-		&do.ID, &do.TenantID, &do.SalesOrderID, &do.WarehouseID, &do.DONumber,
+		&do.ID, &do.TenantID, &soID, &do.WarehouseID, &do.DONumber,
 		&do.Status, &exp, &trk, &drv, &veh, &rec, &recDate,
 		&do.CreatedAt, &do.UpdatedAt,
 	)
@@ -1512,6 +1523,7 @@ func (r *WMSRepo) GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UU
 		}
 		return nil, nil, fmt.Errorf("WMSRepo.GetDeliveryOrderByID: scan header: %w", err)
 	}
+	do.SalesOrderID = nullUUIDToPtr(soID)
 	do.ExpeditionName = nullStringToPtr(exp)
 	do.TrackingNumber = nullStringToPtr(trk)
 	do.DriverName = nullStringToPtr(drv)
@@ -1611,16 +1623,17 @@ ORDER BY created_at DESC`
 	var result []domain.DeliveryOrder
 	for rows.Next() {
 		var do domain.DeliveryOrder
-		var exp, trk, drv, veh, rec sql.NullString
+		var soID, exp, trk, drv, veh, rec sql.NullString
 		var recDate sql.NullTime
 
 		if err := rows.Scan(
-			&do.ID, &do.TenantID, &do.SalesOrderID, &do.WarehouseID, &do.DONumber,
+			&do.ID, &do.TenantID, &soID, &do.WarehouseID, &do.DONumber,
 			&do.Status, &exp, &trk, &drv, &veh, &rec, &recDate,
 			&do.CreatedAt, &do.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListDeliveryOrders: scan: %w", err)
 		}
+		do.SalesOrderID = nullUUIDToPtr(soID)
 		do.ExpeditionName = nullStringToPtr(exp)
 		do.TrackingNumber = nullStringToPtr(trk)
 		do.DriverName = nullStringToPtr(drv)

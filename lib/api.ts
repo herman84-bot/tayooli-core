@@ -407,7 +407,8 @@ export type DeliveryOrderStatus =
 export interface DeliveryOrder {
   id: string
   tenant_id: string
-  sales_order_id: string
+  /** null = direct Surat Jalan without a Sales Order */
+  sales_order_id: string | null
   warehouse_id: string
   do_number: string
   status: DeliveryOrderStatus
@@ -441,7 +442,8 @@ export interface CreateDeliveryOrderItemInput {
 }
 
 export interface CreateDeliveryOrderInput {
-  sales_order_id: string
+  /** Optional Sales Order UUID; omit for a direct Surat Jalan */
+  sales_order_id?: string
   warehouse_id: string
   do_number: string
   status?: DeliveryOrderStatus
