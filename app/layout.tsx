@@ -1,19 +1,12 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+// Inter is bundled from npm (@fontsource-variable/inter), not fetched from
+// Google Fonts at build time. next/font/google downloads font files during
+// `next build`; when that fetch flakes inside the Zeabur Docker build, the
+// loader crashes with "Cannot read properties of null (reading '1')" and the
+// whole deploy fails. A local package makes the build hermetic.
+import '@fontsource-variable/inter'
 import './globals.css'
 import Providers from './providers'
-
-/*
- * Claude-web style typography: Inter is the closest freely-available match to
- * Claude's proprietary "Styrene" grotesque. Loaded via next/font (self-hosted)
- * and exposed as --font-inter for the design system's --font-sans token.
- */
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-  weight: ['400', '500', '600', '700'],
-})
 
 export const metadata: Metadata = {
   title: 'Tayooli — Sistem Manajemen Ritel, Gudang & Kasir POS',
@@ -22,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className={inter.variable}>
+    <html lang="id">
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>

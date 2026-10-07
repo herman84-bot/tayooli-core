@@ -25,9 +25,9 @@
  * Static color scales (mode-independent)
  * -------------------------------------------------------------------------- */
 @theme {
-  /* Typography — Claude-web style: Inter (self-hosted via next/font) stands in
-     for Claude's proprietary "Styrene" grotesque; system-ui is the fallback. */
-  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui,
+  /* Typography — Claude-web style: Inter (bundled via @fontsource-variable/inter)
+     stands in for Claude's proprietary "Styrene" grotesque; system-ui is the fallback. */
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui,
     -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
     sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono",
