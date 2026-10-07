@@ -97,7 +97,7 @@ Customer scan/bayar → dana ditampung gateway Midtrans tenant → settlement H+
 
 ## 12. Rollout & sukses
 
-- Rollout: merge ke `main` → Zeabur auto-deploy (Building→Running) → verifikasi `https://tayooli.my.id` + `https://tayooli-backend.zeabur.app`.
+- Rollout: merge ke `main` → CI lulus → job "Deploy to Zeabur" me-redeploy (Building→Running) → verifikasi `https://tayooli.my.id` + `https://tayooli-backend.zeabur.app`.
 - Kriteria sukses V1:
   1. Tenant baru LIVE <5 menit tanpa CS (wizard 3 langkah lolos).
   2. 0 struk tercetak / stok terpotong sebelum `settlement` terverifikasi.

@@ -95,6 +95,10 @@ Backend berjalan di port `8081`. Frontend secara bawaan telah dikonfigurasi untu
    git commit -m "feat/fix: deskripsi perubahan"
    git push origin main
    ```
-   Lalu buka dashboard Zeabur dan klik **Redeploy** pada service yang berubah (`tayooli-backend` dan/atau `tayooli-frontend`), atau jalankan `node scripts/redeploy-service.js backend|frontend`.
+   Workflow GitHub Actions `.github/workflows/ci.yml` (job **Deploy to Zeabur**) lalu otomatis me-redeploy `tayooli-backend` dan `tayooli-frontend` **setelah** job `test-go` dan `test-frontend` lulus. Bila tes gagal, tidak ada deploy.
 
-   > ⚠️ **Auto-deploy saat push tidak teramati berjalan (Oktober 2026).** Tiga push ke `main` (`511be9c`, `13a20fa`, `e18515d`) tidak menghasilkan deployment baru di Zeabur selama periode pengamatan, sampai Redeploy diklik manual. Halaman Settings service tidak menampilkan toggle auto-deploy. Status webhook GitHub belum diperiksa (butuh akses admin repo). Selalu verifikasi URL live setelah deploy.
+   **Mengapa tidak lewat webhook Zeabur:** kedua service memakai sumber **Arbitrary Git** (clone anonim `https://github.com/herman84-bot/tayooli-core.git`, branch `main`), bukan sumber "GitHub Repository". Sumber Arbitrary Git tidak memasang webhook GitHub, sehingga push tidak pernah memicu build. Hal ini terverifikasi di Settings → Source pada Oktober 2026.
+
+   **Syarat satu kali:** buat access token di Zeabur → Account → API Keys, lalu simpan sebagai secret repo `ZEABUR_API_TOKEN` (GitHub → Settings → Secrets and variables → Actions). Tanpa secret ini, job deploy gagal dengan pesan jelas.
+
+   **Cadangan manual:** klik **Redeploy** di dashboard Zeabur, atau jalankan `node scripts/redeploy-service.js backend|frontend` (lewat Chrome yang sudah login, CDP `:9100`), atau `ZEABUR_API_TOKEN=... ZEABUR_ENV_ID=6ac2683a6a873116ad572b40 bash scripts/zeabur-redeploy.sh <serviceID>`. Selalu verifikasi URL live setelah deploy.

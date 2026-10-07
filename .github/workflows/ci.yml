@@ -88,3 +88,29 @@ jobs:
 
       - name: Run tests
         run: npm test -- --passWithNoTests
+
+  # Zeabur services use the "Arbitrary Git" source (anonymous clone), which has
+  # no GitHub webhook, so a push never triggers a build by itself. This job
+  # redeploys both services through the Zeabur GraphQL API, but only after all
+  # tests pass on main. Requires repository secret ZEABUR_API_TOKEN
+  # (Zeabur > Settings > Developer > API Keys).
+  deploy:
+    name: "Deploy to Zeabur"
+    needs: [test-go, test-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: zeabur-deploy
+      cancel-in-progress: false
+    env:
+      ZEABUR_API_TOKEN: ${{ secrets.ZEABUR_API_TOKEN }}
+      ZEABUR_ENV_ID: 6ac2683a6a873116ad572b40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Redeploy backend and frontend
+        run: |
+          if [ -z "$ZEABUR_API_TOKEN" ]; then
+            echo "::error::Secret ZEABUR_API_TOKEN is not set; cannot deploy."
+            exit 1
+          fi
+          bash scripts/zeabur-redeploy.sh 6ac268f493154e21e628ed15 6ac2da1493154e21e6291302

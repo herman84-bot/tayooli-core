@@ -98,5 +98,6 @@ ACCOUNT
 Untuk memperbarui deployment produksi:
 1. Commit perubahan di branch `main` pada `tayooli-core`.
 2. Push ke remote: `git push origin main`.
-3. Zeabur akan secara otomatis mendeteksi webhook GitHub dan membangun build baru (*Building* $\rightarrow$ *Running*).
-4. Verifikasi URL live di `https://tayooli.my.id`.
+3. **Tidak ada webhook Zeabur.** Kedua service memakai sumber *Arbitrary Git* (clone anonim), dan sumber ini tidak memasang webhook. Deploy dipicu oleh job **Deploy to Zeabur** di `.github/workflows/ci.yml`, yang memanggil `scripts/zeabur-redeploy.sh` (GraphQL `redeployService`). Job ini hanya berjalan setelah `test-go` dan `test-frontend` lulus di `main`, dan butuh secret repo `ZEABUR_API_TOKEN`.
+4. Pantau status *Building* → *Running* di Zeabur. Jika job deploy gagal atau secret belum ada, jalankan cadangan `node scripts/redeploy-service.js backend|frontend`.
+5. Verifikasi URL live di `https://tayooli.my.id` (cek chunk/fitur baru) dan `https://tayooli-backend.zeabur.app/health`. **Jangan pernah mengklaim "sudah di-deploy" tanpa bukti ini.**
