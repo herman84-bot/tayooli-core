@@ -31,6 +31,10 @@ jest.mock('@/hooks/useProducts', () => ({
 jest.mock('@/hooks/usePOS', () => ({
   usePOSOrders: () => ({ data: [], refetch: jest.fn() }),
   usePOSCheckout: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  // QRIS payment hooks (ADR-008 BYO gateway) used by the POS page.
+  usePOSCreatePayment: () => ({ mutateAsync: jest.fn(), isPending: false, reset: jest.fn() }),
+  usePOSPaymentStatus: () => ({ data: undefined, isLoading: false }),
+  usePOSSimulatePayment: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }))
 
 jest.mock('@/hooks/useWMSLedger', () => ({
