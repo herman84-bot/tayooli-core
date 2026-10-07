@@ -36,6 +36,14 @@ test('direct Surat Jalan: create without Sales Order, persist, export', async ({
   await form.getByPlaceholder('e.g. DO/2026/09/0001').fill(doNumber)
   await form.getByPlaceholder('e.g. PT Nusantara Retail Makmur').fill('Uji E2E Surat Jalan Langsung')
 
+  // Pick a warehouse that actually has rack locations (not every warehouse does)
+  const locs = (await (await page.request.get('/api/v1/wms/locations')).json()).data as Array<{
+    warehouse_id?: string | null
+  }>
+  const whWithRack = locs.find((l) => l.warehouse_id)?.warehouse_id
+  test.skip(!whWithRack, 'tenant has no rack location in any warehouse')
+  await form.locator('select').first().selectOption(whWithRack!)
+
   // Add one line item and pick the first real rack location
   await form.getByRole('button', { name: /Tambah Baris/ }).click()
   const locSelect = form.locator('select').filter({ has: page.locator('option', { hasText: 'Pilih Rak/Bin...' }) }).first()
