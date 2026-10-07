@@ -30,6 +30,8 @@ import {
 import { useProducts } from "@/hooks/useProducts"
 import { api, DeliveryOrder, DeliveryOrderItem, DeliveryOrderStatus } from "@/lib/api"
 import { PrintDeliveryOrder } from "@/components/wms/PrintDeliveryOrder"
+import { ExportModal, ExportButton, type ExportFilter } from "@/components/ui/ExportModal"
+import type { ExportColumn } from "@/lib/export"
 
 interface LineItemDraft {
   productId: string
@@ -72,6 +74,60 @@ export default function DeliveryOrdersPage() {
   const [recipientName, setRecipientName] = useState("")
   const [lineItems, setLineItems] = useState<LineItemDraft[]>([])
   const [modalError, setModalError] = useState<string | null>(null)
+
+  // Export Modal State
+  const [exporting, setExporting] = useState(false)
+
+  // Helpers must be declared before doExportColumns/doExportFilters reference them
+  // (they are evaluated during render, before getStatusBadge section below).
+  const getStatusLabel = (status: DeliveryOrderStatus): string => {
+    const labels: Record<DeliveryOrderStatus, string> = {
+      DRAFT: "Draf",
+      CONFIRMED: "Dikonfirmasi",
+      PICKED: "Diambil",
+      PACKED: "Dikemas",
+      SHIPPED: "Dikirim",
+      DELIVERED: "Diterima",
+      RETURNED: "Dikembalikan",
+      CANCELLED: "Dibatalkan",
+    }
+    return labels[status] || status
+  }
+
+  const fmtDate = (iso?: string | null): string => {
+    if (!iso) return ""
+    const d = new Date(iso)
+    return Number.isNaN(d.getTime())
+      ? ""
+      : d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+  }
+
+  const doExportColumns: ExportColumn<DeliveryOrder>[] = [
+    { header: "No. Surat Jalan", value: (d) => d.do_number, width: 22 },
+    { header: "Tanggal", value: (d) => fmtDate(d.created_at), width: 20 },
+    { header: "Gudang", value: (d) => getWarehouseName(d.warehouse_id), width: 22 },
+    { header: "Status", value: (d) => getStatusLabel(d.status), width: 18 },
+    { header: "Penerima", value: (d) => d.recipient_name || "", width: 22 },
+    { header: "Driver", value: (d) => d.driver_name || "", width: 22 },
+    { header: "Plat Kendaraan", value: (d) => d.vehicle_plate || "", width: 18 },
+    { header: "Ekspedisi", value: (d) => d.expedition_name || "", width: 22 },
+    { header: "No. Tracking", value: (d) => d.tracking_number || "", width: 22 },
+    { header: "Tgl Diterima", value: (d) => fmtDate(d.received_date), width: 20 },
+  ]
+  const doExportFilters: ExportFilter<DeliveryOrder>[] = [
+    { type: "dateRange", id: "created", label: "Tanggal terbit", getDate: (d) => d.created_at },
+    { type: "dateRange", id: "received", label: "Tanggal diterima", getDate: (d) => d.received_date },
+    {
+      type: "select",
+      id: "status",
+      label: "Status",
+      options: ["DRAFT", "CONFIRMED", "PICKED", "PACKED", "SHIPPED", "DELIVERED", "RETURNED", "CANCELLED"].map((s) => ({
+        value: s,
+        label: getStatusLabel(s as DeliveryOrderStatus),
+      })),
+      match: (d, v) => d.status === v,
+    },
+  ]
 
   // Locations for selected warehouse in create modal
   const { data: modalLocations = [] } = useWarehouseLocations(modalWarehouseId || null)
@@ -270,6 +326,7 @@ export default function DeliveryOrdersPage() {
     }
   }
 
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 text-slate-900">
       {/* ── Toast Notification ── */}
@@ -327,6 +384,8 @@ export default function DeliveryOrdersPage() {
             >
               <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
             </button>
+            <ExportButton onClick={() => setExporting(true)} disabled={deliveryOrders.length === 0} />
+
             <button
               onClick={handleOpenCreateModal}
               className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg font-semibold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-sm"
@@ -850,6 +909,24 @@ export default function DeliveryOrdersPage() {
           )}
         </>
       )}
+
+      <ExportModal<DeliveryOrder>
+        open={exporting}
+        onClose={() => setExporting(false)}
+        title="Surat Jalan"
+        filename="surat-jalan"
+        allRows={deliveryOrders}
+        visibleRows={filteredOrders}
+        visibleSummary={
+          [
+            statusFilter !== "ALL" ? `Status: ${getStatusLabel(statusFilter as DeliveryOrderStatus)}` : null,
+            selectedWarehouseFilter !== "ALL" ? `Gudang: ${getWarehouseName(selectedWarehouseFilter)}` : null,
+            searchQuery.trim() ? `Pencarian: "${searchQuery.trim()}"` : null,
+          ].filter((x): x is string => x !== null)
+        }
+        columns={doExportColumns}
+        filters={doExportFilters}
+      />
     </div>
   )
 }

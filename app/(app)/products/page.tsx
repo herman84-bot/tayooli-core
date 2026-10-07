@@ -27,6 +27,8 @@ import type { Product } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ExportModal, ExportButton, type ExportFilter } from "@/components/ui/ExportModal"
+import type { ExportColumn } from "@/lib/export"
 import {
   Drawer,
   DrawerProvider,
@@ -34,6 +36,14 @@ import {
   DrawerContent,
   DrawerFooter,
 } from "@/components/ui/drawer"
+
+function fmtExportDate(iso?: string): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+}
 
 const productSchema = z.object({
   name: z.string().trim().min(2, "Nama produk minimal 2 karakter").max(255, "Nama produk maksimal 255 karakter"),
@@ -180,6 +190,39 @@ export default function ProductsPage() {
     )
   }, [products, searchQuery])
 
+  const [exporting, setExporting] = useState(false)
+  const productExportColumns = useMemo<ExportColumn<Product>[]>(
+    () => [
+      { header: "SKU", value: (p) => p.sku, width: 16 },
+      { header: "Nama Produk", value: (p) => p.name, width: 32 },
+      { header: "Deskripsi", value: (p) => p.description ?? "", width: 40 },
+      { header: "Harga (Rp)", value: (p) => Number(p.price) || 0, width: 16, align: "right" },
+      { header: "Dibuat", value: (p) => fmtExportDate(p.created_at), width: 18 },
+      { header: "Diperbarui", value: (p) => fmtExportDate(p.updated_at), width: 18 },
+    ],
+    []
+  )
+  const productExportFilters = useMemo<ExportFilter<Product>[]>(
+    () => [
+      { type: "dateRange", id: "created", label: "Tanggal dibuat", getDate: (p) => p.created_at },
+      {
+        type: "select",
+        id: "price",
+        label: "Rentang harga",
+        options: [
+          { value: "lt50", label: "< Rp50.000" },
+          { value: "50to500", label: "Rp50.000 – Rp500.000" },
+          { value: "gt500", label: "> Rp500.000" },
+        ],
+        match: (p, v) => {
+          const n = Number(p.price) || 0
+          return v === "lt50" ? n < 50_000 : v === "50to500" ? n >= 50_000 && n <= 500_000 : n > 500_000
+        },
+      },
+    ],
+    []
+  )
+
   // Metrics
   const metrics = useMemo(() => {
     const totalCount = products.length
@@ -246,6 +289,8 @@ export default function ProductsPage() {
             >
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </button>
+
+            <ExportButton onClick={() => setExporting(true)} disabled={products.length === 0} />
 
             <button
               type="button"
@@ -788,6 +833,18 @@ export default function ProductsPage() {
           </DrawerContent>
         </Drawer>
       </DrawerProvider>
+
+      <ExportModal<Product>
+        open={exporting}
+        onClose={() => setExporting(false)}
+        title="Katalog Produk"
+        filename="katalog-produk"
+        columns={productExportColumns}
+        allRows={products}
+        visibleRows={filteredProducts}
+        visibleSummary={searchQuery.trim() ? [`Pencarian: "${searchQuery.trim()}"`] : []}
+        filters={productExportFilters}
+      />
     </div>
   )
 }

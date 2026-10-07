@@ -28,6 +28,7 @@ import {
 } from "@/hooks/useWMS"
 import { useProducts } from "@/hooks/useProducts"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
+import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 import { api, Product, StockReceipt, StockReceiptInput, StockReceiptStatus, StockReceiptType } from "@/lib/api"
 
 // ---------------------------------------------------------------------------
@@ -221,6 +222,7 @@ function ReceiptList({ onNew, onOpen }: { onNew: () => void; onOpen: (id: string
   )
 
   const whName = (id: string) => warehouses.find((w) => w.id === id)?.name ?? "-"
+  const [exporting, setExporting] = useState(false)
 
   return (
     <>
@@ -233,13 +235,59 @@ function ReceiptList({ onNew, onOpen }: { onNew: () => void; onOpen: (id: string
             Penerimaan barang dari <strong>Hasil Produksi</strong> (dapur/pabrik), <strong>Transfer Antar-Gudang</strong> (ke cabang/toko), atau <strong>Pemasok Luar</strong>. Stok cabang siap dijual di kasir POS setelah dikonfirmasi.
           </p>
         </div>
-        <button
-          onClick={onNew}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" /> Terima Barang
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportButton onClick={() => setExporting(true)} disabled={receipts.length === 0} />
+          <button
+            onClick={onNew}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 min-h-[44px] text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" /> Terima Barang
+          </button>
+        </div>
       </div>
+
+      <ExportModal<StockReceipt>
+        open={exporting}
+        onClose={() => setExporting(false)}
+        title="Barang Masuk"
+        filename="barang-masuk"
+        allRows={receipts}
+        visibleRows={receipts}
+        visibleSummary={[
+          `Gudang: ${warehouseId ? whName(warehouseId) : "Semua"}`,
+          `Sumber: ${selectedType === "ALL" ? "Semua" : TYPE_CONFIG[selectedType].text}`,
+        ]}
+        columns={[
+          { header: "No. Penerimaan", value: (r) => r.receipt_number, width: 20 },
+          { header: "Tanggal", value: (r) => fmtDate(r.created_at), width: 20 },
+          { header: "Sumber", value: (r) => TYPE_CONFIG[r.receipt_type]?.text ?? r.receipt_type, width: 18 },
+          { header: "Dari", value: (r) => r.supplier_name || r.from_warehouse_name || r.from_name || "", width: 24 },
+          { header: "Gudang Tujuan", value: (r) => whName(r.warehouse_id), width: 22 },
+          { header: "Jumlah Item", value: (r) => r.item_count, width: 12, align: "right" },
+          { header: "Qty Diterima", value: (r) => num(r.total_accepted_qty), width: 14, align: "right" },
+          { header: "Qty Ditolak", value: (r) => num(r.total_rejected_qty), width: 14, align: "right" },
+          { header: "Status", value: (r) => STATUS_LABEL[r.status]?.text ?? r.status, width: 18 },
+          { header: "Ref", value: (r) => r.supplier_ref || r.source_ref || "", width: 18 },
+          { header: "Catatan", value: (r) => r.notes ?? "", width: 30 },
+        ]}
+        filters={[
+          { type: "dateRange", id: "date", label: "Tanggal penerimaan", getDate: (r) => r.created_at },
+          {
+            type: "select",
+            id: "status",
+            label: "Status",
+            options: (Object.keys(STATUS_LABEL) as StockReceiptStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s].text })),
+            match: (r, v) => r.status === v,
+          },
+          {
+            type: "select",
+            id: "type",
+            label: "Sumber",
+            options: (Object.keys(TYPE_CONFIG) as StockReceiptType[]).map((t) => ({ value: t, label: TYPE_CONFIG[t].text })),
+            match: (r, v) => r.receipt_type === v,
+          },
+        ]}
+      />
 
       {/* Filter Tabs & Warehouse Selector */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">

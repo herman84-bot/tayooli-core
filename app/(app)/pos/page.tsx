@@ -41,6 +41,8 @@ import { useProducts } from "@/hooks/useProducts"
 import { usePOSOrders, usePOSCheckout, usePOSCreatePayment, usePOSPaymentStatus, usePOSSimulatePayment } from "@/hooks/usePOS"
 import { useWMSStock } from "@/hooks/useWMSLedger"
 import type { POSOrder, POSPaymentCharge } from "@/lib/api"
+import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
+import type { ExportColumn } from "@/lib/export"
 
 // Sale Mode
 type SaleMode = "JUAL_PUTUS" | "KONSINYASI"
@@ -124,6 +126,24 @@ export default function POSPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showClearCartModal, setShowClearCartModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [exportingOrders, setExportingOrders] = useState(false)
+
+  const posExportColumns: ExportColumn<POSOrder>[] = [
+    { header: "No. Transaksi", value: (o) => o.order_number, width: 20 },
+    {
+      header: "Tanggal & Waktu",
+      value: (o) =>
+        new Date(o.created_at).toLocaleString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+      width: 20,
+    },
+    { header: "Pelanggan", value: (o) => o.customer_name || "Walk-in", width: 22 },
+    { header: "Metode Bayar", value: (o) => o.payment_method, width: 18 },
+    { header: "Subtotal (Rp)", value: (o) => Math.round(Number(o.subtotal) || 0), width: 16, align: "right" },
+    { header: "Pajak (Rp)", value: (o) => Math.round(Number(o.tax_amount) || 0), width: 14, align: "right" },
+    { header: "Diskon (Rp)", value: (o) => Math.round(Number(o.discount_amount) || 0), width: 14, align: "right" },
+    { header: "Total (Rp)", value: (o) => Math.round(Number(o.total_amount) || 0), width: 16, align: "right" },
+    { header: "Status", value: (o) => o.status || "OK", width: 14 },
+  ]
   const [showReconciliationModal, setShowReconciliationModal] = useState(false)
   const [receiptWidth, setReceiptWidth] = useState<"58mm" | "80mm">("80mm")
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
@@ -580,6 +600,9 @@ export default function POSPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Export Button */}
+            <ExportButton onClick={() => setExportingOrders(true)} disabled={posOrders.length === 0} />
+
             {/* Riwayat Transaksi Button */}
             <button
               type="button"
@@ -1713,6 +1736,30 @@ export default function POSPage() {
             }
           `,
         }}
+      />
+
+      {/* Export Modal */}
+      <ExportModal<POSOrder>
+        open={exportingOrders}
+        onClose={() => setExportingOrders(false)}
+        title="Riwayat Transaksi POS"
+        filename="riwayat-pos"
+        allRows={posOrders}
+        visibleRows={posOrders}
+        columns={posExportColumns}
+        filters={[
+          { type: "dateRange", id: "date", label: "Tanggal transaksi", getDate: (o) => o.created_at },
+          {
+            type: "select",
+            id: "method",
+            label: "Metode bayar",
+            options: [
+              { value: "CASH", label: "Tunai" },
+              { value: "QRIS", label: "QRIS" },
+            ],
+            match: (o, v) => (o.payment_method || "").toUpperCase() === v,
+          },
+        ]}
       />
     </div>
   )

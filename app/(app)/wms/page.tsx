@@ -30,7 +30,8 @@ import {
   useStockTransfers,
 } from "@/hooks/useWMS"
 import { useWMSMovements, useWMSStock } from "@/hooks/useWMSLedger"
-import { Warehouse, WarehouseLocation, LocationType } from "@/lib/api"
+import { Warehouse, WarehouseLocation, LocationType, StockSummary } from "@/lib/api"
+import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 
 export default function WMSDashboardPage() {
   const { data: warehouses = [], isLoading: loadingWarehouses, refetch: refetchWarehouses } = useWarehouses()
@@ -121,6 +122,8 @@ export default function WMSDashboardPage() {
     }
     return map
   }, [stockSummary])
+
+  const [exportingStock, setExportingStock] = useState(false)
 
   // Handle warehouse creation
   const handleCreateWarehouse = async (e: React.FormEvent) => {
@@ -268,6 +271,8 @@ export default function WMSDashboardPage() {
               <ArrowRightLeft className="w-4 h-4 text-slate-600" />
               <span>Transfer Gudang</span>
             </Link>
+
+            <ExportButton onClick={() => setExportingStock(true)} disabled={stockSummary.length === 0} />
 
             <button
               type="button"
@@ -923,6 +928,46 @@ export default function WMSDashboardPage() {
           </div>
         </div>
       )}
+
+      <ExportModal<StockSummary>
+        open={exportingStock}
+        onClose={() => setExportingStock(false)}
+        title="Stok & Lokasi Gudang"
+        filename="stok-gudang"
+        allRows={stockSummary}
+        visibleRows={stockSummary}
+        visibleSummary={[`Gudang: ${warehouses.find((w) => w.id === selectedWarehouseId)?.name ?? "Semua"}`]}
+        columns={[
+          { header: "SKU", value: (s) => s.sku, width: 16 },
+          { header: "Nama Produk", value: (s) => s.product_name, width: 32 },
+          { header: "Gudang", value: (s) => s.warehouse_name || "-", width: 22 },
+          { header: "Lokasi", value: (s) => s.location_code || "-", width: 18 },
+          { header: "Qty", value: (s) => Number(s.quantity) || 0, width: 12, align: "right" },
+        ]}
+        filters={[
+          {
+            type: "select",
+            id: "wh",
+            label: "Gudang",
+            options: warehouses.map((w) => ({ value: w.id, label: w.name })),
+            match: (s, v) => s.warehouse_id === v,
+          },
+          {
+            type: "select",
+            id: "qty",
+            label: "Kondisi stok",
+            options: [
+              { value: "zero", label: "Habis (0)" },
+              { value: "low", label: "Menipis (1–10)" },
+              { value: "ok", label: "Aman (> 10)" },
+            ],
+            match: (s, v) => {
+              const q = Number(s.quantity) || 0
+              return v === "zero" ? q <= 0 : v === "low" ? q > 0 && q <= 10 : q > 10
+            },
+          },
+        ]}
+      />
     </div>
   )
 }
