@@ -108,4 +108,9 @@ Untuk memperbarui deployment produksi:
 - **Master PRD & Implementation Plan:** `docs/specs/2026-10-07-enterprise-wms-inbound-outbound-master-prd-plan.md`
 - **Architectural Decision Record:** `docs/adr/014-wms-enterprise-inbound-outbound-lifecycle.md` (ADR-014)
 - **Mandate:** Setiap pengerjaan atau agen AI yang menyentuh modul WMS Inbound, Outbound, Batch, Staging, Putaway, atau Packing **WAJIB membaca dan mengikuti roadmap 5-sprint** serta memperbarui living execution checklist di `docs/specs/2026-10-07-enterprise-wms-inbound-outbound-master-prd-plan.md`. Dilarang memotong alur staging atau menghapus buku besar double-entry.
+- **Benchmark References (MANDATORY):**
+  - **Arsitektur Teknis, Database & REST API:** `docs/references/sentry-wms-spec.md` (mengadopsi pola Sentry WMS: pemisahan bin `Staging` vs `Pickable`, 2-step Inbound, pemisahan stasiun Packing vs Shipping, dan row-level concurrency locking).
+  - **Logika Bisnis & Aturan Pergudangan ISO:** `docs/references/oca-wms-spec.md` (mengadopsi pola OCA/wms: manajemen dermaga/dock, algoritma penataan rak ABC Velocity, rotasi FEFO, dan gelombang pesanan Wave Release).
+  - **Aturan Eksekusi AI:** Sebelum menulis kode pada modul terkait, AI WAJIB membaca file referensi tersebut dan mencantumkan pola spesifik yang diadopsi pada komentar kode atau laporan pengerjaan. Dilarang mengarang arsitektur baru di luar pola acuan ini.
+
 
