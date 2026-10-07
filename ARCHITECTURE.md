@@ -8,12 +8,14 @@
 
 ## 1. Visi & DNA Produk
 Tayooli Core adalah sistem ERP Standalone berkinerja tinggi, ramping, dan mandiri yang dirancang khusus untuk bisnis ritel, pergudangan (WMS), dan kasir POS di Indonesia. 
-Sistem ini dipisahkan dari beban arsitektur enterprise yang kompleks (*Apache Kafka message broker, Python AI worker*) agar dapat berjalan sangat cepat dan hemat sumber daya pada lingkungan PaaS (Zeabur) atau VPS hemat (1–2 vCPU, 1–2 GB RAM).
+Sistem ini dipisahkan dari beban arsitektur enterprise yang kompleks (*Apache Kafka message broker, Python AI worker*) agar dapat berjalan sangat cepat dan hemat sumber daya pada lingkungan PaaS (Zeabur) atau VPS hemat (1â€“2 vCPU, 1â€“2 GB RAM).
 
 ---
 
 ## 2. Struktur Modul: 13 Fitur Inti (The 13 Core Modules)
 Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada **13 modul operasional utama**:
+
+> **Catatan 2026-10-07 (KO-2):** Barang Masuk dan Surat Jalan akan digabung jadi 1 modul **Barang Masuk & Keluar** (target 12 modul). Lihat CLAUDE.md dan PRD master §3.5. Daftar di bawah ini masih menggambarkan kode saat ini sampai item KO-2a/KO-2c selesai.
 
 ```text
 1. OVERVIEW
@@ -64,20 +66,20 @@ Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada 
 
 ```text
 [ Pengguna / Browser ]
-          │
-          ▼
+          â”‚
+          â–¼
    tayooli.my.id (Domain Utama)
    43.157.210.155 (DNS A Record ke Zeabur Edge)
-          │
-          ├─────────────────────────────────────────┐
-          ▼                                         ▼
+          â”‚
+          â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+          â–¼                                         â–¼
 [ Zeabur Frontend Service ]             [ Zeabur Backend Service ]
  Next.js 15 Standalone Node              Go 1.24 Chi Binary API
  (tayooli-frontend.zeabur.app)           (tayooli-backend.zeabur.app)
-          │                                         │
-          └─────────── PROXY /api/v1/* ─────────────┘
-                                                    │
-                                                    ▼
+          â”‚                                         â”‚
+          â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ PROXY /api/v1/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                                                    â”‚
+                                                    â–¼
                                         [ PostgreSQL 15 Database ]
                                          Zeabur Managed PG Database
 ```

@@ -25,8 +25,25 @@ Historically, `tayooli-core` handled stock receipts and delivery orders as singl
 
 ### Invariant 1: Append-Only Ledger with Batch Lineage
 - The `stock_movements` table remains an immutable, append-only double-entry ledger.
-- A nullable foreign key `batch_id UUID REFERENCES stock_batches(id)` is introduced.
-- Every ledger row moving stock into or out of inventory must reference its associated batch whenever the product has lot tracking enabled.
+- A foreign key `batch_id UUID REFERENCES stock_batches(id)` is introduced on `stock_movements`.
+- **(Owner decision 2026-10-07: traceability is per batch, for ALL products.)** Every ledger row that moves physical stock between locations (receipt, putaway, transfer, pick, dispatch, POS sale, marketplace, opname adjustment, scrap/quarantine) MUST carry `batch_id`. There is no "lot tracking disabled" exemption.
+- Products without a supplier batch number receive an auto-generated batch per receipt line (`AUTO-<GR number>-<line>`), so even untracked goods remain traceable to their receipt.
+- Existing (pre-migration) stock balances are backfilled into one `LEGACY-<product>` batch per product and location so the NOT NULL rule holds from day one.
+
+### Invariant 1b: Bidirectional Inbound ↔ Outbound Traceability
+- Lineage chain: `stock_receipt (GR) → stock_batch → putaway → [transfer] → pick → delivery_order (DO) / POS order → customer`.
+- **Forward trace (from a receipt):** the system must answer, for a GR or batch, how much went out, to which customers, through which DOs or POS orders, when, by whom, and how much remains in which rack.
+- **Backward trace (from an outbound document):** the system must answer, for a DO line, which batch(es), expiry, GR, supplier/source, and rack it came from.
+- Both traces are pure queries over `stock_movements` (`batch_id` + `reference_type/reference_id`). No denormalized copies that could drift.
+- A DO line that picks from several batches is split into one line per batch (`delivery_order_items.batch_id NOT NULL`).
+- Enforcement: a DB-level `CHECK`/`NOT NULL` on `stock_movements.batch_id` plus Go tests that fail when any movement path writes without a batch.
+
+### Invariant 1c: Single "Barang Masuk & Keluar" Module (UI)
+- **(Owner decision 2026-10-07)** Inbound and Outbound live in ONE menu module, **"Barang Masuk & Keluar"**, at route `/wms/arus-barang`, with a `MASUK | KELUAR` toggle at the top.
+- `MASUK` shows: receipts → QC → putaway (tabs). `KELUAR` shows: Surat Jalan → picking → packing → manifest/loading (tabs).
+- The last selected mode is remembered (`?mode=masuk|keluar` in the URL plus localStorage).
+- Legacy routes `/wms/inbound` and `/wms/delivery-orders` redirect to `/wms/arus-barang?mode=masuk` and `?mode=keluar`.
+- Merging former modules 3 (Barang Masuk) and 5 (Surat Jalan) reduces the core module count from 13 to **12**.
 - Back-dating or destructive editing of existing ledger movements is strictly prohibited.
 
 ### Invariant 2: Two-Step Inbound Movement (Staging Gate)

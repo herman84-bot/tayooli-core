@@ -26,12 +26,14 @@ Sebagai AI yang bekerja di repositori ini, Anda **DILARANG KERAS** melanggar bat
 | **Dev Port Lokal** | Port `3005` (jika dijalankan) | **Port `3000`** (`http://localhost:3000`) |
 | **Aturan Sentuh** | **DILARANG MENGUBAH / MENYENTUH APAPUN** | **Tempat Anda Bekerja & Berinovasi** |
 
-> ⚠️ **PERINGATAN UNTUK AI:**  
+> âš ï¸ **PERINGATAN UNTUK AI:**  
 > Jika pengguna meminta perbaikan, fitur baru, atau debugging, **HANYA kerjakan di folder `tayooli-core`**. Jangan pernah membuka, mengedit, merevert, atau menjalankan perintah di folder `Erp-Like-PAPER-ID` kecuali ada perintah eksplisit tertulis dari pengguna.
 
 ---
 
 ## 3. Fitur yang Diminta: TEPAT 13 FITUR BERSIH (THE 13 CORE MODULES)
+
+> **Catatan 2026-10-07 (KO-2):** Barang Masuk dan Surat Jalan akan digabung jadi 1 modul **Barang Masuk & Keluar** (target 12 modul). Lihat CLAUDE.md dan PRD master §3.5. Daftar di bawah ini masih menggambarkan kode saat ini sampai item KO-2a/KO-2c selesai.
 
 Pada saat proses pemisahan dari repo induk, aplikasi lama memiliki banyak fitur enterprise yang sangat rumit (*Procure-to-Pay, Order-to-Cash, Chart of Accounts, Journal Entries, Billing/Subscriptions, Kafka broker, Python AI worker*).
 
@@ -60,13 +62,13 @@ ACCOUNT
  13. Help & Support           -> /help
 ```
 
-### 🚫 Yang DILARANG Dikembalikan ke Navigasi Sidebar / Tampilan Utama:
+### ðŸš« Yang DILARANG Dikembalikan ke Navigasi Sidebar / Tampilan Utama:
 1. **Procure-to-Pay (P2P)**: *Purchase Invoices, Purchase Orders, Goods Receipts, Payment Orders, Vendors, Approvals*.
 2. **Order-to-Cash (O2C)**: *Customers, Sales Orders, Sales Invoices*.
 3. **Akuntansi (Accounting)**: *Chart of Accounts (CoA), Jurnal Umum*.
 4. **Billing**: *Paket langganan dan tagihan SaaS*.
 
-> 💡 **Mengapa folder/file route lama masih ada di codebase?**  
+> ðŸ’¡ **Mengapa folder/file route lama masih ada di codebase?**  
 > Di dalam folder `app/(app)/dashboard/invoices`, `app/(app)/sales-orders`, dll., beberapa file sengaja tidak dihapus dari filesystem untuk mencegah *broken import* atau error kompilasi TypeScript. **Namun modul-modul ini sengaja dihilangkan dari navigasi sidebar (`Sidebar.tsx`)**. AI dilarang memunculkan kembali modul-modul lama tersebut ke antarmuka pengguna!
 
 ---

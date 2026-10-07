@@ -184,7 +184,29 @@ Sumber: `RIVIEW TAYOLI.xlsx` (Sheet1, B2:F11), berisi 5 poin feedback. Setiap po
 | **CR-04** | "untuk dasboard mungkin tampilkan jumlah barang keluar atau topten produk yg sering keluar atau toko yg paling banyak order" | `GET /dashboard/summary` (`domain/dashboard.go`) punya statistik POS, WMS (SKU, unit, lokasi, `today_movements`, low stock) dan `TopVendors`, tetapi **tidak ada** total barang keluar, top-10 produk keluar, maupun top customer/toko. | Tambah ke `WMSDashStats`: `outbound_qty_today/month`, `top_outbound_products[10]` (agregasi `stock_movements` dengan tujuan `@CUSTOMER`, termasuk POS & DO), `top_customers[10]` (jumlah DO/order per customer/toko, termasuk toko marketplace). Filter periode 7/30/90 hari. **Sprint 3** (butuh `customer_id` dari CR-02). |
 | **CR-05** | "untuk setiap transaksi atau approval bisa dilihat atau terdetect siapa yg melakukan proses transaksi tersebut atau approval tersebut" | Tabel `audit_logs` ada (hash-chain) tapi hanya dipakai usecase payment/vendor/approval, **tidak** dipakai usecase WMS. `stock_movements.executed_by` ada; `stock_receipts.created_by/posted_by` ada; `stock_transfers.requested_by/approved_by` ada; `stock_opnames.approved_by` ada; **`delivery_orders` tidak punya `created_by`/`dispatched_by`**. UI belum menampilkan pelaku. | (a) Lengkapi kolom pelaku di semua dokumen WMS (`delivery_orders.created_by, confirmed_by, packed_by, dispatched_by`; tabel baru sprint ini wajib punya kolom pelaku per transisi status). (b) Setiap transisi status WMS menulis `audit_logs`. (c) UI: kolom "Dibuat oleh / Disetujui oleh" di tabel + panel "Riwayat Aktivitas" (timeline siapa, apa, kapan) di detail dokumen. **Lintas sprint, wajib mulai Sprint 1** (invariant: tidak ada transisi status tanpa user_id). |
 
-**Catatan aturan 13 modul:** semua CR di atas ditempatkan di modul yang sudah ada (Products, Barang Masuk, Surat Jalan, Dashboard). Tidak ada menu baru yang ditambahkan.
+**Catatan modul:** semua CR di atas ditempatkan di modul yang sudah ada. Tidak ada menu baru. Barang Masuk dan Surat Jalan sekarang digabung (lihat 3.5).
+
+---
+
+### 3.5 Keputusan Owner (2026-10-07): Keterhubungan Data & Penggabungan Modul
+
+**KO-1: Data masuk dan keluar wajib saling terhubung, per batch.**
+- Semua produk dilacak per batch, tanpa pengecualian. Barang tanpa nomor batch dari pemasok tetap mendapat batch otomatis `AUTO-<No GR>-<baris>`.
+- Setiap mutasi stok (terima, putaway, transfer, ambil, kirim, jual POS, marketplace, opname, scrap/karantina) wajib membawa `batch_id`. Mutasi tanpa batch ditolak oleh database dan oleh test.
+- **Lacak maju (dari Barang Masuk):** di detail penerimaan atau batch terlihat berapa yang sudah keluar, ke customer atau toko mana, lewat Surat Jalan atau order POS mana, kapan, oleh siapa, serta sisa stok dan raknya.
+- **Lacak mundur (dari Barang Keluar):** di detail Surat Jalan per baris terlihat batch, tanggal kedaluwarsa, No GR asal, pemasok atau sumber, dan rak asal.
+- Satu baris Surat Jalan yang diambil dari beberapa batch dipecah menjadi satu baris per batch.
+- Stok lama sebelum migrasi dimasukkan ke batch `LEGACY` per produk dan rak.
+- Pelacakan per unit (serial number) **tidak** dikerjakan.
+
+**KO-2: Satu modul "Barang Masuk & Keluar".**
+- Menu Barang Masuk (no. 3) dan Surat Jalan (no. 5) digabung menjadi **"Barang Masuk & Keluar"** di `/wms/arus-barang`. Jumlah modul inti berubah dari 13 menjadi **12**.
+- Di atas halaman ada pilihan **MASUK | KELUAR**. Isi menyesuaikan pilihan:
+  - **MASUK:** tab Penerimaan, QC, dan Putaway.
+  - **KELUAR:** tab Surat Jalan, Picking, Packing, dan Manifest/Muat.
+- Pilihan terakhir diingat (`?mode=masuk|keluar` dan localStorage).
+- Link lama `/wms/inbound` dan `/wms/delivery-orders` otomatis dialihkan ke modul baru.
+- Semua label UI berbahasa Indonesia.
 
 ---
 
@@ -226,6 +248,14 @@ ALTER TABLE stock_receipt_items ADD COLUMN IF NOT EXISTS expiry_date DATE;
 ALTER TABLE stock_receipt_items ADD COLUMN IF NOT EXISTS mfg_date DATE;
 
 ALTER TABLE delivery_order_items ADD COLUMN IF NOT EXISTS batch_id UUID REFERENCES stock_batches(id);
+
+-- KO-1: setelah backfill batch LEGACY untuk stok lama, kunci kewajiban batch:
+--   UPDATE ... (isi batch_id LEGACY untuk baris lama)
+--   ALTER TABLE stock_movements ALTER COLUMN batch_id SET NOT NULL;
+--   ALTER TABLE delivery_order_items ALTER COLUMN batch_id SET NOT NULL;  -- setelah DO lama di-backfill
+-- Index untuk lacak maju/mundur:
+CREATE INDEX IF NOT EXISTS idx_stock_movements_batch ON stock_movements(tenant_id, batch_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_ref ON stock_movements(tenant_id, reference_type, reference_id);
 
 -- RLS Policies
 ALTER TABLE stock_batches ENABLE ROW LEVEL SECURITY;
@@ -462,6 +492,14 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 
 ### SPRINT 1: Fondasi Batch, Expiry Date & 2-Step Inbound (Staging &rarr; Putaway)
 - [ ] **DB-01:** Buat migrasi SQL `033_wms_batches_and_staging_locations.sql` (tabel `stock_batches`, tipe `STAGING_INBOUND`, dan kolom `batch_id`).
+- [ ] **KO-1a (DB):** Backfill batch `LEGACY` untuk stok dan mutasi lama, lalu `stock_movements.batch_id SET NOT NULL` dan tambah index lacak.
+- [ ] **KO-1b (BE):** Semua jalur mutasi (receipt, putaway, transfer, DO, POS, marketplace, opname, scrap) mengisi `batch_id`. Barang tanpa nomor batch mendapat batch `AUTO-<GR>-<baris>`.
+- [ ] **KO-1c (BE):** Endpoint `GET /api/v1/wms/trace/batch/{id}`, `GET /api/v1/wms/trace/receipt/{id}` (lacak maju), dan `GET /api/v1/wms/trace/delivery-order/{id}` (lacak mundur).
+- [ ] **KO-1d (TEST):** Test Go gagal jika ada jalur mutasi tanpa batch, plus test rekonsiliasi: qty masuk batch = qty keluar + sisa di rak (property test dengan fast-check/rapid).
+- [ ] **KO-2a (FE):** Modul gabungan `/wms/arus-barang` dengan toggle MASUK | KELUAR dan tab per mode. Pilihan tersimpan di URL dan localStorage. Redirect dari `/wms/inbound` dan `/wms/delivery-orders`. Sidebar jadi 12 modul.
+- [ ] **KO-2b (FE):** Panel "Lacak Barang" di detail penerimaan (maju) dan detail Surat Jalan (mundur).
+- [ ] **KO-2c (DOC):** Update daftar modul di `CLAUDE.md`, `AI_ONBOARDING_GUIDE.md`, dan `ARCHITECTURE.md` dari 13 jadi 12.
+- [ ] **KO-2d (TEST):** Playwright untuk toggle MASUK/KELUAR, redirect link lama, serta lacak maju dan mundur end-to-end.
 - [ ] **BE-01:** Implementasikan entitas domain `Batch` dan repository PostgreSQL di Go backend.
 - [ ] **BE-02:** Perbarui usecase penerimaan barang agar mencatat `batch_id` dan memasukkan barang pertama kali ke lokasi `STAGING_INBOUND`.
 - [ ] **BE-03:** Buat usecase dan endpoint `Putaway` untuk memindahkan stok dari Staging ke Rak definitif.
