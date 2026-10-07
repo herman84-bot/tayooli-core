@@ -20,6 +20,7 @@
    - 3.1 [Alur Inbound 6 Tahap](#31-alur-inbound-6-tahap)
    - 3.2 [Alur Outbound 6 Tahap](#32-alur-outbound-6-tahap)
    - 3.3 [Matriks Peran, Tanggung Jawab & SLA](#33-matriks-peran-tanggung-jawab--sla)
+   - 3.4 [Review Tambahan Klien (RIVIEW TAYOLI.xlsx)](#34-review-tambahan-klien-riview-tayolixlsx-diterima-2026-10-07)
 4. [Tech Spec: Spesifikasi Teknis & Arsitektur (Engineering)](#4-tech-spec-spesifikasi-teknis--arsitektur-engineering)
    - 4.1 [Skema Database PostgreSQL & Migrasi](#41-skema-database-postgresql--migrasi)
    - 4.2 [Mesin Status (State Machines) & Validasi Transisi](#42-mesin-status-state-machines--validasi-transisi)
@@ -163,6 +164,22 @@ Standar operasional pengeluaran pesanan dari pemrosesan hingga armada berangkat:
 | **O-4** | Packing & AWB | Packer / Outbound Staff | Packing Slip, Thermal Label AWB | 20 Menit | Kemasan aman standar kurir, barcode terbaca |
 | **O-5** | Staging Konsolidasi | Staging Leader / Marshal | Manifest Staging Sheet, Rute Buffer | 15 Menit | Pengelompokan tepat 100% per ekspedisi/tujuan |
 | **O-6** | Loading & Dispatch | Dispatcher / Loader | Surat Jalan (DO), Bill of Lading, Loading Scan | 30 Menit | Pemuatan tepat waktu, data ledger Goods Issue |
+
+---
+
+### 3.4 Review Tambahan Klien (`RIVIEW TAYOLI.xlsx`, diterima 2026-10-07)
+
+Sumber: `RIVIEW TAYOLI.xlsx` (Sheet1, B2:F11), berisi 5 poin. Setiap poin punya 1 screenshot di kolom "PCT". Screenshot **belum dianalisis** karena model yang dipakai saat dokumen ini ditulis tidak bisa membaca gambar. Sebelum mengerjakan item CR, buka screenshot itu (`xl/media/image*.jpg`; urutan per baris: CR-01=image2, CR-02=image3, CR-03=image4, CR-04=image5, CR-05=image1) untuk memastikan layar mana yang dimaksud.
+
+| ID | Permintaan Klien (verbatim) | Kondisi Kode Saat Ini (diverifikasi) | Keputusan & Penempatan |
+| :--- | :--- | :--- | :--- |
+| **CR-01** | "untuk nama produk bisa ditambahkan jenis/kategori" | Tabel `products` (`012_products_inventory.sql`) hanya punya `name, description, sku, price`. Tidak ada kolom/tabel kategori di migrasi maupun domain Go. | Tambah master `product_categories` (per tenant) + `products.category_id` nullable. Field kategori di form Produk, filter & kolom di tabel Produk, ikut ekspor. Juga dipakai untuk ABC/putaway (§1.2 `oca-wms-spec.md`). **Sprint 1.** |
+| **CR-02** | "bisa ditambahkan untuk customer baru, outbound & proses putaway" | Tabel `customers` + endpoint `GET/POST /api/v1/customers` sudah ada (`main.go:591-595`), halaman `app/(app)/customers/page.tsx` ada tapi **bukan** bagian 13 modul menu. `delivery_orders` **tidak punya `customer_id`** (hanya `recipient_name`). Putaway belum ada (scanner masih mock). | (a) Quick-add customer baru langsung dari form Surat Jalan (inline modal, pakai endpoint yang sudah ada) + `delivery_orders.customer_id` nullable. (b) Outbound & putaway sudah tercakup roadmap ini (Sprint 1 putaway, Sprint 3 outbound). Tidak menambah modul menu baru (aturan 13 modul). **Sprint 1 (putaway) & Sprint 3 (customer di DO).** |
+| **CR-03** | "proses barang masuk bisa menyesuaikan dengan rak yg telah ditentukan di awal" | Tidak ada kolom lokasi default per produk (`default_location`/`preferred_location` tidak ditemukan). Form inbound memilih satu rak tujuan manual. | Tambah `products.default_location_id` (rak tetap/"home bin" per gudang; tabel `product_default_locations(product_id, warehouse_id, location_id)` karena multi-gudang). Saat putaway, rak ini menjadi **saran pertama** (`suggested_location_id`), sesuai pola *suggested bin* `sentry-wms-spec.md` §2. Operator tetap scan konfirmasi; bila beda rak, wajib alasan. **Sprint 1.** |
+| **CR-04** | "untuk dasboard mungkin tampilkan jumlah barang keluar atau topten produk yg sering keluar atau toko yg paling banyak order" | `GET /dashboard/summary` (`domain/dashboard.go`) punya statistik POS, WMS (SKU, unit, lokasi, `today_movements`, low stock) dan `TopVendors`, tetapi **tidak ada** total barang keluar, top-10 produk keluar, maupun top customer/toko. | Tambah ke `WMSDashStats`: `outbound_qty_today/month`, `top_outbound_products[10]` (agregasi `stock_movements` dengan tujuan `@CUSTOMER`, termasuk POS & DO), `top_customers[10]` (jumlah DO/order per customer/toko, termasuk toko marketplace). Filter periode 7/30/90 hari. **Sprint 3** (butuh `customer_id` dari CR-02). |
+| **CR-05** | "untuk setiap transaksi atau approval bisa dilihat atau terdetect siapa yg melakukan proses transaksi tersebut atau approval tersebut" | Tabel `audit_logs` ada (hash-chain) tapi hanya dipakai usecase payment/vendor/approval, **tidak** dipakai usecase WMS. `stock_movements.executed_by` ada; `stock_receipts.created_by/posted_by` ada; `stock_transfers.requested_by/approved_by` ada; `stock_opnames.approved_by` ada; **`delivery_orders` tidak punya `created_by`/`dispatched_by`**. UI belum menampilkan pelaku. | (a) Lengkapi kolom pelaku di semua dokumen WMS (`delivery_orders.created_by, confirmed_by, packed_by, dispatched_by`; tabel baru sprint ini wajib punya kolom pelaku per transisi status). (b) Setiap transisi status WMS menulis `audit_logs`. (c) UI: kolom "Dibuat oleh / Disetujui oleh" di tabel + panel "Riwayat Aktivitas" (timeline siapa, apa, kapan) di detail dokumen. **Lintas sprint, wajib mulai Sprint 1** (invariant: tidak ada transisi status tanpa user_id). |
+
+**Catatan aturan 13 modul:** semua CR di atas ditempatkan di modul yang sudah ada (Products, Barang Masuk, Surat Jalan, Dashboard). Tidak ada menu baru yang ditambahkan.
 
 ---
 
@@ -446,6 +463,11 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [ ] **FE-01:** Tambahkan input Nomor Batch & Tanggal Kedaluwarsa pada modal form Barang Masuk (`/wms/inbound`).
 - [ ] **FE-02:** Buat modal cetak label stiker barcode SKU + Batch + Exp Date dari detail penerimaan.
 - [ ] **FE-03:** Buat layar panduan Putaway sederhana di antarmuka web/mobile.
+- [ ] **CR-01a (DB/BE):** Tabel `product_categories` + `products.category_id` (nullable, RLS), CRUD kategori, kategori ikut di response produk & ekspor.
+- [ ] **CR-01b (FE):** Field kategori di form Produk, kolom + filter kategori di tabel Produk.
+- [ ] **CR-03a (DB/BE):** Tabel `product_default_locations(product_id, warehouse_id, location_id)`; putaway memakai rak default sebagai saran pertama.
+- [ ] **CR-03b (FE):** Atur rak default di detail Produk; layar Putaway menampilkan rak default dan meminta alasan bila operator memilih rak lain.
+- [ ] **CR-05a (Invariant):** Setiap transisi status dokumen WMS baru (receipt, putaway) menyimpan user pelaku dan menulis `audit_logs`. Test Go gagal jika transisi tanpa user_id.
 - [ ] **TEST-01:** Tulis pengujian unit Go untuk validasi batch expiry date dan mutasi staging-to-rack.
 - [ ] **DEPLOY-01:** Push commit, pastikan GitHub Actions CI lulus, dan verifikasi deploy di Zeabur.
 
@@ -465,6 +487,11 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [ ] **FE-06:** Format cetak dokumen *Picking List* terurut lokasi rak untuk petugas gudang.
 - [ ] **FE-07:** Halaman stasiun meja kemas `/wms/outbound/pack-station` dengan antarmuka pencocokan scan 100% & audio beeper.
 - [ ] **FE-08:** Generator cetak label stiker resi termal pengiriman AWB ukuran 100x150 mm.
+- [ ] **CR-02a (DB/BE):** `delivery_orders.customer_id` (nullable, FK `customers`) + kolom pelaku `created_by, confirmed_by, packed_by, dispatched_by`.
+- [ ] **CR-02b (FE):** Pilih customer di form Surat Jalan + quick-add customer baru via modal (pakai `POST /api/v1/customers` yang sudah ada).
+- [ ] **CR-04a (BE):** Tambah `outbound_qty_today/month`, `top_outbound_products[10]`, `top_customers[10]` di `GET /dashboard/summary` dengan filter periode 7/30/90 hari.
+- [ ] **CR-04b (FE):** Kartu "Barang Keluar", tabel Top 10 Produk Keluar, dan Top 10 Toko/Customer di Dashboard.
+- [ ] **CR-05b (FE):** Kolom "Dibuat oleh / Disetujui oleh" di tabel Barang Masuk, Surat Jalan, Transfer, Opname, Scrap + panel "Riwayat Aktivitas" di detail dokumen.
 - [ ] **TEST-03:** Pengujian otomatis alokasi FEFO dan pencegahan salah kirim barang di meja kemas.
 - [ ] **DEPLOY-03:** Push commit, verifikasi CI dan produksi Zeabur.
 
