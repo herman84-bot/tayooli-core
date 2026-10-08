@@ -1001,6 +1001,17 @@ func (r *WMSRepo) DeductLocationStock(ctx context.Context, tenantID, locationID,
 		return err
 	}
 
+	// 1b) Quarantine stock is blocked (ADR-014 Invariant 3, sentry-wms 1.1): it can only leave
+	// the bin through the QC release / scrap flow (MoveQuarantineStock), never via
+	// transfer, delivery order, POS or opname deduction.
+	var srcType string
+	if err := tx.QueryRowContext(ctx, `SELECT type FROM warehouse_locations WHERE id = $1 AND tenant_id = $2`, locationID, tenantID).Scan(&srcType); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("WMSRepo.DeductLocationStock: location type: %w", err)
+	}
+	if domain.LocationType(srcType) == domain.LocationTypeQuarantine {
+		return domain.ErrQuarantineStockBlocked
+	}
+
 	// 2) If specific BatchID is requested: check that batch's balance directly
 	if mov.BatchID != nil && *mov.BatchID != uuid.Nil {
 		var currentStock decimal.Decimal

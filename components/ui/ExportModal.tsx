@@ -44,6 +44,8 @@ const FORMATS: { id: ExportFormat; label: string; ext: string; desc: string; Ico
 
 type Scope = 'visible' | 'custom'
 
+export const EXPORT_TIMEOUT_MS = 20_000
+
 function inRange(iso: string | null | undefined, from: string, to: string): boolean {
   if (!from && !to) return true
   if (!iso) return false
@@ -147,7 +149,17 @@ function ExportDialog<T>({
     if (!canExport) return
     setError(null)
     setBusy(true)
-    runExport(format, { title, filename, columns: activeColumns, rows, filterSummary: summary })
+    // Guard: a stalled lazy chunk (slow network / stale deploy) must not leave
+    // the dialog stuck on "Memproses…" forever.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('Ekspor terlalu lama. Muat ulang halaman lalu coba lagi.')),
+        EXPORT_TIMEOUT_MS
+      )
+    })
+    Promise.race([runExport(format, { title, filename, columns: activeColumns, rows, filterSummary: summary }), timeout])
+      .finally(() => clearTimeout(timer))
       .then(() => onClose())
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Gagal mengekspor data.'))
       .finally(() => setBusy(false))

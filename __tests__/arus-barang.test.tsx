@@ -132,6 +132,12 @@ jest.mock('@/hooks/useWMS', () => ({
   useDeleteDefaultLocation: () => ({ mutate: jest.fn() }),
   useBatchTrace: () => ({ data: null, isLoading: false }),
   useAuditTrail: () => ({ data: [], isLoading: false }),
+  useQCInspections: () => ({ data: [], isLoading: false }),
+  useReceiptQC: () => ({ data: null, isLoading: false }),
+  useSubmitQC: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useQuarantineStock: () => ({ data: [], isLoading: false }),
+  useReleaseQuarantine: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useScrapQuarantine: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }))
 
 jest.mock('@/hooks/useProducts', () => ({
@@ -165,15 +171,42 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
   })
 
   it('switches to KELUAR mode when toggle clicked', () => {
-    render(<ArusBarangPage />)
+    const { rerender } = render(<ArusBarangPage />)
     const keluarBtn = screen.getByRole('button', { name: /BARANG KELUAR/i })
     fireEvent.click(keluarBtn)
 
     expect(mockRouterReplace).toHaveBeenCalledWith('/wms/arus-barang?mode=keluar')
+    rerender(<ArusBarangPage />) // router.replace updates the search params
     expect(screen.getByRole('button', { name: /Surat Jalan \(DO\)/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Picking Wave/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Packing Station/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Manifest & Muat/i })).toBeInTheDocument()
+  })
+
+  // Regression (prod bug): ?mode=keluar must win over a stale localStorage "masuk".
+  it('URL ?mode=keluar overrides stale localStorage mode', () => {
+    localStorage.setItem('wms_arus_barang_mode', 'masuk')
+    currentMode = 'keluar'
+    render(<ArusBarangPage />)
+    expect(screen.getByRole('button', { name: /Surat Jalan \(DO\)/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Penerimaan \(GR\)/i })).not.toBeInTheDocument()
+    expect(mockRouterReplace).not.toHaveBeenCalled()
+    expect(localStorage.getItem('wms_arus_barang_mode')).toBe('keluar')
+  })
+
+  it('URL without mode falls back to localStorage via router.replace', () => {
+    localStorage.setItem('wms_arus_barang_mode', 'keluar')
+    currentMode = ''
+    render(<ArusBarangPage />)
+    expect(mockRouterReplace).toHaveBeenCalledWith('/wms/arus-barang?mode=keluar')
+  })
+
+  // Regression (prod bug): "Buat Surat Jalan" was a silent no-op.
+  it('Buat Surat Jalan button opens the create DO form', () => {
+    currentMode = 'keluar'
+    render(<ArusBarangPage />)
+    fireEvent.click(screen.getByRole('button', { name: /Buat Surat Jalan/i }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   it('switches to Putaway tab and displays pending lines in staging', () => {

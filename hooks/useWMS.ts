@@ -31,6 +31,11 @@ import {
   MarketplaceImportBatch,
   MarketplaceOrder,
   MarketplaceSKUMapping,
+  QCInspection,
+  QCInspectionDetail,
+  QCInspectionInput,
+  QuarantineActionInput,
+  QuarantineLine,
 } from "@/lib/api"
 
 /**
@@ -679,5 +684,82 @@ export function useAuditTrail(entityType?: string | null, entityId?: string | nu
       return res.data ?? []
     },
     enabled: !!entityType && !!entityId,
+  })
+}
+
+// -----------------------------------------------------------------------------
+// Sprint 2: QC & Karantina
+// -----------------------------------------------------------------------------
+
+function invalidateQC(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ["wms", "qc"] })
+  qc.invalidateQueries({ queryKey: ["wms", "quarantine"] })
+  qc.invalidateQueries({ queryKey: ["wms", "putaway", "pending"] })
+  qc.invalidateQueries({ queryKey: ["wms", "receipts"] })
+  qc.invalidateQueries({ queryKey: ["wms", "locations"] })
+  qc.invalidateQueries({ queryKey: ["wms", "stock"] })
+}
+
+export function useQCInspections(warehouseId?: string | null) {
+  return useQuery<QCInspection[]>({
+    queryKey: ["wms", "qc", "list", warehouseId],
+    queryFn: async () => {
+      if (!warehouseId) return []
+      const res = await api.wms.qc.list(warehouseId)
+      return res.data ?? []
+    },
+    enabled: !!warehouseId,
+  })
+}
+
+export function useReceiptQC(receiptId?: string | null) {
+  return useQuery<QCInspectionDetail | null>({
+    queryKey: ["wms", "qc", "receipt", receiptId],
+    queryFn: async () => {
+      if (!receiptId) return null
+      const res = await api.wms.qc.getByReceipt(receiptId)
+      return res.data ?? null
+    },
+    enabled: !!receiptId,
+  })
+}
+
+export function useSubmitQC() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ receiptId, input }: { receiptId: string; input: QCInspectionInput }) =>
+      api.wms.qc.submit(receiptId, input),
+    onSuccess: () => invalidateQC(qc),
+  })
+}
+
+export function useQuarantineStock(warehouseId?: string | null) {
+  return useQuery<QuarantineLine[]>({
+    queryKey: ["wms", "quarantine", warehouseId],
+    queryFn: async () => {
+      if (!warehouseId) return []
+      const res = await api.wms.qc.quarantine(warehouseId)
+      return res.data ?? []
+    },
+    enabled: !!warehouseId,
+  })
+}
+
+export function useReleaseQuarantine() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: QuarantineActionInput) => api.wms.qc.release(input),
+    onSuccess: () => invalidateQC(qc),
+  })
+}
+
+export function useScrapQuarantine() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: QuarantineActionInput) => api.wms.qc.scrap(input),
+    onSuccess: () => {
+      invalidateQC(qc)
+      qc.invalidateQueries({ queryKey: ["wms", "scraps"] })
+    },
   })
 }

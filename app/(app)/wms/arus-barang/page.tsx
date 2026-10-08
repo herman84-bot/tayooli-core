@@ -5,9 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
-  PackagePlus,
   Plus,
-  ScanLine,
   Trash2,
   X,
   CheckCircle2,
@@ -19,15 +17,8 @@ import {
   Layers,
   Settings,
   Search,
-  Filter,
-  Printer,
-  Calendar,
-  Clock,
   Warehouse,
-  ShieldCheck,
-  Send,
   Boxes,
-  FileText,
   BadgeAlert,
   ClipboardList,
 } from "lucide-react"
@@ -37,32 +28,23 @@ import {
   useStockReceipts,
   useStockReceipt,
   useCreateStockReceipt,
-  useUpdateStockReceipt,
   usePostStockReceipt,
   useCancelStockReceipt,
   useReleaseStockReceipt,
-  useDeliveryOrders,
-  useCreateDeliveryOrder,
-  useDispatchDeliveryOrder,
 } from "@/hooks/useWMS"
 import { useProducts } from "@/hooks/useProducts"
-import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 import {
-  api,
-  Product,
   StockReceipt,
   StockReceiptInput,
   StockReceiptStatus,
   StockReceiptType,
-  DeliveryOrder,
-  DeliveryOrderItem,
-  DeliveryOrderStatus,
 } from "@/lib/api"
 import { PutawayView } from "@/components/wms/PutawayView"
 import { TraceBatchView } from "@/components/wms/TraceBatchView"
 import { WMSSettingsModal } from "@/components/wms/WMSSettingsModal"
-import { PrintDeliveryOrder } from "@/components/wms/PrintDeliveryOrder"
+import { QCQuarantineView } from "@/components/wms/QCQuarantineView"
+import DeliveryOrdersPanel from "@/components/wms/DeliveryOrdersPanel"
 
 // ---------------------------------------------------------------------------
 // Helpers & Badges
@@ -162,7 +144,11 @@ export default function ArusBarangPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [mode, setMode] = useState<Mode>("masuk")
+  // URL ?mode= is the single source of truth (reactive). localStorage is only
+  // a fallback when the URL carries no mode, and is applied via router.replace
+  // so URL and UI can never diverge.
+  const urlMode = searchParams.get("mode")?.toLowerCase()
+  const mode: Mode = urlMode === "keluar" ? "keluar" : "masuk"
   const [masukTab, setMasukTab] = useState<MasukTab>("penerimaan")
   const [keluarTab, setKeluarTab] = useState<KeluarTab>("surat_jalan")
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("")
@@ -170,19 +156,14 @@ export default function ArusBarangPage() {
 
   const { data: warehouses = [] } = useWarehouses()
 
-  // Initialize mode from URL or localStorage
   useEffect(() => {
-    const urlMode = searchParams.get("mode")?.toLowerCase()
     if (urlMode === "masuk" || urlMode === "keluar") {
-      setMode(urlMode as Mode)
       localStorage.setItem("wms_arus_barang_mode", urlMode)
       return
     }
     const saved = localStorage.getItem("wms_arus_barang_mode")
-    if (saved === "masuk" || saved === "keluar") {
-      setMode(saved as Mode)
-    }
-  }, [searchParams])
+    router.replace(`/wms/arus-barang?mode=${saved === "keluar" ? "keluar" : "masuk"}`)
+  }, [urlMode, router])
 
   // Select default warehouse if available
   useEffect(() => {
@@ -192,7 +173,6 @@ export default function ArusBarangPage() {
   }, [warehouses, selectedWarehouseId])
 
   const switchMode = (newMode: Mode) => {
-    setMode(newMode)
     localStorage.setItem("wms_arus_barang_mode", newMode)
     router.replace(`/wms/arus-barang?mode=${newMode}`)
   }
@@ -369,21 +349,12 @@ export default function ArusBarangPage() {
             <PutawayView warehouseId={selectedWarehouseId} />
           )}
           {masukTab === "trace" && <TraceBatchView />}
-          {masukTab === "qc" && (
-            <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-400">
-              <ShieldCheck className="mx-auto h-12 w-12 text-slate-300 mb-2" />
-              <h3 className="text-base font-semibold text-slate-800">Modul QC & Karantina (Sprint 2)</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Fitur inspeksi sampling/full inspection (PDF-02) dan isolasi barang rusak ke area Karantina akan
-                diaktifkan penuh pada Sprint 2. Barang rusak saat ini otomatis dicatat ke lokasi sistem SCRAP.
-              </p>
-            </div>
-          )}
+          {masukTab === "qc" && <QCQuarantineView warehouseId={selectedWarehouseId} />}
         </div>
       ) : (
         <div>
           {keluarTab === "surat_jalan" && (
-            <OutboundDeliveryOrdersSubView warehouseId={selectedWarehouseId} />
+            <DeliveryOrdersPanel embedded />
           )}
           {keluarTab === "picking" && (
             <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-400">
@@ -1328,253 +1299,3 @@ function InboundReceiptDetail({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Outbound Delivery Orders Sub-View (Barang Keluar)
-// ---------------------------------------------------------------------------
-
-function OutboundDeliveryOrdersSubView({ warehouseId }: { warehouseId: string }) {
-  const { data: deliveryOrders = [], isLoading, refetch } = useDeliveryOrders(warehouseId || null)
-  const { data: warehouses = [] } = useWarehouses()
-  const { data: products = [] } = useProducts()
-  const { data: locations = [] } = useWarehouseLocations(warehouseId || null)
-  const createMut = useCreateDeliveryOrder()
-  const dispatchMut = useDispatchDeliveryOrder()
-
-  const [selectedDoForPrint, setSelectedDoForPrint] = useState<DeliveryOrder | null>(null)
-  const [printItems, setPrintItems] = useState<DeliveryOrderItem[]>([])
-  const [orderToDispatch, setOrderToDispatch] = useState<DeliveryOrder | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [doNumber, setDoNumber] = useState("")
-  const [salesOrderId, setSalesOrderId] = useState("")
-  const [expeditionName, setExpeditionName] = useState("")
-  const [trackingNumber, setTrackingNumber] = useState("")
-  const [driverName, setDriverName] = useState("")
-  const [vehiclePlate, setVehiclePlate] = useState("")
-  const [recipientName, setRecipientName] = useState("")
-  const [lineItems, setLineItems] = useState<
-    Array<{
-      productId: string
-      productName: string
-      sku: string
-      quantity: number
-      locationId: string
-    }>
-  >([])
-  const [modalError, setModalError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null)
-
-  const internalRacks = locations.filter((l) => l.type === "INTERNAL")
-
-  const handleOpenPrint = async (order: DeliveryOrder) => {
-    try {
-      const res = await api.wms.deliveryOrders.get(order.id)
-      setSelectedDoForPrint(res.delivery_order)
-      setPrintItems(res.items ?? [])
-    } catch (e) {
-      setToast({ type: "error", msg: "Gagal memuat rincian Surat Jalan untuk dicetak" })
-    }
-  }
-
-  const handleDispatch = async () => {
-    if (!orderToDispatch) return
-    setIsSubmitting(true)
-    try {
-      await dispatchMut.mutateAsync(orderToDispatch.id)
-      setOrderToDispatch(null)
-      setToast({
-        type: "success",
-        msg: `Surat Jalan ${orderToDispatch.do_number} berhasil dikirim! Alokasi FEFO mutasi stok selesai.`,
-      })
-      refetch()
-    } catch (e) {
-      setToast({ type: "error", msg: errMsg(e) })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleCreateDO = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setModalError(null)
-    if (!warehouseId) {
-      setModalError("Pilih gudang asal pengiriman.")
-      return
-    }
-    if (lineItems.length === 0) {
-      setModalError("Tambahkan minimal 1 item barang yang akan dikirim.")
-      return
-    }
-
-    setIsSubmitting(true)
-    try {
-      const generatedDoNumber = doNumber.trim() || `SJ-${Date.now().toString().slice(-6)}`
-      await createMut.mutateAsync({
-        warehouse_id: warehouseId,
-        sales_order_id: salesOrderId.trim() || undefined,
-        do_number: generatedDoNumber,
-        expedition_name: expeditionName.trim() || undefined,
-        tracking_number: trackingNumber.trim() || undefined,
-        driver_name: driverName.trim() || undefined,
-        vehicle_plate: vehiclePlate.trim() || undefined,
-        recipient_name: recipientName.trim() || undefined,
-        items: lineItems.map((it) => ({
-          product_id: it.productId,
-          quantity: it.quantity,
-          location_id: it.locationId,
-        })),
-      })
-      setShowCreateModal(false)
-      setLineItems([])
-      setToast({ type: "success", msg: "Surat Jalan (DO) berhasil dibuat!" })
-      refetch()
-    } catch (e) {
-      setModalError(errMsg(e))
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      {toast && (
-        <div
-          className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-xs ${
-            toast.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
-          }`}
-        >
-          {toast.type === "success" ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-          ) : (
-            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
-          )}
-          <span>{toast.msg}</span>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-800">Daftar Surat Jalan (Delivery Orders)</h3>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 rounded-lg shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          Buat Surat Jalan
-        </button>
-      </div>
-
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-xs uppercase tracking-wider">
-            <tr>
-              <th className="px-4 py-3">No. Surat Jalan</th>
-              <th className="px-4 py-3">Penerima</th>
-              <th className="px-4 py-3">Ekspedisi / Kurir</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Tanggal Terbit</th>
-              <th className="px-4 py-3 text-center">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 text-xs">
-            {isLoading ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
-                  Memuat data Surat Jalan...
-                </td>
-              </tr>
-            ) : deliveryOrders.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
-                  Belum ada Surat Jalan (DO) di gudang ini.
-                </td>
-              </tr>
-            ) : (
-              deliveryOrders.map((d) => (
-                <tr key={d.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 font-mono font-semibold text-slate-900">{d.do_number}</td>
-                  <td className="px-4 py-3 font-medium text-slate-800">{d.recipient_name || "-"}</td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {d.expedition_name ? `${d.expedition_name} (${d.tracking_number || "-"})` : "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                        d.status === "SHIPPED"
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : d.status === "CONFIRMED"
-                          ? "bg-blue-50 text-blue-700 border border-blue-200"
-                          : "bg-amber-50 text-amber-700 border border-amber-200"
-                      }`}
-                    >
-                      {d.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{fmtDate(d.created_at)}</td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="inline-flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleOpenPrint(d)}
-                        className="p-1 text-slate-600 hover:text-slate-900 rounded"
-                        title="Cetak Surat Jalan"
-                      >
-                        <Printer className="h-4 w-4" />
-                      </button>
-                      {d.status === "DRAFT" && (
-                        <button
-                          onClick={() => setOrderToDispatch(d)}
-                          className="px-2.5 py-1 text-[11px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded"
-                        >
-                          Kirim (Dispatch)
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Print DO Modal */}
-      {selectedDoForPrint && (
-        <PrintDeliveryOrder
-          deliveryOrder={selectedDoForPrint}
-          items={printItems}
-          warehouseName={warehouses.find((w) => w.id === selectedDoForPrint.warehouse_id)?.name || "Gudang Utama"}
-          onClose={() => setSelectedDoForPrint(null)}
-        />
-      )}
-
-      {/* Dispatch Confirmation Modal */}
-      {orderToDispatch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl border border-slate-200 space-y-4">
-            <h3 className="text-base font-semibold text-slate-900">Konfirmasi Pengiriman Surat Jalan</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Mengirim Surat Jalan <strong>{orderToDispatch.do_number}</strong> akan otomatis memotong stok barang
-              dari rak internal menggunakan aturan <strong>FEFO (First-Expired-First-Out)</strong> per batch.
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setOrderToDispatch(null)}
-                className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 rounded-md"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleDispatch}
-                disabled={isSubmitting}
-                className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md disabled:opacity-50"
-              >
-                {isSubmitting ? "Mengirim..." : "Kirim Sekarang"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}

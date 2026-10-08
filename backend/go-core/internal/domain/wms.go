@@ -589,6 +589,7 @@ type MarketplaceOrderItem struct {
 // WMSRepository defines database operations for WMS entities.
 type WMSRepository interface {
 	WMSBatchRepository
+	WMSQCRepository
 
 	// Regional
 	CreateRegional(ctx context.Context, r *Regional) error

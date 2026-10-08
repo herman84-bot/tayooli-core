@@ -539,13 +539,13 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [ ] **DEPLOY-01:** Push commit, pastikan GitHub Actions CI lulus, dan verifikasi deploy di Zeabur.
 
 ### SPRINT 2: Kontrol Mutu (QC Inbound), Karantina & Dokumen Kerusakan (BAK)
-- [ ] **DB-02:** Buat migrasi SQL `034_wms_putaway_and_qc_inspections.sql` (tabel `qc_inspections` & `putaway_tasks`).
-- [ ] **BE-04:** Endpoint submit QC Inbound dengan perhitungan selisih (*shortage/overage*) dan barang rusak.
-- [ ] **BE-05:** Mutasi barang rusak otomatis dialokasikan ke lokasi `@QUARANTINE` bukan langsung `@SCRAP`.
-- [ ] **FE-04:** Halaman khusus `/wms/inbound/qc` untuk pemeriksaan mutu per SKU (Blind Count & Expire Date).
-- [ ] **FE-05:** Komponen cetak dokumen resmi Berita Acara Kerusakan (BAK) berformat A4 dengan bukti foto cacat.
-- [ ] **PDF-02:** Mode inspeksi QC `FULL`/`SAMPLING` + `sample_qty`, default per kategori; sampel gagal → wajib FULL.
-- [ ] **TEST-02:** Pengujian Go untuk isolasi stok karantina dan pembuatan dokumen BAK.
+- [x] **DB-02:** Migrasi `034_wms_qc_inspections_quarantine.sql`: `qc_inspections` (+ kolom BAK, sopir, selisih) & `qc_inspection_items`, FORCE RLS. *Catatan:* tabel `putaway_tasks` TIDAK dibuat; putaway tetap memakai alur ledger langsung Sprint 1 (`POST /wms/putaway/confirm`).
+- [x] **BE-04:** `POST /wms/receipts/{id}/qc` menghitung shortage/overage per batch + rusak; status `QC_PASSED`/`QUARANTINED`/`QC_REJECTED` (`PENDING_QC` = receipt POSTED tanpa inspeksi). Receipt dikunci `FOR UPDATE`, satu inspeksi per receipt.
+- [x] **BE-05:** Qty rusak dipindah STG-IN → bin `QRN` (tipe `QUARANTINE`) per gudang, bukan `@SCRAP`. Stok karantina diblokir dari DO/transfer/POS/opname (`ErrQuarantineStockBlocked`); keluar hanya via `POST /wms/quarantine/release` (→ STG-IN) atau `/wms/quarantine/scrap` (→ `@SCRAP`, catatan wajib).
+- [x] **FE-04:** Tab "QC & Karantina" di `/wms/arus-barang?mode=masuk` (bukan route terpisah, sesuai KO-2): inspeksi blind count, mode, gross cartons, alasan rusak; daftar stok karantina dengan Rilis / Musnahkan. *Belum:* input ulang expiry date saat QC (expiry tetap dari penerimaan).
+- [~] **FE-05:** `PrintBAK.tsx` A4 (nomor `BAK-<GR>`, petugas QC, sopir, tanda tangan). *Belum:* lampiran bukti foto cacat.
+- [~] **PDF-02:** Mode `FULL`/`SAMPLING` + `sample_qty`; sampel gagal → wajib FULL (ditolak server & UI). *Belum:* default mode per kategori.
+- [x] **TEST-02:** Go unit (`EvaluateQC`, usecase, handler) + integrasi PG15 `TestQCQuarantineRealPostgres` (isolasi karantina, BAK, double-submit konkuren, RLS, atomisitas).
 - [ ] **DEPLOY-02:** Push commit, verifikasi CI dan produksi Zeabur.
 
 ### SPRINT 3: Alur Outbound Inti (Picking FEFO, Meja Kemas QC 100% Scan & Resi Termal AWB)

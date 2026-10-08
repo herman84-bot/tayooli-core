@@ -746,6 +746,89 @@ export interface StockReceiptDetailResponse {
   items: StockReceiptItem[]
 }
 
+// --- Sprint 2: QC & Karantina ---------------------------------------------
+export type QCInspectionMode = "FULL" | "SAMPLING"
+export type QCInspectionStatus = "QC_PASSED" | "QUARANTINED" | "QC_REJECTED"
+
+export interface QCInspection {
+  id: string
+  receipt_id: string
+  receipt_number: string
+  warehouse_id: string
+  inspection_mode: QCInspectionMode
+  sample_qty?: string | null
+  gross_cartons: number
+  status: QCInspectionStatus
+  total_checked_qty: string
+  total_passed_qty: string
+  total_damaged_qty: string
+  shortage_qty: string
+  overage_qty: string
+  bak_number?: string | null
+  bak_notes?: string | null
+  driver_name?: string | null
+  driver_signed: boolean
+  notes?: string | null
+  inspector_id: string
+  inspector_name: string
+  supplier_name: string
+  created_at: string
+}
+
+export interface QCInspectionItem {
+  id: string
+  product_id: string
+  product_name: string
+  product_sku: string
+  batch_id: string
+  batch_number: string
+  expiry_date?: string | null
+  staged_qty: string
+  checked_qty: string
+  passed_qty: string
+  damaged_qty: string
+  shortage_qty: string
+  overage_qty: string
+  damage_reason?: string | null
+}
+
+export interface QCInspectionDetail {
+  inspection: QCInspection
+  items: QCInspectionItem[]
+}
+
+export interface QCInspectionInput {
+  inspection_mode: QCInspectionMode
+  sample_qty?: number
+  gross_cartons: number
+  driver_name?: string
+  driver_signed: boolean
+  bak_notes?: string
+  notes?: string
+  items: { batch_id: string; checked_qty: number; damaged_qty: number; damage_reason?: string }[]
+}
+
+export interface QuarantineLine {
+  batch_id: string
+  batch_number: string
+  expiry_date?: string | null
+  status: string
+  location_id: string
+  location_code: string
+  product_id: string
+  product_name?: string
+  product_sku?: string
+  quantity: string
+}
+
+export interface QuarantineActionInput {
+  warehouse_id: string
+  product_id: string
+  batch_id: string
+  quantity: number
+  notes?: string
+}
+
 export interface PutawayPendingLine {
   product_id: string
   product_name?: string
@@ -1236,6 +1319,29 @@ export const api = {
         request<{ data: unknown }>("/wms/putaway/confirm", {
           method: "POST",
           body: JSON.stringify(data),
+        }),
+    },
+    qc: {
+      getByReceipt: (receiptId: string) =>
+        request<{ data: QCInspectionDetail | null }>(`/wms/receipts/${receiptId}/qc`),
+      submit: (receiptId: string, input: QCInspectionInput) =>
+        request<{ data: QCInspectionDetail }>(`/wms/receipts/${receiptId}/qc`, {
+          method: "POST",
+          body: JSON.stringify(input),
+        }),
+      list: (warehouseId: string) =>
+        request<{ data: QCInspection[] }>(`/wms/qc-inspections?warehouse_id=${encodeURIComponent(warehouseId)}`),
+      quarantine: (warehouseId: string) =>
+        request<{ data: QuarantineLine[] }>(`/wms/quarantine?warehouse_id=${encodeURIComponent(warehouseId)}`),
+      release: (input: QuarantineActionInput) =>
+        request<{ data: StockMovement }>("/wms/quarantine/release", {
+          method: "POST",
+          body: JSON.stringify(input),
+        }),
+      scrap: (input: QuarantineActionInput) =>
+        request<{ data: StockMovement }>("/wms/quarantine/scrap", {
+          method: "POST",
+          body: JSON.stringify(input),
         }),
     },
     settings: {

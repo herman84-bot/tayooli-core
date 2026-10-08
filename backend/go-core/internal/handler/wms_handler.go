@@ -88,6 +88,12 @@ type WMSUsecase interface {
 	// Sprint 1: Putaway, Release, Settings, Default Locations, Trace
 	GetPutawayPending(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID) ([]domain.PutawayPendingLine, error)
 	ConfirmPutaway(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.PutawayRequest) (*domain.StockMovement, error)
+	SubmitQCInspection(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID, in domain.QCInspectionInput) (*domain.QCInspectionDetail, error)
+	GetReceiptQC(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.QCInspectionDetail, error)
+	ListQCInspections(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID) ([]domain.QCInspection, error)
+	ListQuarantineStock(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID) ([]domain.BatchBalance, error)
+	ReleaseQuarantine(ctx context.Context, tenantID, userID uuid.UUID, role string, in domain.QuarantineActionInput) (*domain.StockMovement, error)
+	ScrapQuarantine(ctx context.Context, tenantID, userID uuid.UUID, role string, in domain.QuarantineActionInput) (*domain.StockMovement, error)
 	ReleaseStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, error)
 	GetWMSSettings(ctx context.Context, tenantID, userID uuid.UUID, role string) (*domain.WMSSettings, error)
 	UpdateWMSSettings(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.UpdateWMSSettingsRequest) (*domain.WMSSettings, error)
@@ -153,6 +159,14 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Get("/putaway/pending", h.GetPutawayPending)
 		r.Post("/putaway/confirm", h.ConfirmPutaway)
 
+		// QC Inbound & Karantina (Sprint 2, ADR-014 Invariant 3)
+		r.Get("/receipts/{id}/qc", h.GetReceiptQC)
+		r.Post("/receipts/{id}/qc", h.SubmitQCInspection)
+		r.Get("/qc-inspections", h.ListQCInspections)
+		r.Get("/quarantine", h.ListQuarantineStock)
+		r.Post("/quarantine/release", h.ReleaseQuarantine)
+		r.Post("/quarantine/scrap", h.ScrapQuarantine)
+
 		// WMS Settings (PDF-06)
 		r.Get("/settings", h.GetWMSSettings)
 		r.Put("/settings", h.UpdateWMSSettings)
@@ -208,6 +222,22 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusBadRequest, "Penerimaan barang tidak memiliki lot yang berstatus ON_HOLD")
 	case errors.Is(err, domain.ErrBatchOnHold):
 		RespondError(w, r, http.StatusConflict, "Batch/Lot berstatus ON_HOLD dan belum disetujui untuk rilis")
+	case errors.Is(err, domain.ErrQCAlreadyInspected):
+		RespondError(w, r, http.StatusConflict, "Penerimaan ini sudah diinspeksi QC")
+	case errors.Is(err, domain.ErrQCReceiptNotPosted):
+		RespondError(w, r, http.StatusConflict, "Hanya penerimaan berstatus POSTED yang bisa diinspeksi QC")
+	case errors.Is(err, domain.ErrQCSamplingFailed):
+		RespondError(w, r, http.StatusUnprocessableEntity, "Sampel gagal: wajib ulangi dengan inspeksi FULL")
+	case errors.Is(err, domain.ErrQCBAKDriverRequired):
+		RespondError(w, r, http.StatusBadRequest, "Barang rusak wajib dibuatkan BAK: isi nama sopir dan konfirmasi tanda tangan sopir")
+	case errors.Is(err, domain.ErrQCStagedQtyChanged):
+		RespondError(w, r, http.StatusConflict, "Jumlah rusak melebihi stok yang masih di staging (sebagian mungkin sudah di-putaway)")
+	case errors.Is(err, domain.ErrQuarantineQtyInvalid):
+		RespondError(w, r, http.StatusConflict, "Jumlah melebihi stok karantina batch ini")
+	case errors.Is(err, domain.ErrQuarantineStockBlocked):
+		RespondError(w, r, http.StatusConflict, "Stok di area karantina tidak bisa diambil, dijual, atau dipindahkan. Gunakan menu QC & Karantina untuk rilis atau musnahkan.")
+	case errors.Is(err, domain.ErrScrapNotesRequired):
+		RespondError(w, r, http.StatusBadRequest, "Catatan wajib diisi untuk memusnahkan stok karantina")
 	case errors.Is(err, domain.ErrBatchRequired):
 		RespondError(w, r, http.StatusBadRequest, "Batch ID wajib dicantumkan pada setiap mutasi barang")
 	case errors.Is(err, domain.ErrConflict):
