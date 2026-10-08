@@ -172,6 +172,10 @@ export const DashboardSummarySchema = z.object({
   // .default keeps the UI working against a backend deployed before these fields existed.
   sales_orders: SalesOrderStatsSchema.default(EMPTY_SALES_ORDERS),
   outbound: OutboundStatsSchema.default(EMPTY_OUTBOUND),
+  outbound_qty_today: amountString.default('0'),
+  outbound_qty_month: amountString.default('0'),
+  top_outbound_products: z.array(TopOutboundProductSchema).default([]),
+  top_customers: z.array(TopCustomerSchema).default([]),
   financial_overview: FinancialOverviewSchema.default(EMPTY_FINANCIAL),
 })
 export type DashboardSummary = z.infer<typeof DashboardSummarySchema>
@@ -195,5 +199,9 @@ export const EMPTY_DASHBOARD_SUMMARY: DashboardSummary = {
   sales_invoices: { total_invoiced: '0', paid_amount: '0', accounts_receivable: '0', total_count: 0 },
   sales_orders: EMPTY_SALES_ORDERS,
   outbound: EMPTY_OUTBOUND,
+  outbound_qty_today: '0',
+  outbound_qty_month: '0',
+  top_outbound_products: [],
+  top_customers: [],
   financial_overview: EMPTY_FINANCIAL,
 }

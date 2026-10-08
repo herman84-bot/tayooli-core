@@ -167,12 +167,40 @@ ORDER BY total_qty DESC
 LIMIT 10`
 
 const dashboardTopCustomers = `
-SELECT c.id, c.name, COUNT(*), COALESCE(SUM(so.total_amount), 0)
-FROM sales_orders so
-JOIN customers c ON c.id = so.customer_id AND c.tenant_id = so.tenant_id
-WHERE so.tenant_id = $1 AND so.created_at >= NOW() - ($2 || ' days')::interval
+WITH combined_customer_orders AS (
+    SELECT 
+        d.customer_id,
+        d.id AS order_id,
+        d.tenant_id,
+        d.created_at,
+        SUM(doi.quantity * COALESCE(p.price, 0)) AS revenue
+    FROM delivery_orders d
+    JOIN delivery_order_items doi ON doi.delivery_order_id = d.id AND doi.tenant_id = d.tenant_id
+    LEFT JOIN products p ON p.id = doi.product_id AND p.tenant_id = doi.tenant_id
+    WHERE d.customer_id IS NOT NULL
+    GROUP BY d.customer_id, d.id, d.tenant_id, d.created_at
+    UNION ALL
+    SELECT 
+        so.customer_id,
+        so.id AS order_id,
+        so.tenant_id,
+        so.created_at,
+        so.total_amount AS revenue
+    FROM sales_orders so
+    WHERE so.customer_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM delivery_orders d2 WHERE d2.sales_order_id = so.id)
+)
+SELECT 
+    c.id, 
+    c.name, 
+    COUNT(DISTINCT co.order_id) AS order_count, 
+    COALESCE(SUM(co.revenue), 0) AS total_revenue
+FROM combined_customer_orders co
+JOIN customers c ON c.id = co.customer_id AND c.tenant_id = co.tenant_id
+WHERE co.tenant_id = $1 
+  AND co.created_at >= NOW() - ($2 || ' days')::interval
 GROUP BY c.id, c.name
-ORDER BY SUM(so.total_amount) DESC
+ORDER BY total_revenue DESC, order_count DESC
 LIMIT 10`
 
 // ── GetSummary ───────────────────────────────────────────────────────────────

@@ -221,6 +221,16 @@ func TestGetSummary_ExposesCrossModuleSections(t *testing.T) {
 	s.WMS.TotalStockValue = decimal.NewFromInt(9_278_000)
 	s.POS.AverageBasketSize = decimal.NewFromInt(43_540)
 	s.SalesOrders = domain.SalesOrderDashStats{Total: 3, Confirmed: 2, Pending: 1}
+	s.Outbound = domain.OutboundDashStats{
+		QtyToday: decimal.NewFromInt(150),
+		QtyMonth: decimal.NewFromInt(4500),
+		TopProducts: []domain.TopOutboundProduct{
+			{ProductID: uuid.New(), ProductName: "Beras Premium", ProductSKU: "BRS-01", Quantity: decimal.NewFromInt(120)},
+		},
+		TopCustomers: []domain.TopCustomer{
+			{CustomerName: "PT Mitra Jaya", OrderCount: 5, TotalRevenue: decimal.NewFromInt(25_000_000)},
+		},
+	}
 	s.Financial = domain.FinancialOverview{
 		TotalRevenue:   decimal.NewFromInt(3_087_080),
 		NetCashBalance: decimal.NewFromInt(-1_412_920),
@@ -229,15 +239,20 @@ func TestGetSummary_ExposesCrossModuleSections(t *testing.T) {
 		getSummaryFn: func(context.Context, uuid.UUID, int) (*domain.DashboardSummary, error) { return s, nil },
 	})
 	rr := httptest.NewRecorder()
-	h.GetSummary(rr, withTenant(httptest.NewRequest(http.MethodGet, "/api/v1/dashboard/summary", nil), uuid.New()))
+	h.GetSummary(rr, withTenant(httptest.NewRequest(http.MethodGet, "/api/v1/dashboard/summary?period=7d", nil), uuid.New()))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var body struct {
-		Financial map[string]any `json:"financial_overview"`
-		Sales     map[string]any `json:"sales_orders"`
-		POS       map[string]any `json:"pos"`
-		WMS       map[string]any `json:"wms"`
+		Financial           map[string]any   `json:"financial_overview"`
+		Sales               map[string]any   `json:"sales_orders"`
+		POS                 map[string]any   `json:"pos"`
+		WMS                 map[string]any   `json:"wms"`
+		Outbound            map[string]any   `json:"outbound"`
+		OutboundQtyToday    string           `json:"outbound_qty_today"`
+		OutboundQtyMonth    string           `json:"outbound_qty_month"`
+		TopOutboundProducts []map[string]any `json:"top_outbound_products"`
+		TopCustomers        []map[string]any `json:"top_customers"`
 	}
 	if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -253,6 +268,15 @@ func TestGetSummary_ExposesCrossModuleSections(t *testing.T) {
 	}
 	if body.WMS["total_stock_value"] != "9278000" {
 		t.Errorf("total_stock_value wrong: %v", body.WMS["total_stock_value"])
+	}
+	if body.OutboundQtyToday != "150" || body.OutboundQtyMonth != "4500" {
+		t.Errorf("outbound qty aliases wrong: today=%s, month=%s", body.OutboundQtyToday, body.OutboundQtyMonth)
+	}
+	if len(body.TopOutboundProducts) != 1 || body.TopOutboundProducts[0]["product_sku"] != "BRS-01" {
+		t.Errorf("top_outbound_products wrong: %v", body.TopOutboundProducts)
+	}
+	if len(body.TopCustomers) != 1 || body.TopCustomers[0]["customer_name"] != "PT Mitra Jaya" {
+		t.Errorf("top_customers wrong: %v", body.TopCustomers)
 	}
 }
 

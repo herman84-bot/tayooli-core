@@ -168,7 +168,14 @@ type dashboardSummaryView struct {
 	SalesInvoices  salesInvoiceStatsView `json:"sales_invoices"`
 	SalesOrders    salesOrderStatsView   `json:"sales_orders"`
 	Outbound       outboundStatsView     `json:"outbound"`
-	Financial      financialOverviewView `json:"financial_overview"`
+
+	// Direct CR-04a root aliases
+	OutboundQtyToday    string                   `json:"outbound_qty_today"`
+	OutboundQtyMonth    string                   `json:"outbound_qty_month"`
+	TopOutboundProducts []topOutboundProductView `json:"top_outbound_products"`
+	TopCustomers        []topCustomerView        `json:"top_customers"`
+
+	Financial financialOverviewView `json:"financial_overview"`
 }
 
 func toDashboardSummaryView(s *domain.DashboardSummary) dashboardSummaryView {
@@ -298,6 +305,12 @@ func toDashboardSummaryView(s *domain.DashboardSummary) dashboardSummaryView {
 		}
 	}
 
+	// Direct CR-04a root fields
+	v.OutboundQtyToday = v.Outbound.QtyToday
+	v.OutboundQtyMonth = v.Outbound.QtyMonth
+	v.TopOutboundProducts = v.Outbound.TopProducts
+	v.TopCustomers = v.Outbound.TopCustomers
+
 	f := s.Financial
 	v.Financial = financialOverviewView{
 		TotalRevenue:       f.TotalRevenue.String(),
@@ -324,10 +337,13 @@ func (h *DashboardHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	days := 30
 	period := r.URL.Query().Get("period")
-	if period == "7d" {
+	daysParam := r.URL.Query().Get("days")
+	if period == "7d" || daysParam == "7" {
 		days = 7
-	} else if period == "90d" {
+	} else if period == "90d" || daysParam == "90" {
 		days = 90
+	} else if period == "30d" || daysParam == "30" {
+		days = 30
 	}
 
 	summary, err := h.uc.GetSummary(r.Context(), tenantID, days)

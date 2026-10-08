@@ -1629,7 +1629,8 @@ FROM delivery_order_items doi
 LEFT JOIN products p ON p.id = doi.product_id AND p.tenant_id = doi.tenant_id
 LEFT JOIN warehouse_locations wl ON wl.id = doi.location_id AND wl.tenant_id = doi.tenant_id
 LEFT JOIN stock_batches sb ON sb.id = doi.batch_id AND sb.tenant_id = doi.tenant_id
-WHERE doi.delivery_order_id = $1 AND doi.tenant_id = $2`
+WHERE doi.delivery_order_id = $1 AND doi.tenant_id = $2
+ORDER BY sb.expiry_date ASC NULLS LAST, doi.created_at ASC, doi.id ASC`
 
 func (r *WMSRepo) GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.DeliveryOrder, []domain.DeliveryOrderItem, error) {
 	tx, err := r.db.BeginTx(ctx, nil)

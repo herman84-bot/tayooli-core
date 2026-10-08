@@ -33,6 +33,38 @@ describe('DashboardSummarySchema', () => {
     expect(parsed.wms.total_stock_value).toBe('9278000')
   })
 
+  it('parses CR-04a outbound metrics and root aliases', () => {
+    const parsed = DashboardSummarySchema.parse({
+      ...legacyPayload,
+      outbound: {
+        qty_today: '150',
+        qty_month: '4500',
+        top_products: [
+          { product_id: 'p-1', product_name: 'Beras Premium', product_sku: 'BRS-01', quantity: '120' },
+        ],
+        top_customers: [
+          { customer_id: 'c-1', customer_name: 'PT Mitra Jaya', order_count: 5, total_revenue: '25000000' },
+        ],
+      },
+      outbound_qty_today: '150',
+      outbound_qty_month: '4500',
+      top_outbound_products: [
+        { product_id: 'p-1', product_name: 'Beras Premium', product_sku: 'BRS-01', quantity: '120' },
+      ],
+      top_customers: [
+        { customer_id: 'c-1', customer_name: 'PT Mitra Jaya', order_count: 5, total_revenue: '25000000' },
+      ],
+    })
+    expect(parsed.outbound.qty_today).toBe('150')
+    expect(parsed.outbound.qty_month).toBe('4500')
+    expect(parsed.outbound.top_products).toHaveLength(1)
+    expect(parsed.outbound.top_customers).toHaveLength(1)
+    expect(parsed.outbound_qty_today).toBe('150')
+    expect(parsed.outbound_qty_month).toBe('4500')
+    expect(parsed.top_outbound_products[0].product_sku).toBe('BRS-01')
+    expect(parsed.top_customers[0].customer_name).toBe('PT Mitra Jaya')
+  })
+
   it('stays backward compatible with an older backend payload (no crash, zero defaults)', () => {
     const parsed = DashboardSummarySchema.parse(legacyPayload)
     expect(parsed.financial_overview.total_revenue).toBe('0')
