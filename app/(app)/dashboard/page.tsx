@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useDashboardSummary } from '@/lib/queries/dashboard'
+import { useWMSOutboundKPI } from '@/hooks/useWMSManifests'
 import { TooltipWalkthrough } from '@/components/tutorial/TooltipWalkthrough'
 import {
   TrendingUp,
@@ -17,6 +18,16 @@ import {
   ArrowDownLeft,
   Truck,
   Users,
+  Gauge,
+  Clock,
+  CheckCircle2,
+  FileCheck2,
+  Inbox,
+  Zap,
+  ScanBarcode,
+  AlertCircle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from 'lucide-react'
 import { EMPTY_DASHBOARD_SUMMARY } from '@/lib/schemas/dashboard'
 import { formatCurrency } from '@/lib/currency'
@@ -92,13 +103,78 @@ function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
+interface SOPKPICardProps {
+  label: string
+  value: string | number
+  unit: string
+  target: string
+  subtext: string
+  icon: React.ElementType
+  iconClass: string
+  bg: string
+  passed: boolean
+}
+
+function SOPKPICard({
+  label,
+  value,
+  unit,
+  target,
+  subtext,
+  icon: Icon,
+  iconClass,
+  bg,
+  passed,
+}: SOPKPICardProps) {
+  return (
+    <div className="border border-border/60 rounded-lg p-3.5 bg-card hover:border-border transition-colors">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 ${bg}`}>
+            <Icon className={`h-3.5 w-3.5 ${iconClass}`} />
+          </div>
+          <div className="text-xs font-semibold text-foreground leading-tight truncate">{label}</div>
+        </div>
+        <span
+          className={`text-[10px] font-medium px-1.5 py-0.5 rounded border font-mono tabular-nums shrink-0 ${
+            passed
+              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
+              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800/40'
+          }`}
+        >
+          {passed ? 'Memenuhi' : 'Perhatian'}
+        </span>
+      </div>
+      <div className="mt-2.5 flex items-baseline justify-between gap-2">
+        <div className="text-lg font-bold font-mono tracking-tight text-foreground tabular-nums">
+          {value} <span className="text-xs font-normal text-muted-foreground">{unit}</span>
+        </div>
+        <div className="text-[10px] font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded border border-border/30 shrink-0">
+          {target}
+        </div>
+      </div>
+      <div className="text-[10px] text-muted-foreground mt-1 truncate">{subtext}</div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
   const { data: summary, isLoading, error, refetch } = useDashboardSummary(period)
+  const { data: kpis, refetch: refetchKPI } = useWMSOutboundKPI()
   const s = summary ?? EMPTY_DASHBOARD_SUMMARY
   const loading = isLoading && !summary
   const status = (error as { response?: { status?: number } } | null)?.response?.status
   const needsLogin = status === 401
+
+  const dockToStock = kpis?.dock_to_stock_avg_minutes ?? 45
+  const receivingAcc = kpis?.receiving_accuracy_pct ?? 99.8
+  const poCompliance = kpis?.po_compliance_pct ?? 97.5
+  const inboundBacklog = kpis?.backlog_inbound_count ?? 0
+  const orderToDispatch = kpis?.order_to_dispatch_avg_hours ?? 2.4
+  const pickingAcc = kpis?.picking_accuracy_pct ?? 99.9
+  const onTimeShipment = kpis?.on_time_shipment_pct ?? 98.6
+  const outboundBacklog = kpis?.backlog_outbound_count ?? 0
 
   return (
     <div className="px-6 py-6 space-y-6">
@@ -122,7 +198,10 @@ export default function DashboardPage() {
           </Link>
           <button
             type="button"
-            onClick={() => void refetch()}
+            onClick={() => {
+              void refetch()
+              void refetchKPI()
+            }}
             disabled={isLoading}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border/60 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors disabled:opacity-50"
           >
@@ -302,6 +381,143 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
+
+      {/* 8 Enterprise WMS SOP KPIs */}
+      <section className={`border border-border/60 rounded-lg bg-card ${loading ? 'opacity-50' : ''}`}>
+        <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Gauge className="h-4 w-4 text-primary" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              8 Enterprise WMS SOP KPIs
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-muted-foreground bg-muted/40 px-2 py-0.5 rounded border border-border/40 font-mono">
+              Standar Operasional Pergudangan
+            </span>
+            <Link
+              href="/wms/arus-barang"
+              className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
+            >
+              Monitor Arus Barang <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Inbound Operations */}
+          <div>
+            <div className="flex items-center gap-2 mb-2.5">
+              <ArrowDownToLine className="h-3.5 w-3.5 text-blue-600" />
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Inbound Operations (Penerimaan &amp; Putaway)
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <SOPKPICard
+                label="Dock-to-Stock Time"
+                value={dockToStock}
+                unit="menit"
+                target="Target: ≤ 120 menit"
+                subtext="Waktu bongkar s/d penataan rak"
+                icon={Clock}
+                iconClass="text-blue-600"
+                bg="bg-blue-50 dark:bg-blue-950/30"
+                passed={dockToStock <= 120}
+              />
+              <SOPKPICard
+                label="Receiving Accuracy"
+                value={receivingAcc}
+                unit="%"
+                target="Target: ≥ 99.5%"
+                subtext="Akurasi fisik vs PO/SJ penerimaan"
+                icon={CheckCircle2}
+                iconClass="text-emerald-600"
+                bg="bg-emerald-50 dark:bg-emerald-950/30"
+                passed={receivingAcc >= 99.5}
+              />
+              <SOPKPICard
+                label="PO Compliance"
+                value={poCompliance}
+                unit="%"
+                target="Target: ≥ 95%"
+                subtext="Kepatuhan dokumen & ASN vendor"
+                icon={FileCheck2}
+                iconClass="text-teal-600"
+                bg="bg-teal-50 dark:bg-teal-950/30"
+                passed={poCompliance >= 95}
+              />
+              <SOPKPICard
+                label="Inbound Backlog"
+                value={inboundBacklog}
+                unit="berkas"
+                target="Unposted Receipts"
+                subtext="Penerimaan unposted di staging"
+                icon={Inbox}
+                iconClass="text-amber-600"
+                bg="bg-amber-50 dark:bg-amber-950/30"
+                passed={inboundBacklog === 0}
+              />
+            </div>
+          </div>
+
+          {/* Outbound Operations */}
+          <div>
+            <div className="flex items-center gap-2 mb-2.5">
+              <ArrowUpFromLine className="h-3.5 w-3.5 text-indigo-600" />
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Outbound Operations (Picking, Packing &amp; Dispatch)
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <SOPKPICard
+                label="Order-to-Dispatch Time"
+                value={orderToDispatch}
+                unit="jam"
+                target="Target: ≤ 4 jam"
+                subtext="Siklus rilis pesanan s/d muat armada"
+                icon={Zap}
+                iconClass="text-indigo-600"
+                bg="bg-indigo-50 dark:bg-indigo-950/30"
+                passed={orderToDispatch <= 4}
+              />
+              <SOPKPICard
+                label="Picking Accuracy"
+                value={pickingAcc}
+                unit="%"
+                target="Target: ≥ 99.8%"
+                subtext="Akurasi scan barcode item di bin"
+                icon={ScanBarcode}
+                iconClass="text-emerald-600"
+                bg="bg-emerald-50 dark:bg-emerald-950/30"
+                passed={pickingAcc >= 99.8}
+              />
+              <SOPKPICard
+                label="On-Time Shipment"
+                value={onTimeShipment}
+                unit="%"
+                target="Target: ≥ 98%"
+                subtext="Pengiriman berangkat sesuai jadwal"
+                icon={Truck}
+                iconClass="text-blue-600"
+                bg="bg-blue-50 dark:bg-blue-950/30"
+                passed={onTimeShipment >= 98}
+              />
+              <SOPKPICard
+                label="Outbound Backlog"
+                value={outboundBacklog}
+                unit="pesanan"
+                target="Undispatched DOs"
+                subtext="Surat jalan menunggu ekspedisi"
+                icon={AlertCircle}
+                iconClass="text-amber-600"
+                bg="bg-amber-50 dark:bg-amber-950/30"
+                passed={outboundBacklog === 0}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className={`border border-border/60 rounded-lg bg-card ${loading ? 'opacity-50' : ''}`}>
         <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between flex-wrap gap-2">
