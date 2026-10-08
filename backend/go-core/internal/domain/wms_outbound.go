@@ -131,6 +131,23 @@ type PickingDamagedReportResult struct {
 	AlternativeBatch *BatchAllocation `json:"alternative_batch,omitempty"`
 }
 
+// ShortageTicket carries shortage details and recommended next FEFO batch (PDF-03/04).
+type ShortageTicket struct {
+	TaskItemID       uuid.UUID        `json:"task_item_id"`
+	ProductID        uuid.UUID        `json:"product_id"`
+	RequestedQty     decimal.Decimal  `json:"requested_qty"`
+	PickedQty        decimal.Decimal  `json:"picked_qty"`
+	ShortageQty      decimal.Decimal  `json:"shortage_qty"`
+	AlternativeBatch *BatchAllocation `json:"alternative_batch,omitempty"`
+}
+
+// ShortageReportRequest carries parameters when picker encounters a shortage.
+type ShortageReportRequest struct {
+	TaskItemID uuid.UUID       `json:"task_item_id"`
+	PickedQty  decimal.Decimal `json:"picked_qty"`
+	Reason     string          `json:"reason"`
+}
+
 // WMSOutboundRepository defines the persistence port for Sprint 3 outbound operations.
 type WMSOutboundRepository interface {
 	GetOrCreatePickingTask(ctx context.Context, tenantID uuid.UUID, doID uuid.UUID) (*PickingTaskDetail, error)

@@ -55,6 +55,63 @@ func (u *Usecase) RecordPickingItem(ctx context.Context, tenantID, userID uuid.U
 	return u.repo.GetPickingTaskByDO(ctx, tenantID, doID)
 }
 
+// ReportPickingShortage logs shortage on a picking task line and suggests the next available FEFO batch (PDF-03/04).
+func (u *Usecase) ReportPickingShortage(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.ShortageReportRequest) (*domain.ShortageTicket, error) {
+	detail, err := u.GetPickingTask(ctx, tenantID, userID, role, doID)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, detail.DeliveryOrder.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	var targetItem *domain.PickingTaskItem
+	for i := range detail.Items {
+		if detail.Items[i].ID == req.TaskItemID {
+			targetItem = &detail.Items[i]
+			break
+		}
+	}
+	if targetItem == nil {
+		return nil, domain.ErrPickingItemNotFound
+	}
+
+	if err := u.repo.RecordPickingItemProgress(ctx, tenantID, req.TaskItemID, req.PickedQty); err != nil {
+		return nil, err
+	}
+
+	shortageQty := targetItem.RequestedQty.Sub(req.PickedQty)
+	var altBatch *domain.BatchAllocation
+	if shortageQty.IsPositive() {
+		locType := domain.LocationTypeInternal
+		balances, err := u.repo.ListBatchBalances(ctx, tenantID, domain.BatchBalanceFilter{
+			WarehouseID:  &detail.DeliveryOrder.WarehouseID,
+			ProductID:    &targetItem.ProductID,
+			LocationType: &locType,
+		})
+		if err == nil {
+			var validBalances []domain.BatchBalance
+			for _, b := range balances {
+				if b.BatchID != targetItem.BatchID {
+					validBalances = append(validBalances, b)
+				}
+			}
+			if allocs, aErr := domain.AllocateFEFO(validBalances, shortageQty, false); aErr == nil && len(allocs) > 0 {
+				altBatch = &allocs[0]
+			}
+		}
+	}
+
+	return &domain.ShortageTicket{
+		TaskItemID:       req.TaskItemID,
+		ProductID:        targetItem.ProductID,
+		RequestedQty:     targetItem.RequestedQty,
+		PickedQty:        req.PickedQty,
+		ShortageQty:      shortageQty,
+		AlternativeBatch: altBatch,
+	}, nil
+}
+
 // ReportPickingDamaged isolates damaged stock found during picking into @QUARANTINE
 // and queries the next available FEFO batch to recommend an alternative pick (PDF-03/04).
 func (u *Usecase) ReportPickingDamaged(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PickingDamagedReportRequest) (*domain.PickingDamagedReportResult, error) {

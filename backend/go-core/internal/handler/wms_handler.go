@@ -99,6 +99,7 @@ type WMSUsecase interface {
 	StartPickingTask(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.PickingTaskDetail, error)
 	RecordPickingItem(ctx context.Context, tenantID, userID uuid.UUID, role string, doID, taskItemID uuid.UUID, pickedQty decimal.Decimal) (*domain.PickingTaskDetail, error)
 	ReportPickingDamaged(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PickingDamagedReportRequest) (*domain.PickingDamagedReportResult, error)
+	ReportPickingShortage(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.ShortageReportRequest) (*domain.ShortageTicket, error)
 	ScanPackStationItem(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackScanRequest) (*domain.PackScanResult, error)
 	CompletePackStation(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackCompleteRequest) (*domain.DeliveryOrder, error)
 	ReleaseStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, error)
@@ -146,6 +147,7 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Post("/delivery-orders/{id}/picking/start", h.StartPickingTask)
 		r.Post("/delivery-orders/{id}/picking/items/{itemId}", h.RecordPickingItem)
 		r.Post("/delivery-orders/{id}/picking/damaged", h.ReportPickingDamaged)
+		r.Post("/delivery-orders/{id}/picking/shortage", h.ReportPickingShortage)
 		r.Post("/delivery-orders/{id}/pack/scan", h.ScanPackStationItem)
 		r.Post("/delivery-orders/{id}/pack/complete", h.CompletePackStation)
 

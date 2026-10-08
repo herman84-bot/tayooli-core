@@ -125,6 +125,35 @@ func (h *WMSHandler) ReportPickingDamaged(w http.ResponseWriter, r *http.Request
 	respondJSON(w, http.StatusOK, map[string]any{"data": res})
 }
 
+func (h *WMSHandler) ReportPickingShortage(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	doID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid delivery order id")
+		return
+	}
+
+	var req domain.ShortageReportRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	res, err := h.uc.ReportPickingShortage(r.Context(), tenantID, userID, role, doID, req)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"data": res})
+}
+
 func (h *WMSHandler) ScanPackStationItem(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := appMiddleware.GetTenantID(r.Context())
 	if !ok {

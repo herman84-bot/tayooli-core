@@ -348,6 +348,9 @@ func (m *mockWMSUsecase) RecordPickingItem(ctx context.Context, tenantID, userID
 func (m *mockWMSUsecase) ReportPickingDamaged(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PickingDamagedReportRequest) (*domain.PickingDamagedReportResult, error) {
 	return &domain.PickingDamagedReportResult{MovementID: uuid.New(), DamagedQty: req.DamagedQty}, nil
 }
+func (m *mockWMSUsecase) ReportPickingShortage(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.ShortageReportRequest) (*domain.ShortageTicket, error) {
+	return &domain.ShortageTicket{TaskItemID: req.TaskItemID, PickedQty: req.PickedQty}, nil
+}
 func (m *mockWMSUsecase) ScanPackStationItem(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackScanRequest) (*domain.PackScanResult, error) {
 	return &domain.PackScanResult{ProductID: uuid.New(), PackedQty: req.Quantity}, nil
 }
