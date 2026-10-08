@@ -635,6 +635,7 @@ type WMSRepository interface {
 	WMSQCRepository
 	WMSOutboundRepository
 	WMSManifestRepository
+	WMSDockLPNRepository
 
 	// Regional
 	CreateRegional(ctx context.Context, r *Regional) error
