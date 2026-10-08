@@ -36,7 +36,7 @@
 - Consumes: `tenants`, `warehouses`, `delivery_orders`, `users`
 - Produces: Table `shipping_manifests`, column `delivery_orders.manifest_id`, `delivery_orders.loading_scanned_at`, `delivery_orders.loading_scanned_by`
 
-- [ ] **Step 1: Tulis berkas migrasi SQL `036_wms_shipping_manifests.sql`**
+- [x] **Step 1: Tulis berkas migrasi SQL `036_wms_shipping_manifests.sql`**
 ```sql
 -- 036_wms_shipping_manifests.sql
 -- Sprint 4 Master PRD WMS: Shipping Manifests, Loading Scan, Courier Multi-DO consolidation
@@ -93,11 +93,11 @@ CREATE INDEX IF NOT EXISTS idx_delivery_orders_manifest ON delivery_orders(tenan
 COMMIT;
 ```
 
-- [ ] **Step 2: Jalankan syntax check migrasi melalui go vet/build**
+- [x] **Step 2: Jalankan syntax check migrasi melalui go vet/build**
 Run: `go build ./...` di `backend/go-core`
 Expected: exit 0
 
-- [ ] **Step 3: Commit migrasi database**
+- [x] **Step 3: Commit migrasi database**
 ```bash
 git add backend/go-core/migrations/036_wms_shipping_manifests.sql
 git commit -m "feat(wms): add migration 036 for shipping manifests and loading scan tracking"
@@ -117,10 +117,10 @@ git commit -m "feat(wms): add migration 036 for shipping manifests and loading s
 - Consumes: `domain.DeliveryOrder`, `domain.StockMovement`
 - Produces: `domain.ShippingManifest`, `domain.WMSOutboundRepository` methods (`CreateShippingManifest`, `ListShippingManifests`, `GetShippingManifestByID`, `ScanDOLoading`, `DispatchShippingManifest`, `GetWMSOutboundKPIs`)
 
-- [ ] **Step 1: Buat domain model di `internal/domain/wms_manifest.go`**
+- [x] **Step 1: Buat domain model di `internal/domain/wms_manifest.go`**
 Definisikan struct `ShippingManifest`, `ShippingManifestItem`, status enum `ShippingManifestStatus`, request/response DTOs, dan error sentinel `ErrManifestNotFound`, `ErrInvalidManifestStatus`, `ErrManifestSignatureRequired`, `ErrDOMisload`.
 
-- [ ] **Step 2: Implementasikan repository PostgreSQL di `internal/infra/postgres/wms_manifest_repo.go`**
+- [x] **Step 2: Implementasikan repository PostgreSQL di `internal/infra/postgres/wms_manifest_repo.go`**
 Implementasikan metode:
 - `CreateShippingManifest`: insert header manifest, update `delivery_orders.manifest_id` dan ubah status DO ke `STAGED`.
 - `GetShippingManifestByID`: select manifest dan load daftar DO terlampir dengan status loading-nya.
@@ -128,11 +128,11 @@ Implementasikan metode:
 - `ScanDOLoading`: verifikasi barcode cocok dengan DO di manifest, set `loading_scanned_at` dan `loading_scanned_by`.
 - `DispatchShippingManifest`: transaksi atomik multi-DO, potong stok buku besar via `DeductLocationStock`, update status DO ke `SHIPPED`, update status manifest ke `DISPATCHED` beserta signature SVG, catat audit logs.
 
-- [ ] **Step 3: Tulis unit test untuk domain & repository wms_manifest**
+- [x] **Step 3: Tulis unit test untuk domain & repository wms_manifest**
 Run: `go test -v ./internal/domain/...`
 Expected: PASS
 
-- [ ] **Step 4: Commit domain & repository**
+- [x] **Step 4: Commit domain & repository**
 ```bash
 git add backend/go-core/internal/domain/wms_manifest.go backend/go-core/internal/infra/postgres/wms_manifest_repo.go
 git commit -m "feat(wms): implement domain models and postgres repository for shipping manifests"
