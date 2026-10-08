@@ -1266,6 +1266,153 @@ export interface ImportMarketplaceResponse {
   orders?: MarketplaceOrder[]
 }
 
+// =============================================================================
+// Sprint 5: Inbound Dock Bay Scheduling, Appointments, & Pallet LPN Containerization
+// ADR-014 Invariant 1 (Double-Entry Ledger per Batch), OCA/wms patterns
+// =============================================================================
+
+export type DockStatus = "AVAILABLE" | "OCCUPIED" | "MAINTENANCE"
+export type DockType = "INBOUND" | "OUTBOUND" | "CROSS_DOCK"
+export type AppointmentStatus = "SCHEDULED" | "ARRIVED" | "UNLOADING" | "COMPLETED" | "CANCELLED"
+export type LPNStatus = "STAGED" | "STORED" | "PICKED" | "SHIPPED" | "DECOMMISSIONED"
+export type PalletType = "WOODEN" | "PLASTIC" | "METAL" | "CAGE"
+
+export interface InboundDock {
+  id: string
+  tenant_id?: string
+  warehouse_id: string
+  warehouse_name?: string
+  dock_code: string
+  dock_name: string
+  dock_type: DockType
+  max_tonnage: number | string
+  status: DockStatus
+  notes?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateDockInput {
+  warehouse_id: string
+  dock_code?: string
+  dock_name: string
+  dock_type: DockType
+  max_tonnage: number | string
+  notes?: string
+}
+
+export interface UpdateDockStatusInput {
+  status: DockStatus
+  notes?: string
+}
+
+export interface DockAppointment {
+  id: string
+  tenant_id?: string
+  warehouse_id: string
+  warehouse_name?: string
+  dock_id?: string
+  dock_code?: string
+  dock_name?: string
+  appointment_number: string
+  vendor_name: string
+  vehicle_plate: string
+  driver_name: string
+  driver_phone?: string
+  po_reference?: string
+  estimated_arrival: string
+  actual_arrival?: string
+  start_unloading_at?: string
+  completed_at?: string
+  status: AppointmentStatus
+  notes?: string
+  created_by?: string
+  created_by_name?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateAppointmentInput {
+  warehouse_id: string
+  dock_id?: string
+  vendor_name: string
+  vehicle_plate: string
+  driver_name: string
+  driver_phone?: string
+  po_reference?: string
+  estimated_arrival: string
+  notes?: string
+}
+
+export interface UpdateAppointmentStatusInput {
+  status: AppointmentStatus
+  notes?: string
+}
+
+export interface AssignDockInput {
+  dock_id: string
+}
+
+export interface StockLPN {
+  id: string
+  tenant_id?: string
+  warehouse_id: string
+  warehouse_name?: string
+  lpn_code: string
+  location_id: string
+  location_code?: string
+  location_name?: string
+  pallet_type: PalletType
+  status: LPNStatus
+  max_weight_kg: number | string
+  total_weight_kg: number | string
+  notes?: string
+  created_by?: string
+  created_by_name?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface StockLPNItem {
+  id: string
+  tenant_id?: string
+  lpn_id: string
+  product_id: string
+  product_sku?: string
+  product_name?: string
+  batch_id: string
+  batch_number?: string
+  expiry_date?: string
+  quantity: number | string
+  created_at: string
+  updated_at: string
+}
+
+export interface StockLPNDetail {
+  lpn: StockLPN
+  items: StockLPNItem[]
+}
+
+export interface CreateLPNInput {
+  warehouse_id: string
+  location_id: string
+  lpn_code?: string
+  pallet_type?: PalletType
+  max_weight_kg?: number | string
+  notes?: string
+}
+
+export interface AddLPNItemInput {
+  product_id: string
+  batch_id: string
+  quantity: number | string
+}
+
+export interface MoveLPNInput {
+  target_location_id: string
+  notes?: string
+}
+
 function qs(params: PaginationParams): string {
   const entries = Object.entries(params).filter(([, v]) => v !== undefined)
   return entries.length ? `?${new URLSearchParams(entries.map(([k, v]) => [k, String(v)]))}` : ""
@@ -1727,6 +1874,69 @@ export const api = {
         request<{ data: StockSummary[] }>(
           `/wms/stock${warehouseId ? `?warehouse_id=${encodeURIComponent(warehouseId)}` : ""}`
         ),
+    },
+    docks: {
+      list: (warehouseId: string, status?: string) => {
+        const sp = new URLSearchParams({ warehouse_id: warehouseId })
+        if (status) sp.set("status", status)
+        return request<{ data: InboundDock[] }>(`/wms/docks?${sp.toString()}`)
+      },
+      create: (data: CreateDockInput) =>
+        request<{ data: InboundDock }>("/wms/docks", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      updateStatus: (id: string, data: UpdateDockStatusInput) =>
+        request<{ data: InboundDock }>(`/wms/docks/${encodeURIComponent(id)}/status`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+    dockAppointments: {
+      list: (warehouseId: string, status?: string) => {
+        const sp = new URLSearchParams({ warehouse_id: warehouseId })
+        if (status) sp.set("status", status)
+        return request<{ data: DockAppointment[] }>(`/wms/dock-appointments?${sp.toString()}`)
+      },
+      create: (data: CreateAppointmentInput) =>
+        request<{ data: DockAppointment }>("/wms/dock-appointments", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      assign: (id: string, dockId: string) =>
+        request<{ data: DockAppointment }>(`/wms/dock-appointments/${encodeURIComponent(id)}/assign`, {
+          method: "POST",
+          body: JSON.stringify({ dock_id: dockId }),
+        }),
+      updateStatus: (id: string, data: UpdateAppointmentStatusInput) =>
+        request<{ data: DockAppointment }>(`/wms/dock-appointments/${encodeURIComponent(id)}/status`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+    lpns: {
+      list: (warehouseId: string, status?: string) => {
+        const sp = new URLSearchParams({ warehouse_id: warehouseId })
+        if (status) sp.set("status", status)
+        return request<{ data: StockLPN[] }>(`/wms/lpns?${sp.toString()}`)
+      },
+      create: (data: CreateLPNInput) =>
+        request<{ data: StockLPN }>("/wms/lpns", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      get: (id: string) =>
+        request<{ data: StockLPNDetail }>(`/wms/lpns/${encodeURIComponent(id)}`),
+      addItem: (id: string, data: AddLPNItemInput) =>
+        request<{ data: StockLPNDetail }>(`/wms/lpns/${encodeURIComponent(id)}/items`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      move: (id: string, data: MoveLPNInput) =>
+        request<{ data: StockLPNDetail }>(`/wms/lpns/${encodeURIComponent(id)}/move`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
     },
   },
   pos: {
