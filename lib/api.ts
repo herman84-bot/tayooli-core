@@ -589,6 +589,75 @@ export interface DeliveryOrderDetailResponse {
   items: DeliveryOrderItem[]
 }
 
+export type ShippingManifestStatus = "STAGED" | "LOADED" | "DISPATCHED" | "CANCELLED"
+
+export interface ShippingManifest {
+  id: string
+  tenant_id?: string
+  warehouse_id: string
+  warehouse_name?: string
+  manifest_number: string
+  expedition_name: string
+  driver_name: string
+  vehicle_plate: string
+  driver_phone?: string | null
+  total_packages: number
+  total_weight_kg: number | string
+  status: ShippingManifestStatus
+  driver_signature_svg?: string | null
+  notes?: string | null
+  created_by?: string | null
+  created_by_name?: string | null
+  dispatched_by?: string | null
+  dispatched_by_name?: string | null
+  dispatched_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ShippingManifestItem {
+  delivery_order_id: string
+  do_number: string
+  customer_name: string
+  destination_city?: string | null
+  package_weight_kg?: number | string | null
+  packaging_type?: string | null
+  scanned: boolean
+  scanned_at?: string | null
+  scanned_by_name?: string | null
+}
+
+export interface ShippingManifestDetail {
+  manifest: ShippingManifest
+  items: ShippingManifestItem[]
+}
+
+export interface CreateShippingManifestInput {
+  warehouse_id: string
+  expedition_name: string
+  driver_name: string
+  vehicle_plate: string
+  driver_phone?: string
+  delivery_order_ids: string[]
+  notes?: string
+}
+
+export interface DispatchShippingManifestInput {
+  driver_signature_svg: string
+  notes?: string
+}
+
+export interface WMSOutboundKPISummary {
+  dock_to_stock_avg_minutes: number
+  receiving_accuracy_pct: number
+  po_compliance_pct: number
+  backlog_inbound_count: number
+  order_to_dispatch_avg_hours: number
+  picking_accuracy_pct: number
+  on_time_shipment_pct: number
+  backlog_outbound_count: number
+}
+
 export interface StockMovement {
   id: string
   tenant_id: string
@@ -1450,6 +1519,37 @@ export const api = {
           method: "POST",
           body: JSON.stringify({ picker_id: pickerId }),
         }),
+    },
+    manifests: {
+      list: (params?: { warehouse_id?: string; status?: string; expedition_name?: string }) => {
+        const q = new URLSearchParams()
+        if (params?.warehouse_id) q.set("warehouse_id", params.warehouse_id)
+        if (params?.status) q.set("status", params.status)
+        if (params?.expedition_name) q.set("expedition_name", params.expedition_name)
+        const qs = q.toString() ? `?${q.toString()}` : ""
+        return request<{ data: ShippingManifest[] }>(`/wms/manifests${qs}`)
+      },
+      create: (payload: CreateShippingManifestInput) =>
+        request<{ data: ShippingManifest }>("/wms/manifests", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      get: (id: string) =>
+        request<{ data: ShippingManifestDetail }>(`/wms/manifests/${id}`),
+      scanLoading: (id: string, barcode: string) =>
+        request<{ data: ShippingManifestDetail }>(`/wms/manifests/${id}/loading-scan`, {
+          method: "POST",
+          body: JSON.stringify({ barcode }),
+        }),
+      dispatch: (id: string, payload: DispatchShippingManifestInput) =>
+        request<{ data: ShippingManifest }>(`/wms/manifests/${id}/dispatch`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      kpis: (warehouseId?: string) => {
+        const qs = warehouseId ? `?warehouse_id=${encodeURIComponent(warehouseId)}` : ""
+        return request<{ data: WMSOutboundKPISummary }>(`/wms/kpi${qs}`)
+      },
     },
     opnames: {
       list: (warehouseId?: string) =>
