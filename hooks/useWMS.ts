@@ -564,3 +564,120 @@ export function useCreateSKUMapping() {
     },
   })
 }
+
+// -----------------------------------------------------------------------------
+// Sprint 1 Hooks: Putaway, Release, Settings, Default Locations, Trace
+// -----------------------------------------------------------------------------
+
+export function usePutawayPending(warehouseId?: string | null) {
+  return useQuery({
+    queryKey: ["wms", "putaway", "pending", warehouseId],
+    queryFn: async () => {
+      if (!warehouseId) return []
+      const res = await api.wms.putaway.getPending(warehouseId)
+      return res.data ?? []
+    },
+    enabled: !!warehouseId,
+  })
+}
+
+export function useConfirmPutaway() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.wms.putaway.confirm,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wms", "putaway", "pending"] })
+      qc.invalidateQueries({ queryKey: ["wms", "locations"] })
+      qc.invalidateQueries({ queryKey: ["wms", "stock"] })
+    },
+  })
+}
+
+export function useReleaseStockReceipt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.wms.receipts.release(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wms", "receipts"] })
+      qc.invalidateQueries({ queryKey: ["wms", "putaway", "pending"] })
+      qc.invalidateQueries({ queryKey: ["wms", "stock"] })
+    },
+  })
+}
+
+export function useWMSSettings() {
+  return useQuery({
+    queryKey: ["wms", "settings"],
+    queryFn: async () => {
+      const res = await api.wms.settings.get()
+      return res.data
+    },
+  })
+}
+
+export function useUpdateWMSSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (requireReleaseApproval: boolean) =>
+      api.wms.settings.update(requireReleaseApproval),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wms", "settings"] })
+    },
+  })
+}
+
+export function useProductDefaultLocations(productId?: string | null) {
+  return useQuery({
+    queryKey: ["wms", "default-locations", productId ?? "all"],
+    queryFn: async () => {
+      const res = await api.wms.defaultLocations.list(productId || undefined)
+      return res.data ?? []
+    },
+  })
+}
+
+export function useSetDefaultLocation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.wms.defaultLocations.set,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wms", "default-locations"] })
+      qc.invalidateQueries({ queryKey: ["wms", "putaway", "pending"] })
+    },
+  })
+}
+
+export function useDeleteDefaultLocation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ productId, warehouseId }: { productId: string; warehouseId: string }) =>
+      api.wms.defaultLocations.delete(productId, warehouseId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wms", "default-locations"] })
+    },
+  })
+}
+
+export function useBatchTrace(batchId?: string | null) {
+  return useQuery({
+    queryKey: ["wms", "trace", "batch", batchId],
+    queryFn: async () => {
+      if (!batchId) return null
+      const res = await api.wms.trace.batch(batchId)
+      return res.data
+    },
+    enabled: !!batchId,
+  })
+}
+
+export function useAuditTrail(entityType?: string | null, entityId?: string | null) {
+  return useQuery({
+    queryKey: ["wms", "audit-trail", entityType, entityId],
+    queryFn: async () => {
+      if (!entityType || !entityId) return []
+      const res = await api.wms.trace.auditTrail(entityType, entityId)
+      return res.data ?? []
+    },
+    enabled: !!entityType && !!entityId,
+  })
+}

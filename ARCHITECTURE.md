@@ -12,10 +12,8 @@ Sistem ini dipisahkan dari beban arsitektur enterprise yang kompleks (*Apache Ka
 
 ---
 
-## 2. Struktur Modul: 13 Fitur Inti (The 13 Core Modules)
-Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada **13 modul operasional utama**:
-
-> **Catatan 2026-10-07 (KO-2):** Barang Masuk dan Surat Jalan akan digabung jadi 1 modul **Barang Masuk & Keluar** (target 12 modul). Lihat CLAUDE.md dan PRD master §3.5. Daftar di bawah ini masih menggambarkan kode saat ini sampai item KO-2a/KO-2c selesai.
+## 2. Struktur Modul: 12 Fitur Inti (The 12 Core Modules)
+Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada **12 modul operasional utama** (KO-2 & KO-2c):
 
 ```text
 1. OVERVIEW
@@ -25,9 +23,8 @@ Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada 
    - Products (/products) : Master data katalog barang, SKU unik, harga modal (HPP), harga jual, dan kode barcode.
 
 3. WAREHOUSE & POS
-   - Barang Masuk / Inbound (/wms/inbound) : Pencatatan barang masuk dari pemasok, hasil produksi, dan transfer antar gudang, langsung menambah stok di rak tujuan.
+   - Barang Masuk & Keluar (/wms/arus-barang) : Manajemen terpadu barang masuk (Inbound Staging, QC, Putaway ke rak internal) dan barang keluar (Surat Jalan DO, Picking FEFO, Packing) dengan rotasi FEFO per batch. Toggle MASUK | KELUAR.
    - Warehouse & Stock (/wms) : Manajemen multi-gudang, monitoring level stok fisik, dan riwayat mutasi barang.
-   - Surat Jalan DO (/wms/delivery-orders) : Penerbitan dan cetak dokumen resmi Delivery Order untuk ekspedisi/kurir.
    - Marketplace Omnichannel (/wms/marketplace) : Sinkronisasi stok terpusat lintas channel (Tokopedia, Shopee, TikTok Shop, Lazada).
    - Stock Transfers (/wms/transfers) : Alur pemindahan barang antar gudang (Draft -> Pending Approval -> In Transit -> Received).
    - Stock Opname (/wms/opname) : Audit fisik barang periodik dan kalkulasi selisih stok (varians) otomatis.
@@ -52,7 +49,7 @@ Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada 
 - **State & Data Fetching**: TanStack Query v5 & Zustand
 - **Local Dev Port**: **3000** (`http://localhost:3000`)
 - **API Proxy**: `app/api/v1/[...path]/route.ts` (meneruskan request ke backend Zeabur)
-- **Built-in Support AI**: `app/api/v1/chat/message/route.ts` (penjawab panduan 13 modul dengan format rapi tanpa karakter markdown mentah)
+- **Built-in Support AI**: `app/api/v1/chat/message/route.ts` (penjawab panduan 12 modul dengan format rapi tanpa karakter markdown mentah)
 
 ### Backend:
 - **Framework**: Go 1.24 (Chi Router, Clean/Hexagonal Architecture)

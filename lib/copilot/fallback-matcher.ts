@@ -386,6 +386,9 @@ export function matchRuleBasedAction(message: string): {
     } else if (normalized.includes("pos") || normalized.includes("kasir") || normalized.includes("point of sale")) {
       targetPath = "/pos"
       modName = "Point of Sale"
+    } else if (normalized.includes("arus barang") || normalized.includes("barang masuk") || normalized.includes("barang keluar") || normalized.includes("putaway")) {
+      targetPath = "/wms/arus-barang"
+      modName = "Barang Masuk & Keluar"
     } else if (normalized.includes("surat jalan") || normalized.includes("delivery order")) {
       targetPath = "/wms/delivery-orders"
       modName = "Surat Jalan (DO)"

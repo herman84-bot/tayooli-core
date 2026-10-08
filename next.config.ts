@@ -37,6 +37,20 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['lucide-react', 'recharts', 'motion'],
   },
   transpilePackages: ['motion'],
+  async redirects() {
+    return [
+      {
+        source: '/wms/inbound',
+        destination: '/wms/arus-barang?mode=masuk',
+        permanent: false,
+      },
+      {
+        source: '/wms/delivery-orders',
+        destination: '/wms/arus-barang?mode=keluar',
+        permanent: false,
+      },
+    ];
+  },
   webpack: (config, {dev}) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
     // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

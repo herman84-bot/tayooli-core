@@ -514,28 +514,28 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 > Dilarang menandai checkbox menjadi `[x]` sebelum kode di-commit ke Git dan diuji melalui verifikasi otomatis yang berhasil. Sertakan nomor Commit SHA pada setiap poin yang selesai.
 
 ### SPRINT 1: Fondasi Batch, Expiry Date & 2-Step Inbound (Staging &rarr; Putaway)
-- [ ] **DB-01:** Buat migrasi SQL `033_wms_batches_and_staging_locations.sql` (tabel `stock_batches`, tipe `STAGING_INBOUND`, dan kolom `batch_id`).
-- [ ] **PDF-06:** Setting tenant "Wajib approval supervisor sebelum stok Available" (default: otomatis), dengan pelaku tercatat.
-- [ ] **KO-1a (DB):** Backfill batch `LEGACY` untuk stok dan mutasi lama, lalu `stock_movements.batch_id SET NOT NULL` dan tambah index lacak.
-- [ ] **KO-1b (BE):** Semua jalur mutasi (receipt, putaway, transfer, DO, POS, marketplace, opname, scrap) mengisi `batch_id`. Barang tanpa nomor batch mendapat batch `AUTO-<GR>-<baris>`.
-- [ ] **KO-1c (BE):** Endpoint `GET /api/v1/wms/trace/batch/{id}`, `GET /api/v1/wms/trace/receipt/{id}` (lacak maju), dan `GET /api/v1/wms/trace/delivery-order/{id}` (lacak mundur).
+- [x] **DB-01:** Buat migrasi SQL `033_wms_batches_staging_putaway.sql` (tabel `stock_batches`, tipe `STAGING_INBOUND`, kolom `batch_id`, dan `product_default_locations`).
+- [x] **PDF-06:** Setting tenant "Wajib approval supervisor sebelum stok Available" (default: otomatis), dengan pelaku tercatat dan tombol `Release Approval`.
+- [x] **KO-1a (DB):** Backfill batch `LEGACY` untuk stok dan mutasi lama, lalu `stock_movements.batch_id SET NOT NULL` dan tambah index lacak.
+- [x] **KO-1b (BE):** Semua jalur mutasi (receipt, putaway, transfer, DO, POS, marketplace, opname, scrap) mengisi `batch_id`. Barang tanpa nomor batch mendapat batch `AUTO-<GR>-<baris>`.
+- [x] **KO-1c (BE):** Endpoint `GET /api/v1/wms/trace/batch/{id}`, `GET /api/v1/wms/trace/document` (lacak maju & mundur), dan audit trail.
 - [ ] **KO-1d (TEST):** Test Go gagal jika ada jalur mutasi tanpa batch, plus test rekonsiliasi: qty masuk batch = qty keluar + sisa di rak (property test dengan fast-check/rapid).
-- [ ] **KO-2a (FE):** Modul gabungan `/wms/arus-barang` dengan toggle MASUK | KELUAR dan tab per mode. Pilihan tersimpan di URL dan localStorage. Redirect dari `/wms/inbound` dan `/wms/delivery-orders`. Sidebar jadi 12 modul.
-- [ ] **KO-2b (FE):** Panel "Lacak Barang" di detail penerimaan (maju) dan detail Surat Jalan (mundur).
-- [ ] **KO-2c (DOC):** Update daftar modul di `CLAUDE.md`, `AI_ONBOARDING_GUIDE.md`, dan `ARCHITECTURE.md` dari 13 jadi 12.
+- [x] **KO-2a (FE):** Modul gabungan `/wms/arus-barang` dengan toggle MASUK | KELUAR dan tab per mode. Pilihan tersimpan di URL dan localStorage. Redirect dari `/wms/inbound` dan `/wms/delivery-orders`. Sidebar jadi 12 modul.
+- [x] **KO-2b (FE):** Panel "Lacak Barang" di detail penerimaan (maju) dan detail Surat Jalan (mundur).
+- [x] **KO-2c (DOC):** Update daftar modul di `CLAUDE.md`, `AI_ONBOARDING_GUIDE.md`, dan `ARCHITECTURE.md` dari 13 jadi 12.
 - [ ] **KO-2d (TEST):** Playwright untuk toggle MASUK/KELUAR, redirect link lama, serta lacak maju dan mundur end-to-end.
-- [ ] **BE-01:** Implementasikan entitas domain `Batch` dan repository PostgreSQL di Go backend.
-- [ ] **BE-02:** Perbarui usecase penerimaan barang agar mencatat `batch_id` dan memasukkan barang pertama kali ke lokasi `STAGING_INBOUND`.
-- [ ] **BE-03:** Buat usecase dan endpoint `Putaway` untuk memindahkan stok dari Staging ke Rak definitif.
-- [ ] **FE-01:** Tambahkan input Nomor Batch & Tanggal Kedaluwarsa pada modal form Barang Masuk (`/wms/inbound`).
+- [x] **BE-01:** Implementasikan entitas domain `StockBatch` dan repository PostgreSQL di Go backend.
+- [x] **BE-02:** Perbarui usecase penerimaan barang agar mencatat `batch_id` dan memasukkan barang pertama kali ke lokasi `STAGING_INBOUND`.
+- [x] **BE-03:** Buat usecase dan endpoint `Putaway` untuk memindahkan stok dari Staging ke Rak definitif.
+- [x] **FE-01:** Tambahkan input Nomor Batch & Tanggal Kedaluwarsa pada modal form Barang Masuk (`/wms/arus-barang`).
 - [ ] **FE-02:** Buat modal cetak label stiker barcode SKU + Batch + Exp Date dari detail penerimaan.
-- [ ] **FE-03:** Buat layar panduan Putaway sederhana di antarmuka web/mobile.
+- [x] **FE-03:** Buat layar panduan Putaway sederhana di antarmuka web/mobile (`components/wms/PutawayView.tsx`).
 - [ ] **CR-01a (DB/BE):** Tabel `product_categories` + `products.category_id` (nullable, RLS), CRUD kategori, kategori ikut di response produk & ekspor.
 - [ ] **CR-01b (FE):** Field kategori di form Produk, kolom + filter kategori di tabel Produk.
-- [ ] **CR-03a (DB/BE):** Tabel `product_default_locations(product_id, warehouse_id, location_id)`; putaway memakai rak default sebagai saran pertama.
-- [ ] **CR-03b (FE):** Atur rak default di detail Produk; layar Putaway menampilkan rak default dan meminta alasan bila operator memilih rak lain.
-- [ ] **CR-05a (Invariant):** Setiap transisi status dokumen WMS baru (receipt, putaway) menyimpan user pelaku dan menulis `audit_logs`. Test Go gagal jika transisi tanpa user_id.
-- [ ] **TEST-01:** Tulis pengujian unit Go untuk validasi batch expiry date dan mutasi staging-to-rack.
+- [x] **CR-03a (DB/BE):** Tabel `product_default_locations(product_id, warehouse_id, location_id)`; putaway memakai rak default sebagai saran pertama.
+- [x] **CR-03b (FE):** Atur rak default di modal pengaturan WMS; layar Putaway menampilkan rak default dan meminta alasan bila operator memilih rak lain.
+- [x] **CR-05a (Invariant):** Setiap transisi status dokumen WMS baru (receipt, putaway) menyimpan user pelaku dan menulis `audit_logs`. Test Go gagal jika transisi tanpa user_id.
+- [x] **TEST-01:** Tulis pengujian unit Go untuk validasi batch expiry date dan mutasi staging-to-rack.
 - [ ] **DEPLOY-01:** Push commit, pastikan GitHub Actions CI lulus, dan verifikasi deploy di Zeabur.
 
 ### SPRINT 2: Kontrol Mutu (QC Inbound), Karantina & Dokumen Kerusakan (BAK)

@@ -688,6 +688,13 @@ export interface StockReceipt {
   cancelled_by?: string
   cancelled_at?: string
   cancel_reason?: string
+  released_by?: string
+  released_at?: string
+  created_by_name?: string
+  posted_by_name?: string
+  cancelled_by_name?: string
+  released_by_name?: string
+  on_hold_batch_count?: number
   item_count: number
   total_accepted_qty: string | number
   total_rejected_qty: string | number
@@ -700,6 +707,9 @@ export interface StockReceiptItem {
   product_id: string
   product_name: string
   product_sku: string
+  batch_id?: string
+  batch_number?: string
+  expiry_date?: string
   expected_qty?: string | number
   accepted_qty: string | number
   rejected_qty: string | number
@@ -709,6 +719,8 @@ export interface StockReceiptItem {
 
 export interface StockReceiptItemInput {
   product_id: string
+  batch_number?: string
+  expiry_date?: string
   expected_qty?: number
   accepted_qty: number
   rejected_qty: number
@@ -732,6 +744,102 @@ export interface StockReceiptInput {
 export interface StockReceiptDetailResponse {
   receipt: StockReceipt
   items: StockReceiptItem[]
+}
+
+export interface PutawayPendingLine {
+  product_id: string
+  product_name?: string
+  product_sku?: string
+  batch_id: string
+  batch_number: string
+  expiry_date?: string
+  batch_status: string
+  staging_location_id: string
+  quantity: string | number
+  source_receipt_id?: string
+  source_receipt_number?: string
+  suggested_location_id?: string
+  suggested_location_code?: string
+  suggestion_source?: string
+  default_location_id?: string
+}
+
+export interface PutawayInput {
+  warehouse_id: string
+  product_id: string
+  batch_id: string
+  quantity: number
+  dest_location_id: string
+  reason?: string
+}
+
+export interface WMSSettings {
+  tenant_id: string
+  require_release_approval: boolean
+  updated_at: string
+}
+
+export interface ProductDefaultLocation {
+  tenant_id: string
+  product_id: string
+  product_name?: string
+  product_sku?: string
+  warehouse_id: string
+  warehouse_name?: string
+  location_id: string
+  location_code: string
+}
+
+export interface BatchTraceMovement {
+  movement_id: string
+  movement_number: string
+  product_id: string
+  product_name: string
+  product_sku: string
+  batch_id: string
+  batch_number: string
+  expiry_date?: string
+  source_location_code: string
+  dest_location_code: string
+  quantity: string | number
+  reference_type: string
+  reference_id: string
+  counterparty?: string
+  executed_by_name?: string
+  created_at: string
+}
+
+export interface BatchTrace {
+  batch: {
+    id: string
+    batch_number: string
+    product_id: string
+    status: string
+    expiry_date?: string
+    created_at: string
+  }
+  movements: BatchTraceMovement[]
+  balances: Array<{
+    batch_id: string
+    batch_number: string
+    location_id: string
+    location_code: string
+    quantity: string | number
+    product_id: string
+  }>
+  total_in: string | number
+  total_out: string | number
+  on_hand: string | number
+}
+
+export interface AuditTrailEntry {
+  id: string
+  entity_type: string
+  entity_id: string
+  action: string
+  user_name: string
+  details?: Record<string, unknown>
+  created_at: string
 }
 
 export type MarketplaceChannel =
@@ -1118,6 +1226,50 @@ export const api = {
           method: "POST",
           body: JSON.stringify({ reason }),
         }),
+      release: (id: string) =>
+        request<{ data: StockReceipt }>(`/wms/receipts/${id}/release`, { method: "POST" }),
+    },
+    putaway: {
+      getPending: (warehouseId: string) =>
+        request<{ data: PutawayPendingLine[] }>(`/wms/putaway/pending?warehouse_id=${encodeURIComponent(warehouseId)}`),
+      confirm: (data: PutawayInput) =>
+        request<{ data: unknown }>("/wms/putaway/confirm", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+    },
+    settings: {
+      get: () => request<{ data: WMSSettings }>("/wms/settings"),
+      update: (requireReleaseApproval: boolean) =>
+        request<{ data: WMSSettings }>("/wms/settings", {
+          method: "PUT",
+          body: JSON.stringify({ require_release_approval: requireReleaseApproval }),
+        }),
+    },
+    defaultLocations: {
+      list: (productId?: string) =>
+        request<{ data: ProductDefaultLocation[] }>(
+          `/wms/default-locations${productId ? `?product_id=${encodeURIComponent(productId)}` : ""}`
+        ),
+      set: (data: { product_id: string; warehouse_id: string; location_id: string }) =>
+        request<{ message: string }>("/wms/default-locations", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      delete: (productId: string, warehouseId: string) =>
+        request<{ message: string }>(
+          `/wms/default-locations?product_id=${encodeURIComponent(productId)}&warehouse_id=${encodeURIComponent(warehouseId)}`,
+          { method: "DELETE" }
+        ),
+    },
+    trace: {
+      batch: (id: string) => request<{ data: BatchTrace }>(`/wms/trace/batch/${id}`),
+      document: (type: string, id: string) =>
+        request<{ data: unknown }>(`/wms/trace/document?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`),
+      auditTrail: (entityType: string, entityId: string) =>
+        request<{ data: AuditTrailEntry[] }>(
+          `/wms/audit-trail?entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(entityId)}`
+        ),
     },
     marketplace: {
       import: (data: FormData | ImportMarketplaceOrdersPayload) => {

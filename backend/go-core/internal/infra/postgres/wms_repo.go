@@ -880,10 +880,17 @@ LIMIT 1`
 // -----------------------------------------------------------------------------
 
 const createStockMovementSQL = `
-INSERT INTO stock_movements (id, tenant_id, movement_number, product_id, source_location_id, dest_location_id, quantity, unit_cost, status, reference_type, reference_id, executed_by, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+INSERT INTO stock_movements (id, tenant_id, movement_number, product_id, source_location_id, dest_location_id, quantity, unit_cost, status, reference_type, reference_id, executed_by, batch_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
 
 func (r *WMSRepo) CreateStockMovement(ctx context.Context, m *domain.StockMovement) error {
+	if m == nil {
+		return domain.ErrInvalidInput
+	}
+	if m.BatchID == nil || *m.BatchID == uuid.Nil {
+		return domain.ErrBatchRequired
+	}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("WMSRepo.CreateStockMovement: begin tx: %w", err)
@@ -908,7 +915,7 @@ func (r *WMSRepo) CreateStockMovement(ctx context.Context, m *domain.StockMoveme
 		m.ID, m.TenantID, m.MovementNumber, m.ProductID,
 		m.SourceLocationID, m.DestLocationID, m.Quantity,
 		m.UnitCost, m.Status, m.ReferenceType, m.ReferenceID,
-		ptrToNullUUID(m.ExecutedBy), m.CreatedAt)
+		ptrToNullUUID(m.ExecutedBy), ptrToNullUUID(m.BatchID), m.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("WMSRepo.CreateStockMovement: exec: %w", err)
 	}
@@ -974,7 +981,11 @@ WHERE tenant_id = $1
   AND status = 'DONE'`
 
 // DeductLocationStock atomically checks stock and inserts movement under an advisory transaction lock.
+// If mov.BatchID is nil, it allocates stock via FEFO (OCA §1.3) from on-hand batches at locationID.
 func (r *WMSRepo) DeductLocationStock(ctx context.Context, tenantID, locationID, productID uuid.UUID, qty decimal.Decimal, mov *domain.StockMovement) error {
+	if !qty.IsPositive() {
+		return domain.ErrInvalidInput
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("WMSRepo.DeductLocationStock: begin tx: %w", err)
@@ -990,38 +1001,113 @@ func (r *WMSRepo) DeductLocationStock(ctx context.Context, tenantID, locationID,
 		return err
 	}
 
-	// 2) Calculate current stock
-	var currentStock decimal.Decimal
-	if err := tx.QueryRowContext(ctx, deductStockCalcSQL, tenantID, locationID, productID).Scan(&currentStock); err != nil {
-		return fmt.Errorf("WMSRepo.DeductLocationStock: scan stock: %w", err)
+	// 2) If specific BatchID is requested: check that batch's balance directly
+	if mov.BatchID != nil && *mov.BatchID != uuid.Nil {
+		var currentStock decimal.Decimal
+		batchCalcSQL := `
+SELECT COALESCE(
+    SUM(CASE WHEN dest_location_id = $2 THEN quantity ELSE -quantity END),
+    0
+)
+FROM stock_movements
+WHERE tenant_id = $1 AND product_id = $3 AND batch_id = $4
+  AND (source_location_id = $2 OR dest_location_id = $2)
+  AND status = 'DONE'`
+		if err := tx.QueryRowContext(ctx, batchCalcSQL, tenantID, locationID, productID, *mov.BatchID).Scan(&currentStock); err != nil {
+			return fmt.Errorf("WMSRepo.DeductLocationStock: scan batch stock: %w", err)
+		}
+		if currentStock.LessThan(qty) {
+			return domain.ErrInsufficientStock
+		}
+
+		if mov.ID == uuid.Nil {
+			mov.ID = uuid.New()
+		}
+		if mov.CreatedAt.IsZero() {
+			mov.CreatedAt = time.Now().UTC()
+		}
+		if mov.Status == "" {
+			mov.Status = domain.StockMovementStatusDone
+		}
+		_, err = tx.ExecContext(ctx, createStockMovementSQL,
+			mov.ID, mov.TenantID, mov.MovementNumber, mov.ProductID,
+			mov.SourceLocationID, mov.DestLocationID, mov.Quantity,
+			mov.UnitCost, mov.Status, mov.ReferenceType, mov.ReferenceID,
+			ptrToNullUUID(mov.ExecutedBy), ptrToNullUUID(mov.BatchID), mov.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("WMSRepo.DeductLocationStock: exec movement: %w", err)
+		}
+		return tx.Commit()
 	}
 
-	// 3) Check if current_stock < qty -> returns ErrInsufficientStock
-	if currentStock.LessThan(qty) {
-		return domain.ErrInsufficientStock
-	}
+	// 3) BatchID is nil: query all on-hand batches at this location and allocate via FEFO
+	includeOnHold := (mov.ReferenceType == domain.StockRefScrap || mov.ReferenceType == domain.StockRefOpname)
+	balQuery := `
+SELECT b.id, b.batch_number, b.expiry_date, b.status, loc.id, loc.code, sm.product_id,
+       SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) AS qty,
+       b.created_at
+FROM stock_movements sm
+JOIN stock_batches b ON b.id = sm.batch_id AND b.tenant_id = sm.tenant_id
+JOIN warehouse_locations loc ON (loc.id = sm.dest_location_id OR loc.id = sm.source_location_id) AND loc.tenant_id = sm.tenant_id
+WHERE sm.tenant_id = $1 AND sm.product_id = $2 AND loc.id = $3 AND sm.status = 'DONE'
+GROUP BY b.id, b.batch_number, b.expiry_date, b.status, b.created_at, loc.id, loc.code, sm.product_id
+HAVING SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) > 0
+ORDER BY b.expiry_date ASC NULLS LAST, b.created_at ASC, b.id ASC`
 
-	// 4) Insert movement
-	if mov.ID == uuid.Nil {
-		mov.ID = uuid.New()
-	}
-	if mov.CreatedAt.IsZero() {
-		mov.CreatedAt = time.Now().UTC()
-	}
-	if mov.Status == "" {
-		mov.Status = domain.StockMovementStatusDone
-	}
-
-	_, err = tx.ExecContext(ctx, createStockMovementSQL,
-		mov.ID, mov.TenantID, mov.MovementNumber, mov.ProductID,
-		mov.SourceLocationID, mov.DestLocationID, mov.Quantity,
-		mov.UnitCost, mov.Status, mov.ReferenceType, mov.ReferenceID,
-		ptrToNullUUID(mov.ExecutedBy), mov.CreatedAt)
+	rows, err := tx.QueryContext(ctx, balQuery, tenantID, productID, locationID)
 	if err != nil {
-		return fmt.Errorf("WMSRepo.DeductLocationStock: exec movement: %w", err)
+		return fmt.Errorf("WMSRepo.DeductLocationStock: query batch balances: %w", err)
+	}
+	defer rows.Close()
+
+	var balances []domain.BatchBalance
+	for rows.Next() {
+		var bal domain.BatchBalance
+		var exp sql.NullTime
+		if err := rows.Scan(
+			&bal.BatchID, &bal.BatchNumber, &exp, &bal.Status,
+			&bal.LocationID, &bal.LocationCode, &bal.ProductID,
+			&bal.Quantity, &bal.CreatedAt,
+		); err != nil {
+			return fmt.Errorf("WMSRepo.DeductLocationStock: scan: %w", err)
+		}
+		bal.ExpiryDate = nullTimeToPtr(exp)
+		balances = append(balances, bal)
+	}
+	_ = rows.Close()
+
+	allocs, err := domain.AllocateFEFO(balances, qty, includeOnHold)
+	if err != nil {
+		return err
 	}
 
-	// 5) Commit
+	now := time.Now().UTC()
+	for i, alloc := range allocs {
+		m := *mov
+		m.ID = uuid.New()
+		m.TenantID = tenantID
+		m.ProductID = productID
+		m.BatchID = &alloc.BatchID
+		m.SourceLocationID = locationID
+		m.Quantity = alloc.Quantity
+		m.CreatedAt = now
+		if m.Status == "" {
+			m.Status = domain.StockMovementStatusDone
+		}
+		if len(allocs) > 1 {
+			m.MovementNumber = fmt.Sprintf("%s-B%d", mov.MovementNumber, i+1)
+		}
+
+		_, err := tx.ExecContext(ctx, createStockMovementSQL,
+			m.ID, m.TenantID, m.MovementNumber, m.ProductID,
+			m.SourceLocationID, m.DestLocationID, m.Quantity,
+			m.UnitCost, m.Status, m.ReferenceType, m.ReferenceID,
+			ptrToNullUUID(m.ExecutedBy), ptrToNullUUID(m.BatchID), m.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("WMSRepo.DeductLocationStock: insert movement %d: %w", i, err)
+		}
+	}
+
 	return tx.Commit()
 }
 
@@ -1047,11 +1133,13 @@ SELECT
     sm.source_location_id, COALESCE(sl.code, ''),
     sm.dest_location_id, COALESCE(dl.code, ''),
     sm.quantity, sm.unit_cost, sm.status, sm.reference_type, sm.reference_id,
+    sm.batch_id, COALESCE(b.batch_number, ''),
     sm.executed_by, COALESCE(u.full_name, u.email, ''), sm.created_at
 FROM stock_movements sm
 LEFT JOIN products p ON p.id = sm.product_id AND p.tenant_id = sm.tenant_id
 LEFT JOIN warehouse_locations sl ON sl.id = sm.source_location_id AND sl.tenant_id = sm.tenant_id
 LEFT JOIN warehouse_locations dl ON dl.id = sm.dest_location_id AND dl.tenant_id = sm.tenant_id
+LEFT JOIN stock_batches b ON b.id = sm.batch_id AND b.tenant_id = sm.tenant_id
 LEFT JOIN users u ON u.id = sm.executed_by
 WHERE sm.tenant_id = $1
   AND ($2::uuid IS NULL OR sm.product_id = $2)
@@ -1068,17 +1156,19 @@ LIMIT $4`
 	var result []domain.StockMovement
 	for rows.Next() {
 		var m domain.StockMovement
-		var execBy sql.NullString
+		var execBy, batchID sql.NullString
 		if err := rows.Scan(
 			&m.ID, &m.TenantID, &m.MovementNumber, &m.ProductID,
 			&m.ProductName, &m.SKU,
 			&m.SourceLocationID, &m.SourceLocationCode,
 			&m.DestLocationID, &m.DestLocationCode,
 			&m.Quantity, &m.UnitCost, &m.Status, &m.ReferenceType, &m.ReferenceID,
+			&batchID, &m.BatchNumber,
 			&execBy, &m.ExecutedByName, &m.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListStockMovements: scan: %w", err)
 		}
+		m.BatchID = nullUUIDToPtr(batchID)
 		m.ExecutedBy = nullUUIDToPtr(execBy)
 		result = append(result, m)
 	}

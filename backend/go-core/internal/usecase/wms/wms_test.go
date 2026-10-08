@@ -39,29 +39,38 @@ type mockWMSRepo struct {
 	marketplaceBatches map[uuid.UUID]*domain.MarketplaceImportBatch
 	marketplaceOrders  map[uuid.UUID]*domain.MarketplaceOrder
 	// Stock receipts (lazily initialised in wms_receipt_test.go)
-	stockReceipts map[uuid.UUID]*domain.StockReceipt
-	receiptItems  map[uuid.UUID][]domain.StockReceiptItem
+	stockReceipts    map[uuid.UUID]*domain.StockReceipt
+	receiptItems     map[uuid.UUID][]domain.StockReceiptItem
+	batches          map[uuid.UUID]*domain.StockBatch
+	wmsSettings      map[uuid.UUID]*domain.WMSSettings
+	defaultLocations map[string]*domain.ProductDefaultLocation
+	auditLogs        []domain.AuditTrailEntry
 }
 
 func newMockWMSRepo() *mockWMSRepo {
 	return &mockWMSRepo{
-		warehouses:      make(map[uuid.UUID]domain.Warehouse),
-		userWarehouses:  make(map[string][]uuid.UUID),
-		locations:       make(map[uuid.UUID]domain.WarehouseLocation),
-		systemLocations: make(map[string]*domain.WarehouseLocation),
-		barcodes:        make(map[string]domain.ProductBarcode),
-		skuMappings:     make(map[string]domain.ProductSKUMapping),
-		products:        make(map[string]domain.Product),
-		stockLevels:     make(map[string]decimal.Decimal),
-		transfers:       make(map[uuid.UUID]*domain.StockTransfer),
-		transferItems:   make(map[uuid.UUID][]domain.StockTransferItem),
-		deliveryOrders:  make(map[uuid.UUID]*domain.DeliveryOrder),
-		doItems:         make(map[uuid.UUID][]domain.DeliveryOrderItem),
-		stockOpnames:    make(map[uuid.UUID]*domain.StockOpname),
-		opnameItems:     make(map[uuid.UUID][]domain.StockOpnameItem),
-		stockScraps:     make(map[uuid.UUID]*domain.StockScrap),
+		warehouses:         make(map[uuid.UUID]domain.Warehouse),
+		userWarehouses:     make(map[string][]uuid.UUID),
+		locations:          make(map[uuid.UUID]domain.WarehouseLocation),
+		systemLocations:    make(map[string]*domain.WarehouseLocation),
+		barcodes:           make(map[string]domain.ProductBarcode),
+		skuMappings:        make(map[string]domain.ProductSKUMapping),
+		products:           make(map[string]domain.Product),
+		batches:            make(map[uuid.UUID]*domain.StockBatch),
+		wmsSettings:        make(map[uuid.UUID]*domain.WMSSettings),
+		defaultLocations:   make(map[string]*domain.ProductDefaultLocation),
+		stockLevels:        make(map[string]decimal.Decimal),
+		transfers:          make(map[uuid.UUID]*domain.StockTransfer),
+		transferItems:      make(map[uuid.UUID][]domain.StockTransferItem),
+		deliveryOrders:     make(map[uuid.UUID]*domain.DeliveryOrder),
+		doItems:            make(map[uuid.UUID][]domain.DeliveryOrderItem),
+		stockOpnames:       make(map[uuid.UUID]*domain.StockOpname),
+		opnameItems:        make(map[uuid.UUID][]domain.StockOpnameItem),
+		stockScraps:        make(map[uuid.UUID]*domain.StockScrap),
 		marketplaceBatches: make(map[uuid.UUID]*domain.MarketplaceImportBatch),
 		marketplaceOrders:  make(map[uuid.UUID]*domain.MarketplaceOrder),
+		stockReceipts:      make(map[uuid.UUID]*domain.StockReceipt),
+		receiptItems:       make(map[uuid.UUID][]domain.StockReceiptItem),
 	}
 }
 
@@ -293,6 +302,10 @@ func (m *mockWMSRepo) ResolveBarcode(ctx context.Context, tenantID uuid.UUID, co
 }
 
 func (m *mockWMSRepo) CreateStockMovement(ctx context.Context, sm *domain.StockMovement) error {
+	if sm.BatchID == nil {
+		dummyBatch := uuid.New()
+		sm.BatchID = &dummyBatch
+	}
 	m.stockMovements = append(m.stockMovements, *sm)
 	// Update mock stock levels
 	srcKey := fmt.Sprintf("%s:%s:%s", sm.TenantID, sm.SourceLocationID, sm.ProductID)

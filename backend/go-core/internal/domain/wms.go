@@ -41,7 +41,57 @@ var (
 	ErrStockReceiptNotDraft         = errors.New("stock receipt is not in DRAFT status")
 	ErrStockReceiptAlreadyCancelled = errors.New("stock receipt is already cancelled")
 	ErrStockReceiptStockConsumed    = errors.New("received stock has already been used and cannot be reversed")
+
+	// Batch ledger (ADR-014 Invariant 1): every movement must carry a batch.
+	ErrBatchRequired        = errors.New("stock movement batch is required")
+	ErrStockBatchNotFound   = errors.New("stock batch not found")
+	ErrBatchExpiryMismatch  = errors.New("batch already exists with a different expiry date")
+	ErrPutawayReasonRequired = errors.New("reason is required when putaway location differs from default rack")
+	ErrInvalidPutawayLocation = errors.New("putaway destination must be an internal rack in the same warehouse")
+	ErrActorRequired        = errors.New("authenticated user is required")
+	ErrReceiptNotOnHold     = errors.New("receipt has no batch awaiting release")
+	ErrBatchOnHold          = errors.New("batch is on hold")
 )
+
+// StockBatchStatus controls whether a batch may be allocated to sales.
+type StockBatchStatus string
+
+const (
+	StockBatchStatusReleased StockBatchStatus = "RELEASED"
+	StockBatchStatusOnHold   StockBatchStatus = "ON_HOLD"
+)
+
+// LegacyBatchNumber marks the batch backfilled by migration 033 for pre-batch movements.
+const LegacyBatchNumber = "LEGACY"
+
+// StockBatch is a lot of one product (KO-1). Expiry drives FEFO (OCA §1.3).
+type StockBatch struct {
+	ID              uuid.UUID        `json:"id"`
+	TenantID        uuid.UUID        `json:"tenant_id"`
+	ProductID       uuid.UUID        `json:"product_id"`
+	BatchNumber     string           `json:"batch_number"`
+	ExpiryDate      *time.Time       `json:"expiry_date,omitempty"`
+	SourceReceiptID *uuid.UUID       `json:"source_receipt_id,omitempty"`
+	Status          StockBatchStatus `json:"status"`
+	IsLegacy        bool             `json:"is_legacy"`
+	CreatedBy       *uuid.UUID       `json:"created_by,omitempty"`
+	CreatedAt       time.Time        `json:"created_at"`
+}
+
+// BatchBalance is the on-hand quantity of one batch at one location.
+type BatchBalance struct {
+	BatchID      uuid.UUID        `json:"batch_id"`
+	BatchNumber  string           `json:"batch_number"`
+	ExpiryDate   *time.Time       `json:"expiry_date,omitempty"`
+	Status       StockBatchStatus `json:"status"`
+	LocationID   uuid.UUID        `json:"location_id"`
+	LocationCode string           `json:"location_code"`
+	ProductID    uuid.UUID        `json:"product_id"`
+	ProductName  string           `json:"product_name,omitempty"`
+	ProductSKU   string           `json:"product_sku,omitempty"`
+	Quantity     decimal.Decimal  `json:"quantity"`
+	CreatedAt    time.Time        `json:"-"`
+}
 
 // StockReceiptValidationError carries a user-facing (Indonesian) validation message.
 // It unwraps to ErrInvalidInput so generic callers still treat it as a 400.
@@ -72,7 +122,14 @@ const (
 	LocationTypeLoss       LocationType = "LOSS"
 	LocationTypeScrap      LocationType = "SCRAP"
 	LocationTypeProduction LocationType = "PRODUCTION"
+	// Staging bins (sentry-wms §1.1): received goods wait here; never pickable for orders.
+	LocationTypeStagingInbound  LocationType = "STAGING_INBOUND"
+	LocationTypeStagingOutbound LocationType = "STAGING_OUTBOUND"
+	LocationTypeQuarantine      LocationType = "QUARANTINE"
 )
+
+// StagingInboundCode is the per-warehouse inbound staging bin code.
+const StagingInboundCode = "STG-IN"
 
 // SKUMappingType represents the type of external mapping.
 type SKUMappingType string
@@ -141,6 +198,8 @@ const (
 	StockRefOpname        = "OPNAME"
 	StockRefScrap         = "SCRAP"
 	StockRefMarketplace   = "MARKETPLACE"
+	StockRefPutaway       = "PUTAWAY"
+	StockRefPOS           = "POS_SALE"
 )
 
 // MarketplaceChannel represents supported e-commerce channels.
@@ -268,6 +327,8 @@ type StockMovement struct {
 	Status             StockMovementStatus `json:"status"`
 	ReferenceType      string              `json:"reference_type"`
 	ReferenceID        uuid.UUID           `json:"reference_id"`
+	BatchID            *uuid.UUID          `json:"batch_id,omitempty"`
+	BatchNumber        string              `json:"batch_number,omitempty"`
 	ExecutedBy         *uuid.UUID          `json:"executed_by,omitempty"`
 	ExecutedByName     string              `json:"executed_by_name,omitempty"`
 	CreatedAt          time.Time           `json:"created_at"`
@@ -428,6 +489,13 @@ type StockReceipt struct {
 	CancelledBy       *uuid.UUID         `json:"cancelled_by,omitempty"`
 	CancelledAt       *time.Time         `json:"cancelled_at,omitempty"`
 	CancelReason      *string            `json:"cancel_reason,omitempty"`
+	ReleasedBy        *uuid.UUID         `json:"released_by,omitempty"`
+	ReleasedAt        *time.Time         `json:"released_at,omitempty"`
+	CreatedByName     string             `json:"created_by_name,omitempty"`
+	PostedByName      string             `json:"posted_by_name,omitempty"`
+	CancelledByName   string             `json:"cancelled_by_name,omitempty"`
+	ReleasedByName    string             `json:"released_by_name,omitempty"`
+	OnHoldBatchCount  int                `json:"on_hold_batch_count"`
 	ItemCount         int                `json:"item_count"`
 	TotalAcceptedQty  decimal.Decimal    `json:"total_accepted_qty"`
 	TotalRejectedQty  decimal.Decimal    `json:"total_rejected_qty"`
@@ -445,7 +513,11 @@ type StockReceiptItem struct {
 	AcceptedQty  decimal.Decimal  `json:"accepted_qty"`
 	RejectedQty  decimal.Decimal  `json:"rejected_qty"`
 	RejectReason *string          `json:"reject_reason,omitempty"`
-	CreatedAt    time.Time        `json:"created_at"`
+	// Batch/lot (KO-1). Empty BatchNumber on post -> AUTO-<GR>-<line>.
+	BatchNumber *string    `json:"batch_number,omitempty"`
+	ExpiryDate  *time.Time `json:"expiry_date,omitempty"`
+	BatchID     *uuid.UUID `json:"batch_id,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 // ResolvedProduct represents the resolved master product from a barcode, SKU, or external mapping.
@@ -516,6 +588,8 @@ type MarketplaceOrderItem struct {
 
 // WMSRepository defines database operations for WMS entities.
 type WMSRepository interface {
+	WMSBatchRepository
+
 	// Regional
 	CreateRegional(ctx context.Context, r *Regional) error
 	GetRegionalByID(ctx context.Context, tenantID, id uuid.UUID) (*Regional, error)
@@ -578,8 +652,9 @@ type WMSRepository interface {
 	UpdateDraftStockReceipt(ctx context.Context, rc *StockReceipt, items []StockReceiptItem) error
 	GetStockReceiptByID(ctx context.Context, tenantID, id uuid.UUID) (*StockReceipt, []StockReceiptItem, error)
 	ListStockReceipts(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *StockReceiptStatus, receiptType *StockReceiptType) ([]StockReceipt, error)
-	// PostStockReceipt atomically writes ledger movements and sets POSTED.
-	PostStockReceipt(ctx context.Context, tenantID, id, userID, sourceLocID, scrapLocID uuid.UUID) (*StockReceipt, error)
+	// PostStockReceipt atomically creates batches, writes ledger movements into
+	// inbound staging (sentry-wms §1.2 step 1), writes the audit row and sets POSTED.
+	PostStockReceipt(ctx context.Context, p PostReceiptParams) (*StockReceipt, error)
 	// CancelStockReceipt atomically cancels a DRAFT, or reverses a POSTED receipt's movements.
 	CancelStockReceipt(ctx context.Context, tenantID, id, userID, defaultSourceLocID, scrapLocID uuid.UUID, reason string) (*StockReceipt, error)
 

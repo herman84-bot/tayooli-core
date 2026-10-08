@@ -96,29 +96,89 @@ func (m *mockWMSRepo) ListStockReceipts(ctx context.Context, tenantID uuid.UUID,
 	return list, nil
 }
 
-func (m *mockWMSRepo) PostStockReceipt(ctx context.Context, tenantID, id, userID, vendorLocID, scrapLocID uuid.UUID) (*domain.StockReceipt, error) {
+func (m *mockWMSRepo) PostStockReceipt(ctx context.Context, p domain.PostReceiptParams) (*domain.StockReceipt, error) {
 	m.initReceipts()
-	rc, ok := m.stockReceipts[id]
-	if !ok || rc.TenantID != tenantID {
+	rc, ok := m.stockReceipts[p.ReceiptID]
+	if !ok || rc.TenantID != p.TenantID {
 		return nil, domain.ErrStockReceiptNotFound
 	}
 	if rc.Status != domain.StockReceiptStatusDraft {
 		return nil, domain.ErrStockReceiptNotDraft
 	}
 	now := time.Now().UTC()
-	for i, it := range m.receiptItems[id] {
+	targetStaging := p.StagingLocID
+	if targetStaging == uuid.Nil {
+		targetStaging = rc.DestLocationID
+	}
+	items := m.receiptItems[p.ReceiptID]
+	for i := range items {
+		it := &items[i]
+		batchNum := ""
+		if it.BatchNumber != nil && *it.BatchNumber != "" {
+			batchNum = *it.BatchNumber
+		} else {
+			batchNum = domain.AutoBatchNumber(rc.ReceiptNumber, i+1)
+		}
+		status := domain.StockBatchStatusReleased
+		if p.HoldForRelease {
+			status = domain.StockBatchStatusOnHold
+		}
+		batchID := uuid.New()
+		b := &domain.StockBatch{
+			ID:              batchID,
+			TenantID:        p.TenantID,
+			ProductID:       it.ProductID,
+			BatchNumber:     batchNum,
+			ExpiryDate:      it.ExpiryDate,
+			SourceReceiptID: &p.ReceiptID,
+			Status:          status,
+			CreatedBy:       &p.UserID,
+			CreatedAt:       now,
+		}
+		if m.batches == nil {
+			m.batches = make(map[uuid.UUID]*domain.StockBatch)
+		}
+		m.batches[batchID] = b
+		it.BatchID = &batchID
+		it.BatchNumber = &batchNum
+
 		if it.AcceptedQty.IsPositive() {
-			_ = m.CreateStockMovement(ctx, &domain.StockMovement{ID: uuid.New(), TenantID: tenantID, MovementNumber: fmt.Sprintf("GR-IN-%s-%d", rc.ReceiptNumber, i+1),
-				ProductID: it.ProductID, SourceLocationID: vendorLocID, DestLocationID: rc.DestLocationID, Quantity: it.AcceptedQty,
-				Status: domain.StockMovementStatusDone, ReferenceType: domain.StockRefGoodsReceipt, ReferenceID: id, ExecutedBy: &userID, CreatedAt: now})
+			_ = m.CreateStockMovement(ctx, &domain.StockMovement{
+				ID:               uuid.New(),
+				TenantID:         p.TenantID,
+				MovementNumber:   fmt.Sprintf("GR-IN-%s-%d", rc.ReceiptNumber, i+1),
+				ProductID:        it.ProductID,
+				BatchID:          &batchID,
+				SourceLocationID: p.SourceLocID,
+				DestLocationID:   targetStaging,
+				Quantity:         it.AcceptedQty,
+				Status:           domain.StockMovementStatusDone,
+				ReferenceType:    domain.StockRefGoodsReceipt,
+				ReferenceID:      p.ReceiptID,
+				ExecutedBy:       &p.UserID,
+				CreatedAt:        now,
+			})
 		}
 		if it.RejectedQty.IsPositive() {
-			_ = m.CreateStockMovement(ctx, &domain.StockMovement{ID: uuid.New(), TenantID: tenantID, MovementNumber: fmt.Sprintf("GR-REJ-%s-%d", rc.ReceiptNumber, i+1),
-				ProductID: it.ProductID, SourceLocationID: vendorLocID, DestLocationID: scrapLocID, Quantity: it.RejectedQty,
-				Status: domain.StockMovementStatusDone, ReferenceType: domain.StockRefGoodsReceipt, ReferenceID: id, ExecutedBy: &userID, CreatedAt: now})
+			_ = m.CreateStockMovement(ctx, &domain.StockMovement{
+				ID:               uuid.New(),
+				TenantID:         p.TenantID,
+				MovementNumber:   fmt.Sprintf("GR-REJ-%s-%d", rc.ReceiptNumber, i+1),
+				ProductID:        it.ProductID,
+				BatchID:          &batchID,
+				SourceLocationID: p.SourceLocID,
+				DestLocationID:   p.ScrapLocID,
+				Quantity:         it.RejectedQty,
+				Status:           domain.StockMovementStatusDone,
+				ReferenceType:    domain.StockRefGoodsReceipt,
+				ReferenceID:      p.ReceiptID,
+				ExecutedBy:       &p.UserID,
+				CreatedAt:        now,
+			})
 		}
 	}
-	rc.Status, rc.PostedBy, rc.PostedAt = domain.StockReceiptStatusPosted, &userID, &now
+	m.receiptItems[p.ReceiptID] = items
+	rc.Status, rc.PostedBy, rc.PostedAt = domain.StockReceiptStatusPosted, &p.UserID, &now
 	cp := *rc
 	return &cp, nil
 }
@@ -134,26 +194,22 @@ func (m *mockWMSRepo) CancelStockReceipt(ctx context.Context, tenantID, id, user
 	}
 	now := time.Now().UTC()
 	if rc.Status == domain.StockReceiptStatusPosted {
-		items := m.receiptItems[id]
-		for _, it := range items { // check everything before mutating (atomic)
-			if it.AcceptedQty.IsPositive() && m.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, rc.DestLocationID, it.ProductID)].LessThan(it.AcceptedQty) {
-				return nil, domain.ErrStockReceiptStockConsumed
-			}
-			if it.RejectedQty.IsPositive() && m.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, scrapLocID, it.ProductID)].LessThan(it.RejectedQty) {
+		movs, _ := m.ListMovementsByReference(ctx, tenantID, domain.StockRefGoodsReceipt, id)
+		for _, sm := range movs {
+			key := fmt.Sprintf("%s:%s:%s", tenantID, sm.DestLocationID, sm.ProductID)
+			if m.stockLevels[key].LessThan(sm.Quantity) {
 				return nil, domain.ErrStockReceiptStockConsumed
 			}
 		}
-		for i, it := range items {
-			if it.AcceptedQty.IsPositive() {
-				_ = m.CreateStockMovement(ctx, &domain.StockMovement{ID: uuid.New(), TenantID: tenantID, MovementNumber: fmt.Sprintf("GR-REV-IN-%s-%d", rc.ReceiptNumber, i+1),
-					ProductID: it.ProductID, SourceLocationID: rc.DestLocationID, DestLocationID: vendorLocID, Quantity: it.AcceptedQty,
-					Status: domain.StockMovementStatusDone, ReferenceType: domain.StockRefGoodsReceipt, ReferenceID: id, ExecutedBy: &userID, CreatedAt: now})
-			}
-			if it.RejectedQty.IsPositive() {
-				_ = m.CreateStockMovement(ctx, &domain.StockMovement{ID: uuid.New(), TenantID: tenantID, MovementNumber: fmt.Sprintf("GR-REV-REJ-%s-%d", rc.ReceiptNumber, i+1),
-					ProductID: it.ProductID, SourceLocationID: scrapLocID, DestLocationID: vendorLocID, Quantity: it.RejectedQty,
-					Status: domain.StockMovementStatusDone, ReferenceType: domain.StockRefGoodsReceipt, ReferenceID: id, ExecutedBy: &userID, CreatedAt: now})
-			}
+		for i, sm := range movs {
+			revMov := sm
+			revMov.ID = uuid.New()
+			revMov.MovementNumber = fmt.Sprintf("GR-REV-%s-%d", rc.ReceiptNumber, i+1)
+			revMov.SourceLocationID = sm.DestLocationID
+			revMov.DestLocationID = sm.SourceLocationID
+			revMov.ExecutedBy = &userID
+			revMov.CreatedAt = now
+			_ = m.CreateStockMovement(ctx, &revMov)
 		}
 	}
 	rc.Status, rc.CancelledBy, rc.CancelledAt, rc.CancelReason = domain.StockReceiptStatusCancelled, &userID, &now, &reason
@@ -283,6 +339,7 @@ func TestStockReceiptLifecycle(t *testing.T) {
 
 		vendor, _ := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeVendor)
 		scrap, _ := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeScrap)
+		stgLoc, _ := repo.GetOrCreateStagingLocation(ctx, tenantID, whID)
 		require.Len(t, repo.stockMovements, 3)
 		type mv struct {
 			src, dst, prod uuid.UUID
@@ -296,18 +353,18 @@ func TestStockReceiptLifecycle(t *testing.T) {
 			got = append(got, mv{m.SourceLocationID, m.DestLocationID, m.ProductID, m.Quantity.String()})
 		}
 		assert.ElementsMatch(t, []mv{
-			{vendor.ID, binLoc, prodA, "10"},
+			{vendor.ID, stgLoc.ID, prodA, "10"},
 			{vendor.ID, scrap.ID, prodA, "2"},
-			{vendor.ID, binLoc, prodB, "5"},
+			{vendor.ID, stgLoc.ID, prodB, "5"},
 		}, got)
 		nums := map[string]bool{}
 		for _, m := range repo.stockMovements {
 			assert.False(t, nums[m.MovementNumber], "movement numbers must be unique")
 			nums[m.MovementNumber] = true
 		}
-		assert.True(t, stock(binLoc, prodA).Equal(dec(10)))
+		assert.True(t, stock(stgLoc.ID, prodA).Equal(dec(10)))
 		assert.True(t, stock(scrap.ID, prodA).Equal(dec(2)))
-		assert.True(t, stock(binLoc, prodB).Equal(dec(5)))
+		assert.True(t, stock(stgLoc.ID, prodB).Equal(dec(5)))
 
 		_, err = usecase.PostStockReceipt(ctx, tenantID, staffID, "warehouse", rc.ID)
 		assert.ErrorIs(t, err, domain.ErrStockReceiptNotDraft)
@@ -330,9 +387,9 @@ func TestStockReceiptLifecycle(t *testing.T) {
 			assert.Equal(t, vendor.ID, m.DestLocationID)
 			assert.Equal(t, rc.ID, m.ReferenceID)
 		}
-		assert.True(t, stock(binLoc, prodA).IsZero())
+		assert.True(t, stock(stgLoc.ID, prodA).IsZero())
 		assert.True(t, stock(scrap.ID, prodA).IsZero())
-		assert.True(t, stock(binLoc, prodB).IsZero())
+		assert.True(t, stock(stgLoc.ID, prodB).IsZero())
 
 		// terminal
 		_, err = usecase.CancelStockReceipt(ctx, tenantID, staffID, "warehouse", rc.ID, "lagi")
@@ -367,10 +424,11 @@ func TestStockReceiptLifecycle(t *testing.T) {
 		_, err = usecase.PostStockReceipt(ctx, tenantID, staffID, "warehouse", rc.ID)
 		require.NoError(t, err)
 
-		// consume 3 of prodA from the bin (e.g. a sale / delivery)
+		stgLoc, _ := repo.GetOrCreateStagingLocation(ctx, tenantID, whID)
+		// consume 3 of prodA from staging (e.g. putaway / consumption)
 		customer, _ := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeCustomer)
-		require.NoError(t, repo.DeductLocationStock(ctx, tenantID, binLoc, prodA, dec(3), &domain.StockMovement{
-			ID: uuid.New(), TenantID: tenantID, MovementNumber: "DO-X", ProductID: prodA, SourceLocationID: binLoc,
+		require.NoError(t, repo.DeductLocationStock(ctx, tenantID, stgLoc.ID, prodA, dec(3), &domain.StockMovement{
+			ID: uuid.New(), TenantID: tenantID, MovementNumber: "DO-X", ProductID: prodA, SourceLocationID: stgLoc.ID,
 			DestLocationID: customer.ID, Quantity: dec(3), Status: domain.StockMovementStatusDone, ReferenceType: domain.StockRefDeliveryOrder, ReferenceID: uuid.New(),
 		}))
 		before := len(repo.stockMovements)
@@ -439,10 +497,11 @@ func TestStockReceiptLifecycle(t *testing.T) {
 		prodLoc, _ := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeProduction)
 		scrapLoc, _ := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeScrap)
 		// Check that source location is @PRODUCTION
+		stgWh, _ := repo.GetOrCreateStagingLocation(ctx, tenantID, whID)
 		var foundProdAccepted, foundProdScrap bool
 		for _, m := range repo.stockMovements {
 			if m.ReferenceID == prodRc.ID {
-				if m.DestLocationID == binLoc {
+				if m.DestLocationID == stgWh.ID {
 					assert.Equal(t, prodLoc.ID, m.SourceLocationID)
 					assert.True(t, m.Quantity.Equal(dec(48)))
 					foundProdAccepted = true
@@ -493,11 +552,12 @@ func TestStockReceiptLifecycle(t *testing.T) {
 		assert.Equal(t, domain.StockReceiptStatusPosted, postedTr.Status)
 
 		transitLocObj, _ := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeTransit)
+		otherStg, _ := repo.GetOrCreateStagingLocation(ctx, tenantID, otherWhID)
 		var foundTransitAccepted bool
 		for _, m := range repo.stockMovements {
 			if m.ReferenceID == transferRc.ID {
 				assert.Equal(t, transitLocObj.ID, m.SourceLocationID)
-				assert.Equal(t, otherLoc, m.DestLocationID)
+				assert.Equal(t, otherStg.ID, m.DestLocationID)
 				assert.True(t, m.Quantity.Equal(dec(20)))
 				foundTransitAccepted = true
 			}

@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -56,9 +57,8 @@ const navGroups: NavGroup[] = [
   {
     label: 'Warehouse & POS',
     items: [
-      { href: '/wms/inbound', label: 'Barang Masuk', icon: PackagePlus },
+      { href: '/wms/arus-barang', label: 'Barang Masuk & Keluar', icon: ArrowLeftRight },
       { href: '/wms', label: 'Warehouse & Stock', icon: Warehouse, exact: true },
-      { href: '/wms/delivery-orders', label: 'Surat Jalan (DO)', icon: FileCheck },
       { href: '/wms/marketplace', label: 'Marketplace Omnichannel', icon: ShoppingBag },
       { href: '/wms/transfers', label: 'Stock Transfers', icon: Truck },
       { href: '/wms/opname', label: 'Stock Opname', icon: ClipboardCheck },

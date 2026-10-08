@@ -18,8 +18,8 @@ jest.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
 }))
 
-describe('Sidebar Navigation - 13 Clean Core Modules Hierarchy', () => {
-  it('renders all 13 core clean module links', () => {
+describe('Sidebar Navigation - 12 Clean Core Modules Hierarchy', () => {
+  it('renders all 12 core clean module links', () => {
     render(<Sidebar />)
 
     // 1. Dashboard (/dashboard)
@@ -28,14 +28,11 @@ describe('Sidebar Navigation - 13 Clean Core Modules Hierarchy', () => {
     // 2. Products (/products)
     expect(screen.getByRole('link', { name: /^Products$/i })).toHaveAttribute('href', '/products')
 
-    // 2b. Barang Masuk / inbound (/wms/inbound)
-    expect(screen.getByRole('link', { name: /^Barang Masuk$/i })).toHaveAttribute('href', '/wms/inbound')
+    // 3. Barang Masuk & Keluar (/wms/arus-barang) per KO-2a
+    expect(screen.getByRole('link', { name: /^Barang Masuk & Keluar$/i })).toHaveAttribute('href', '/wms/arus-barang')
 
-    // 3. Warehouse & Stock (/wms)
+    // 4. Warehouse & Stock (/wms)
     expect(screen.getByRole('link', { name: /^Warehouse & Stock$/i })).toHaveAttribute('href', '/wms')
-
-    // 4. Surat Jalan DO (/wms/delivery-orders)
-    expect(screen.getByRole('link', { name: /Surat Jalan/i })).toHaveAttribute('href', '/wms/delivery-orders')
 
     // 5. Marketplace Omnichannel (/wms/marketplace)
     expect(screen.getByRole('link', { name: /Marketplace/i })).toHaveAttribute('href', '/wms/marketplace')

@@ -243,6 +243,7 @@ export const COPILOT_TOOLS: ToolDefinition[] = [
             "/dashboard/payment-gateways",
             "/pos",
             "/wms",
+            "/wms/arus-barang",
             "/wms/delivery-orders",
             "/wms/marketplace",
             "/wms/transfers",

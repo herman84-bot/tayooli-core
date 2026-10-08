@@ -21,6 +21,8 @@ type StockReceiptItemRequest struct {
 	AcceptedQty  decimal.Decimal  `json:"accepted_qty"`
 	RejectedQty  decimal.Decimal  `json:"rejected_qty"`
 	RejectReason *string          `json:"reject_reason,omitempty"`
+	BatchNumber  *string          `json:"batch_number,omitempty"`
+	ExpiryDate   *time.Time       `json:"expiry_date,omitempty"`
 }
 
 type StockReceiptRequest struct {
@@ -102,17 +104,26 @@ func (u *Usecase) validateStockReceiptRequest(ctx context.Context, tenantID, use
 		return nil, receiptInvalid("Penerimaan harus memiliki minimal satu barang")
 	}
 
-	seen := make(map[uuid.UUID]bool, len(req.Items))
+	type productBatchKey struct {
+		prod  uuid.UUID
+		batch string
+	}
+	seen := make(map[productBatchKey]bool, len(req.Items))
 	items := make([]domain.StockReceiptItem, 0, len(req.Items))
 	for i, it := range req.Items {
 		line := i + 1
 		if it.ProductID == uuid.Nil {
 			return nil, receiptInvalid(fmt.Sprintf("Baris %d: produk wajib dipilih", line))
 		}
-		if seen[it.ProductID] {
-			return nil, receiptInvalid(fmt.Sprintf("Baris %d: produk yang sama tidak boleh diinput dua kali", line))
+		bn := ""
+		if it.BatchNumber != nil {
+			bn = strings.TrimSpace(*it.BatchNumber)
 		}
-		seen[it.ProductID] = true
+		key := productBatchKey{prod: it.ProductID, batch: strings.ToUpper(bn)}
+		if seen[key] {
+			return nil, receiptInvalid(fmt.Sprintf("Baris %d: kombinasi produk dan nomor batch yang sama tidak boleh diinput dua kali", line))
+		}
+		seen[key] = true
 		if it.ExpectedQty != nil && it.ExpectedQty.IsNegative() {
 			return nil, receiptInvalid(fmt.Sprintf("Baris %d: jumlah dipesan tidak boleh negatif", line))
 		}
@@ -135,6 +146,8 @@ func (u *Usecase) validateStockReceiptRequest(ctx context.Context, tenantID, use
 			AcceptedQty:  it.AcceptedQty,
 			RejectedQty:  it.RejectedQty,
 			RejectReason: reason,
+			BatchNumber:  trimPtr(it.BatchNumber),
+			ExpiryDate:   it.ExpiryDate,
 		})
 	}
 
@@ -350,11 +363,28 @@ func (u *Usecase) PostStockReceipt(ctx context.Context, tenantID, userID uuid.UU
 	if existing.Status != domain.StockReceiptStatusDraft {
 		return nil, domain.ErrStockReceiptNotDraft
 	}
+	stagingLoc, err := u.repo.GetOrCreateStagingLocation(ctx, tenantID, existing.WarehouseID)
+	if err != nil {
+		return nil, fmt.Errorf("PostStockReceipt: get staging location: %w", err)
+	}
 	sourceLocID, scrapID, err := u.systemReceiptLocations(ctx, tenantID, existing.ReceiptType)
 	if err != nil {
 		return nil, err
 	}
-	return u.repo.PostStockReceipt(ctx, tenantID, receiptID, userID, sourceLocID, scrapID)
+	holdForRelease := false
+	settings, err := u.repo.GetWMSSettings(ctx, tenantID)
+	if err == nil && settings != nil {
+		holdForRelease = settings.RequireReleaseApproval
+	}
+	return u.repo.PostStockReceipt(ctx, domain.PostReceiptParams{
+		TenantID:       tenantID,
+		ReceiptID:      receiptID,
+		UserID:         userID,
+		SourceLocID:    sourceLocID,
+		ScrapLocID:     scrapID,
+		StagingLocID:   stagingLoc.ID,
+		HoldForRelease: holdForRelease,
+	})
 }
 
 func (u *Usecase) CancelStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID, reason string) (*domain.StockReceipt, error) {

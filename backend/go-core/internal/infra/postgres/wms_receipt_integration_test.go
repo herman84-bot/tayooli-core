@@ -42,6 +42,9 @@ func TestStockReceiptRealPostgres(t *testing.T) {
 	defer admin.Close()
 	require.NoError(t, admin.PingContext(ctx))
 
+	// Clean throwaway database schema before running migrations
+	_, _ = admin.ExecContext(ctx, "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;")
+
 	// 1. Migrations exactly as production startup runs them.
 	require.NoError(t, migrations.Run(ctx, admin), "migrations.Run must succeed on a fresh database")
 
@@ -62,9 +65,9 @@ func TestStockReceiptRealPostgres(t *testing.T) {
 	// Production upgrade path: a database already at 027 receives 028 on deploy.
 	// Roll 028 back to "pending", then let the real runner apply it again.
 	for _, q := range []string{
-		`DROP TABLE stock_receipt_items`,
-		// CASCADE: 033 adds stock_batches.source_receipt_id -> stock_receipts FK.
-		`DROP TABLE stock_receipts CASCADE`,
+		`DROP TABLE IF EXISTS stock_receipt_items CASCADE`,
+		`DROP TABLE IF EXISTS stock_batches CASCADE`,
+		`DROP TABLE IF EXISTS stock_receipts CASCADE`,
 		// 029 and 033 ALTER the 028 tables; dropping them also drops those columns,
 		// so both must be re-applied too or the schema is silently incomplete.
 		`DELETE FROM schema_migrations WHERE filename IN ('028_wms_stock_receipts.sql', '029_wms_receipt_source_types.sql', '033_wms_batches_staging_putaway.sql')`,
@@ -178,17 +181,26 @@ func TestStockReceiptRealPostgres(t *testing.T) {
 	var vErr *domain.StockReceiptValidationError
 	require.True(t, errors.As(err, &vErr), "unknown product should be a validation error, got %v", err)
 
-	// 5. POST: accepted -> bin, rejected -> @SCRAP, atomically.
+	// 5. POST: accepted -> staging, rejected -> @SCRAP, atomically with batch.
+	stgLoc, err := repo.GetOrCreateStagingLocation(ctx, tenantID, warehouseID)
+	require.NoError(t, err)
+
 	posted, err := uc.PostStockReceipt(ctx, tenantID, userID, "admin", rc.ID)
 	require.NoError(t, err)
 	require.Equal(t, domain.StockReceiptStatusPosted, posted.Status)
-	require.True(t, stockAt(binID).Equal(decimal.NewFromInt(12)), "bin stock = %s", stockAt(binID))
+	require.True(t, stockAt(stgLoc.ID).Equal(decimal.NewFromInt(12)), "staging stock = %s", stockAt(stgLoc.ID))
 	require.True(t, stockAt(scrapLoc.ID).Equal(decimal.NewFromInt(2)), "scrap stock = %s", stockAt(scrapLoc.ID))
 
 	var movCount int
 	require.NoError(t, admin.QueryRowContext(ctx,
 		`SELECT count(*) FROM stock_movements WHERE reference_type = 'GOODS_RECEIPT' AND reference_id = $1`, rc.ID).Scan(&movCount))
 	require.Equal(t, 2, movCount)
+
+	// Fetch created batch_id for test simulation
+	var batchID uuid.UUID
+	require.NoError(t, admin.QueryRowContext(ctx,
+		`SELECT batch_id FROM stock_receipt_items WHERE receipt_id = $1 LIMIT 1`, rc.ID).Scan(&batchID))
+	require.NotEqual(t, uuid.Nil, batchID)
 
 	// Double post and edit-after-post are rejected; no extra ledger rows.
 	_, err = uc.PostStockReceipt(ctx, tenantID, userID, "admin", rc.ID)
@@ -203,28 +215,30 @@ func TestStockReceiptRealPostgres(t *testing.T) {
 	_, _, err = uc.GetStockReceipt(ctx, otherTenant, userID, "admin", rc.ID)
 	require.ErrorIs(t, err, domain.ErrStockReceiptNotFound)
 
-	// 7. Cancel blocked when stock already consumed (simulate a sale: bin -> @CUSTOMER).
+	// 7. Cancel blocked when stock already consumed (simulate a consumption: stgLoc -> @CUSTOMER).
 	custLoc, err := repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeCustomer)
 	require.NoError(t, err)
 	require.NoError(t, repo.CreateStockMovement(ctx, &domain.StockMovement{
 		ID: uuid.New(), TenantID: tenantID, MovementNumber: "IT-SALE-1", ProductID: productID,
-		SourceLocationID: binID, DestLocationID: custLoc.ID, Quantity: decimal.NewFromInt(5),
+		SourceLocationID: stgLoc.ID, DestLocationID: custLoc.ID, Quantity: decimal.NewFromInt(5),
 		Status: domain.StockMovementStatusDone, ReferenceType: "IT", ReferenceID: uuid.New(),
+		BatchID: &batchID,
 	}))
 	_, err = uc.CancelStockReceipt(ctx, tenantID, userID, "admin", rc.ID, "salah input")
 	require.ErrorIs(t, err, domain.ErrStockReceiptStockConsumed)
-	require.True(t, stockAt(binID).Equal(decimal.NewFromInt(7)), "failed cancel must not change stock")
+	require.True(t, stockAt(stgLoc.ID).Equal(decimal.NewFromInt(7)), "failed cancel must not change stock")
 
-	// Return the sold units, then cancel succeeds and fully reverses.
+	// Return the consumed units, then cancel succeeds and fully reverses.
 	require.NoError(t, repo.CreateStockMovement(ctx, &domain.StockMovement{
 		ID: uuid.New(), TenantID: tenantID, MovementNumber: "IT-RETURN-1", ProductID: productID,
-		SourceLocationID: custLoc.ID, DestLocationID: binID, Quantity: decimal.NewFromInt(5),
+		SourceLocationID: custLoc.ID, DestLocationID: stgLoc.ID, Quantity: decimal.NewFromInt(5),
 		Status: domain.StockMovementStatusDone, ReferenceType: "IT", ReferenceID: uuid.New(),
+		BatchID: &batchID,
 	}))
 	cancelled, err := uc.CancelStockReceipt(ctx, tenantID, userID, "admin", rc.ID, "salah input")
 	require.NoError(t, err)
 	require.Equal(t, domain.StockReceiptStatusCancelled, cancelled.Status)
-	require.True(t, stockAt(binID).IsZero(), "bin after cancel = %s", stockAt(binID))
+	require.True(t, stockAt(stgLoc.ID).IsZero(), "staging after cancel = %s", stockAt(stgLoc.ID))
 	require.True(t, stockAt(scrapLoc.ID).IsZero(), "scrap after cancel = %s", stockAt(scrapLoc.ID))
 
 	// Ledger is append-only: 2 post + 2 reversal rows, nothing deleted.

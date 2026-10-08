@@ -2,6 +2,7 @@ package pos
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -176,31 +177,43 @@ func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req 
 
 		// Record in immutable stock movement ledger if WMS repo is available
 		if u.wmsRepo != nil {
-			var locID uuid.UUID
-			// Find a default internal location
-			locs, err := u.wmsRepo.ListLocations(ctx, tenantID, req.WarehouseID)
-			if err == nil && len(locs) > 0 {
-				locID = locs[0].ID
+			var whID uuid.UUID
+			if req.WarehouseID != nil && *req.WarehouseID != uuid.Nil {
+				whID = *req.WarehouseID
 			} else {
-				locID = uuid.New()
+				whs, err := u.wmsRepo.ListWarehouses(ctx, tenantID)
+				if err == nil && len(whs) > 0 {
+					whID = whs[0].ID
+				}
 			}
 
-			mov := &domain.StockMovement{
-				ID:               uuid.New(),
-				TenantID:         tenantID,
-				MovementNumber:   generatePOSNumber("MV-POS"),
-				ProductID:        item.ProductID,
-				SourceLocationID: locID,
-				DestLocationID:   locID,
-				Quantity:         item.Quantity,
-				UnitCost:         itemPrice,
-				Status:           domain.StockMovementStatusDone,
-				ReferenceType:    "POS_SALE",
-				ReferenceID:      orderID,
-				ExecutedBy:       &userID,
-				CreatedAt:        time.Now().UTC(),
+			if whID != uuid.Nil {
+				custLoc, err := u.wmsRepo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeCustomer)
+				if err != nil {
+					return nil, fmt.Errorf("pos: resolve customer location: %w", err)
+				}
+
+				mov := &domain.StockMovement{
+					ID:             uuid.New(),
+					TenantID:       tenantID,
+					MovementNumber: generatePOSNumber("MV-POS"),
+					ProductID:      item.ProductID,
+					DestLocationID: custLoc.ID,
+					Quantity:       item.Quantity,
+					UnitCost:       itemPrice,
+					Status:         domain.StockMovementStatusDone,
+					ReferenceType:  domain.StockRefPOS,
+					ReferenceID:    orderID,
+					ExecutedBy:     &userID,
+					CreatedAt:      time.Now().UTC(),
+				}
+				if err := u.wmsRepo.DeductWarehouseStock(ctx, tenantID, whID, item.ProductID, item.Quantity, mov); err != nil {
+					if errors.Is(err, domain.ErrInsufficientStock) {
+						return nil, fmt.Errorf("%w: stok gudang tidak mencukupi untuk SKU %s", domain.ErrInsufficientStock, p.SKU)
+					}
+					return nil, fmt.Errorf("pos: deduct warehouse stock SKU %s: %w", p.SKU, err)
+				}
 			}
-			_ = u.wmsRepo.CreateStockMovement(ctx, mov)
 		}
 	}
 

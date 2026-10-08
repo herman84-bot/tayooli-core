@@ -84,6 +84,19 @@ type WMSUsecase interface {
 	ListMarketplaceOrders(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID, batchID *uuid.UUID, status *domain.MarketplaceOrderStatus) ([]domain.MarketplaceOrder, error)
 	GetMarketplaceOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, orderID uuid.UUID) (*domain.MarketplaceOrder, error)
 	ListSKUMappings(ctx context.Context, tenantID uuid.UUID, channelName string) ([]domain.ProductSKUMapping, error)
+
+	// Sprint 1: Putaway, Release, Settings, Default Locations, Trace
+	GetPutawayPending(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID) ([]domain.PutawayPendingLine, error)
+	ConfirmPutaway(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.PutawayRequest) (*domain.StockMovement, error)
+	ReleaseStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, error)
+	GetWMSSettings(ctx context.Context, tenantID, userID uuid.UUID, role string) (*domain.WMSSettings, error)
+	UpdateWMSSettings(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.UpdateWMSSettingsRequest) (*domain.WMSSettings, error)
+	ListDefaultLocations(ctx context.Context, tenantID, userID uuid.UUID, role string, productID *uuid.UUID) ([]domain.ProductDefaultLocation, error)
+	SetDefaultLocation(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.SetDefaultLocationRequest) error
+	DeleteDefaultLocation(ctx context.Context, tenantID, userID uuid.UUID, role string, productID, warehouseID uuid.UUID) error
+	TraceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.BatchTrace, error)
+	TraceDocument(ctx context.Context, tenantID, userID uuid.UUID, role string, refType string, refID uuid.UUID) (*domain.DocumentTrace, error)
+	ListAuditTrail(ctx context.Context, tenantID, userID uuid.UUID, role string, entityType string, entityID uuid.UUID) ([]domain.AuditTrailEntry, error)
 }
 
 type WMSHandler struct {
@@ -134,6 +147,25 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Put("/receipts/{id}", h.UpdateStockReceipt)
 		r.Post("/receipts/{id}/post", h.PostStockReceipt)
 		r.Post("/receipts/{id}/cancel", h.CancelStockReceipt)
+		r.Post("/receipts/{id}/release", h.ReleaseStockReceipt)
+
+		// Putaway (sentry-wms §1.2 step 2)
+		r.Get("/putaway/pending", h.GetPutawayPending)
+		r.Post("/putaway/confirm", h.ConfirmPutaway)
+
+		// WMS Settings (PDF-06)
+		r.Get("/settings", h.GetWMSSettings)
+		r.Put("/settings", h.UpdateWMSSettings)
+
+		// Product Default Locations (CR-03)
+		r.Get("/default-locations", h.ListDefaultLocations)
+		r.Post("/default-locations", h.SetDefaultLocation)
+		r.Delete("/default-locations", h.DeleteDefaultLocation)
+
+		// Traceability (KO-1c) & Audit
+		r.Get("/trace/batch/{id}", h.TraceBatch)
+		r.Get("/trace/document", h.TraceDocument)
+		r.Get("/audit-trail", h.ListAuditTrail)
 
 		// Stock movements & Ledger
 		r.Get("/movements", h.ListStockMovements)
@@ -168,6 +200,16 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusConflict, "Penerimaan sudah dibatalkan sebelumnya")
 	case errors.Is(err, domain.ErrStockReceiptStockConsumed):
 		RespondError(w, r, http.StatusUnprocessableEntity, "Penerimaan tidak bisa dibatalkan karena sebagian barang sudah terpakai, dipindahkan, atau terjual")
+	case errors.Is(err, domain.ErrPutawayReasonRequired):
+		RespondError(w, r, http.StatusBadRequest, "Alasan putaway wajib diisi jika lokasi tujuan berbeda dari rak default")
+	case errors.Is(err, domain.ErrInvalidPutawayLocation):
+		RespondError(w, r, http.StatusBadRequest, "Lokasi rak tujuan putaway tidak valid atau bukan rak internal")
+	case errors.Is(err, domain.ErrReceiptNotOnHold):
+		RespondError(w, r, http.StatusBadRequest, "Penerimaan barang tidak memiliki lot yang berstatus ON_HOLD")
+	case errors.Is(err, domain.ErrBatchOnHold):
+		RespondError(w, r, http.StatusConflict, "Batch/Lot berstatus ON_HOLD dan belum disetujui untuk rilis")
+	case errors.Is(err, domain.ErrBatchRequired):
+		RespondError(w, r, http.StatusBadRequest, "Batch ID wajib dicantumkan pada setiap mutasi barang")
 	case errors.Is(err, domain.ErrConflict):
 		RespondError(w, r, http.StatusConflict, "conflict")
 	case errors.Is(err, domain.ErrWarehouseNotFound):

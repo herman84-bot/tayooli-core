@@ -3,9 +3,11 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,21 +32,28 @@ INSERT INTO stock_receipts (
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`
 
 const createStockReceiptItemSQL = `
-INSERT INTO stock_receipt_items (id, tenant_id, receipt_id, product_id, expected_qty, accepted_qty, rejected_qty, reject_reason, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+INSERT INTO stock_receipt_items (id, tenant_id, receipt_id, product_id, expected_qty, accepted_qty, rejected_qty, reject_reason, batch_number, expiry_date, batch_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 
 const stockReceiptColumns = `
 r.id, r.tenant_id, r.receipt_number, r.receipt_type, r.warehouse_id, r.dest_location_id,
 COALESCE(r.from_name, r.supplier_name, ''), r.from_warehouse_id, fw.name, r.source_ref, r.transfer_id,
 COALESCE(r.supplier_name, r.from_name, ''), r.supplier_ref, r.notes,
 r.status, r.created_by, r.created_at, r.updated_at, r.posted_by, r.posted_at, r.cancelled_by, r.cancelled_at, r.cancel_reason,
+r.released_by, r.released_at,
+COALESCE(u_cr.full_name, u_cr.email, ''),
+COALESCE(u_po.full_name, u_po.email, ''),
+COALESCE(u_ca.full_name, u_ca.email, ''),
+COALESCE(u_re.full_name, u_re.email, ''),
+(SELECT COUNT(*) FROM stock_batches b WHERE b.source_receipt_id = r.id AND b.tenant_id = r.tenant_id AND b.status = 'ON_HOLD'),
 (SELECT COUNT(*) FROM stock_receipt_items i WHERE i.receipt_id = r.id AND i.tenant_id = r.tenant_id),
 (SELECT COALESCE(SUM(i.accepted_qty), 0) FROM stock_receipt_items i WHERE i.receipt_id = r.id AND i.tenant_id = r.tenant_id),
 (SELECT COALESCE(SUM(i.rejected_qty), 0) FROM stock_receipt_items i WHERE i.receipt_id = r.id AND i.tenant_id = r.tenant_id)`
 
 const getStockReceiptItemsSQL = `
 SELECT i.id, i.tenant_id, i.receipt_id, i.product_id, COALESCE(p.name, ''), COALESCE(p.sku, ''),
-       i.expected_qty, i.accepted_qty, i.rejected_qty, i.reject_reason, i.created_at
+       i.expected_qty, i.accepted_qty, i.rejected_qty, i.reject_reason,
+       i.batch_number, i.expiry_date, i.batch_id, i.created_at
 FROM stock_receipt_items i
 LEFT JOIN products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
 WHERE i.receipt_id = $1 AND i.tenant_id = $2
@@ -52,14 +61,19 @@ ORDER BY i.created_at, i.id`
 
 func scanStockReceipt(s rowScanner) (*domain.StockReceipt, error) {
 	var rc domain.StockReceipt
-	var fromWhID, transferID, postedBy, cancelledBy sql.NullString
+	var fromWhID, transferID, postedBy, cancelledBy, releasedBy sql.NullString
 	var fromWhName, sourceRef, supName, supRef, notes, cancelReason sql.NullString
-	var postedAt, cancelledAt sql.NullTime
+	var postedAt, cancelledAt, releasedAt sql.NullTime
+	var crName, poName, caName, reName string
+	var onHoldCount int
 	if err := s.Scan(
 		&rc.ID, &rc.TenantID, &rc.ReceiptNumber, &rc.ReceiptType, &rc.WarehouseID, &rc.DestLocationID,
 		&rc.FromName, &fromWhID, &fromWhName, &sourceRef, &transferID,
 		&supName, &supRef, &notes,
 		&rc.Status, &rc.CreatedBy, &rc.CreatedAt, &rc.UpdatedAt, &postedBy, &postedAt, &cancelledBy, &cancelledAt, &cancelReason,
+		&releasedBy, &releasedAt,
+		&crName, &poName, &caName, &reName,
+		&onHoldCount,
 		&rc.ItemCount, &rc.TotalAcceptedQty, &rc.TotalRejectedQty,
 	); err != nil {
 		return nil, err
@@ -80,6 +94,13 @@ func scanStockReceipt(s rowScanner) (*domain.StockReceipt, error) {
 	rc.CancelledBy = nullUUIDToPtr(cancelledBy)
 	rc.CancelledAt = nullTimeToPtr(cancelledAt)
 	rc.CancelReason = nullStringToPtr(cancelReason)
+	rc.ReleasedBy = nullUUIDToPtr(releasedBy)
+	rc.ReleasedAt = nullTimeToPtr(releasedAt)
+	rc.CreatedByName = crName
+	rc.PostedByName = poName
+	rc.CancelledByName = caName
+	rc.ReleasedByName = reName
+	rc.OnHoldBatchCount = onHoldCount
 	return &rc, nil
 }
 
@@ -87,6 +108,10 @@ func getStockReceiptTx(ctx context.Context, tx *sql.Tx, tenantID, id uuid.UUID, 
 	q := `SELECT ` + stockReceiptColumns + `
 FROM stock_receipts r
 LEFT JOIN warehouses fw ON fw.id = r.from_warehouse_id AND fw.tenant_id = r.tenant_id
+LEFT JOIN users u_cr ON u_cr.id = r.created_by
+LEFT JOIN users u_po ON u_po.id = r.posted_by
+LEFT JOIN users u_ca ON u_ca.id = r.cancelled_by
+LEFT JOIN users u_re ON u_re.id = r.released_by
 WHERE r.id = $1 AND r.tenant_id = $2`
 	if forUpdate {
 		q += ` FOR UPDATE OF r`
@@ -112,12 +137,19 @@ func getStockReceiptItemsTx(ctx context.Context, tx *sql.Tx, tenantID, id uuid.U
 		var it domain.StockReceiptItem
 		var expected decimal.NullDecimal
 		var reason sql.NullString
+		var batchNum sql.NullString
+		var exp sql.NullTime
+		var batchID sql.NullString
 		if err := rows.Scan(&it.ID, &it.TenantID, &it.ReceiptID, &it.ProductID, &it.ProductName, &it.ProductSKU,
-			&expected, &it.AcceptedQty, &it.RejectedQty, &reason, &it.CreatedAt); err != nil {
+			&expected, &it.AcceptedQty, &it.RejectedQty, &reason,
+			&batchNum, &exp, &batchID, &it.CreatedAt); err != nil {
 			return nil, err
 		}
 		it.ExpectedQty = nullDecimalToPtr(expected)
 		it.RejectReason = nullStringToPtr(reason)
+		it.BatchNumber = nullStringToPtr(batchNum)
+		it.ExpiryDate = nullTimeToPtr(exp)
+		it.BatchID = nullUUIDToPtr(batchID)
 		items = append(items, it)
 	}
 	return items, rows.Err()
@@ -136,7 +168,9 @@ func insertStockReceiptItemsTx(ctx context.Context, tx *sql.Tx, rc *domain.Stock
 		}
 		if _, err := tx.ExecContext(ctx, createStockReceiptItemSQL,
 			it.ID, it.TenantID, it.ReceiptID, it.ProductID, ptrToNullDecimal(it.ExpectedQty),
-			it.AcceptedQty, it.RejectedQty, ptrToNullString(it.RejectReason), it.CreatedAt); err != nil {
+			it.AcceptedQty, it.RejectedQty, ptrToNullString(it.RejectReason),
+			ptrToNullString(it.BatchNumber), ptrToNullTime(it.ExpiryDate), ptrToNullUUID(it.BatchID),
+			it.CreatedAt); err != nil {
 			var pqErr *pq.Error
 			if errors.As(err, &pqErr) && pqErr.Code == "23503" {
 				// Unknown product (or one belonging to another tenant): user error, not a 500.
@@ -317,6 +351,10 @@ func (r *WMSRepo) ListStockReceipts(ctx context.Context, tenantID uuid.UUID, war
 	query := `SELECT ` + stockReceiptColumns + `
 FROM stock_receipts r
 LEFT JOIN warehouses fw ON fw.id = r.from_warehouse_id AND fw.tenant_id = r.tenant_id
+LEFT JOIN users u_cr ON u_cr.id = r.created_by
+LEFT JOIN users u_po ON u_po.id = r.posted_by
+LEFT JOIN users u_ca ON u_ca.id = r.cancelled_by
+LEFT JOIN users u_re ON u_re.id = r.released_by
 WHERE r.tenant_id = $1
   AND ($2::uuid IS NULL OR r.warehouse_id = $2)
   AND ($3::varchar IS NULL OR r.status = $3)
@@ -347,53 +385,37 @@ ORDER BY r.created_at DESC`
 	return result, nil
 }
 
-func insertReceiptMovementTx(ctx context.Context, tx *sql.Tx, tenantID, userID, receiptID, productID, src, dst uuid.UUID, qty decimal.Decimal, number string, now time.Time) error {
+func insertReceiptMovementTx(ctx context.Context, tx *sql.Tx, tenantID, userID, receiptID, productID, batchID, src, dst uuid.UUID, qty decimal.Decimal, number string, now time.Time) error {
 	_, err := tx.ExecContext(ctx, createStockMovementSQL,
 		uuid.New(), tenantID, number, productID, src, dst, qty, decimal.Zero,
 		domain.StockMovementStatusDone, domain.StockRefGoodsReceipt, receiptID,
-		ptrToNullUUID(&userID), now)
+		ptrToNullUUID(&userID), ptrToNullUUID(&batchID), now)
 	return err
-}
-
-// postedLocationTx returns the location a receipt's posted movements used,
-// matched by movement_number prefix. For "GR-IN-%" the vendor side is the
-// source; for "GR-REJ-%" the scrap side is the destination (vendor is source).
-// wantSource selects which column to read. ok=false means no such movement.
-func postedLocationTx(ctx context.Context, tx *sql.Tx, tenantID, receiptID uuid.UUID, numberLike string, wantSource bool) (uuid.UUID, bool, error) {
-	col := "dest_location_id"
-	if wantSource {
-		col = "source_location_id"
-	}
-	var loc uuid.UUID
-	err := tx.QueryRowContext(ctx, `
-SELECT `+col+` FROM stock_movements
-WHERE tenant_id = $1 AND reference_type = $2 AND reference_id = $3 AND movement_number LIKE $4
-ORDER BY created_at, id LIMIT 1`,
-		tenantID, domain.StockRefGoodsReceipt, receiptID, numberLike).Scan(&loc)
-	if errors.Is(err, sql.ErrNoRows) {
-		return uuid.Nil, false, nil
-	}
-	if err != nil {
-		return uuid.Nil, false, fmt.Errorf("WMSRepo.CancelStockReceipt: posted location: %w", err)
-	}
-	return loc, true, nil
 }
 
 // PostStockReceipt: DRAFT -> POSTED in a single transaction. The header row is
 // locked FOR UPDATE so concurrent/double posts serialize and the second one
 // sees POSTED and returns ErrStockReceiptNotDraft (no double ledger entries).
-func (r *WMSRepo) PostStockReceipt(ctx context.Context, tenantID, id, userID, sourceLocID, scrapLocID uuid.UUID) (*domain.StockReceipt, error) {
+// Adopted patterns: sentry-wms §1.2 (inbound to staging), OCA §1.3 (lot + expiry).
+func (r *WMSRepo) PostStockReceipt(ctx context.Context, p domain.PostReceiptParams) (*domain.StockReceipt, error) {
+	if p.UserID == uuid.Nil {
+		return nil, domain.ErrActorRequired
+	}
+	if p.ReceiptID == uuid.Nil || p.TenantID == uuid.Nil {
+		return nil, domain.ErrInvalidInput
+	}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.PostStockReceipt: begin tx: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+	if err := setTenantLocally(ctx, tx, p.TenantID); err != nil {
 		return nil, fmt.Errorf("WMSRepo.PostStockReceipt: set tenant: %w", err)
 	}
 
-	rc, err := getStockReceiptTx(ctx, tx, tenantID, id, true)
+	rc, err := getStockReceiptTx(ctx, tx, p.TenantID, p.ReceiptID, true)
 	if err != nil {
 		if errors.Is(err, domain.ErrStockReceiptNotFound) {
 			return nil, err
@@ -403,7 +425,7 @@ func (r *WMSRepo) PostStockReceipt(ctx context.Context, tenantID, id, userID, so
 	if rc.Status != domain.StockReceiptStatusDraft {
 		return nil, domain.ErrStockReceiptNotDraft
 	}
-	items, err := getStockReceiptItemsTx(ctx, tx, tenantID, id)
+	items, err := getStockReceiptItemsTx(ctx, tx, p.TenantID, p.ReceiptID)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.PostStockReceipt: items: %w", err)
 	}
@@ -411,16 +433,56 @@ func (r *WMSRepo) PostStockReceipt(ctx context.Context, tenantID, id, userID, so
 		return nil, &domain.StockReceiptValidationError{Msg: "Penerimaan harus memiliki minimal satu barang"}
 	}
 
+	targetStagingLoc := p.StagingLocID
+	if targetStagingLoc == uuid.Nil {
+		targetStagingLoc = rc.DestLocationID
+	}
+
 	now := time.Now().UTC()
 	for i, it := range items {
+		batchNum := ""
+		if it.BatchNumber != nil && strings.TrimSpace(*it.BatchNumber) != "" {
+			batchNum = strings.TrimSpace(*it.BatchNumber)
+		} else {
+			batchNum = domain.AutoBatchNumber(rc.ReceiptNumber, i+1)
+		}
+		batchStatus := domain.StockBatchStatusReleased
+		if p.HoldForRelease {
+			batchStatus = domain.StockBatchStatusOnHold
+		}
+
+		batchObj := &domain.StockBatch{
+			ID:              uuid.New(),
+			TenantID:        p.TenantID,
+			ProductID:       it.ProductID,
+			BatchNumber:     batchNum,
+			ExpiryDate:      it.ExpiryDate,
+			SourceReceiptID: &rc.ID,
+			Status:          batchStatus,
+			CreatedBy:       &p.UserID,
+			CreatedAt:       now,
+		}
+		batch, err := r.getOrCreateBatchTx(ctx, tx, batchObj)
+		if err != nil {
+			return nil, fmt.Errorf("WMSRepo.PostStockReceipt: batch line %d: %w", i+1, err)
+		}
+
+		if _, err := tx.ExecContext(ctx, `
+UPDATE stock_receipt_items
+SET batch_id = $1, batch_number = $2, expiry_date = $3
+WHERE id = $4 AND tenant_id = $5`,
+			batch.ID, batch.BatchNumber, ptrToNullTime(batch.ExpiryDate), it.ID, p.TenantID); err != nil {
+			return nil, fmt.Errorf("WMSRepo.PostStockReceipt: update item batch: %w", err)
+		}
+
 		if it.AcceptedQty.GreaterThan(decimal.Zero) {
-			if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, it.ProductID, sourceLocID, rc.DestLocationID,
+			if err := insertReceiptMovementTx(ctx, tx, p.TenantID, p.UserID, p.ReceiptID, it.ProductID, batch.ID, p.SourceLocID, targetStagingLoc,
 				it.AcceptedQty, fmt.Sprintf("GR-IN-%s-%d", rc.ReceiptNumber, i+1), now); err != nil {
 				return nil, fmt.Errorf("WMSRepo.PostStockReceipt: accepted movement %d: %w", i, err)
 			}
 		}
 		if it.RejectedQty.GreaterThan(decimal.Zero) {
-			if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, it.ProductID, sourceLocID, scrapLocID,
+			if err := insertReceiptMovementTx(ctx, tx, p.TenantID, p.UserID, p.ReceiptID, it.ProductID, batch.ID, p.SourceLocID, p.ScrapLocID,
 				it.RejectedQty, fmt.Sprintf("GR-REJ-%s-%d", rc.ReceiptNumber, i+1), now); err != nil {
 				return nil, fmt.Errorf("WMSRepo.PostStockReceipt: rejected movement %d: %w", i, err)
 			}
@@ -431,20 +493,32 @@ func (r *WMSRepo) PostStockReceipt(ctx context.Context, tenantID, id, userID, so
 		_, _ = tx.ExecContext(ctx, `
 UPDATE stock_transfers
 SET status = 'RECEIVED', received_at = $3, updated_at = $3
-WHERE id = $1 AND tenant_id = $2 AND status IN ('DISPATCHED', 'IN_TRANSIT')`, *rc.TransferID, tenantID, now)
+WHERE id = $1 AND tenant_id = $2 AND status IN ('DISPATCHED', 'IN_TRANSIT')`, *rc.TransferID, p.TenantID, now)
 	}
 
 	if _, err := tx.ExecContext(ctx, `
 UPDATE stock_receipts SET status = $3, posted_by = $4, posted_at = $5, updated_at = $5
-WHERE id = $1 AND tenant_id = $2`, id, tenantID, domain.StockReceiptStatusPosted, userID, now); err != nil {
+WHERE id = $1 AND tenant_id = $2`, p.ReceiptID, p.TenantID, domain.StockReceiptStatusPosted, p.UserID, now); err != nil {
 		return nil, fmt.Errorf("WMSRepo.PostStockReceipt: update status: %w", err)
+	}
+
+	auditDetails, _ := json.Marshal(map[string]any{
+		"receipt_number": rc.ReceiptNumber,
+		"receipt_type":   rc.ReceiptType,
+		"warehouse_id":   rc.WarehouseID,
+		"staging_loc_id": targetStagingLoc,
+		"item_count":     len(items),
+		"held":           p.HoldForRelease,
+	})
+	if err := r.WriteAuditTx(ctx, tx, p.TenantID, &p.UserID, "stock_receipt", p.ReceiptID, "posted", auditDetails); err != nil {
+		return nil, fmt.Errorf("WMSRepo.PostStockReceipt: audit: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("WMSRepo.PostStockReceipt: commit: %w", err)
 	}
 	rc.Status = domain.StockReceiptStatusPosted
-	rc.PostedBy = &userID
+	rc.PostedBy = &p.UserID
 	rc.PostedAt = &now
 	rc.UpdatedAt = now
 	return rc, nil
@@ -453,6 +527,10 @@ WHERE id = $1 AND tenant_id = $2`, id, tenantID, domain.StockReceiptStatusPosted
 // CancelStockReceipt: DRAFT -> CANCELLED, or POSTED -> CANCELLED with reversing
 // movements, all in one transaction. Movements are never deleted.
 func (r *WMSRepo) CancelStockReceipt(ctx context.Context, tenantID, id, userID, vendorLocID, scrapLocID uuid.UUID, reason string) (*domain.StockReceipt, error) {
+	if userID == uuid.Nil {
+		return nil, domain.ErrActorRequired
+	}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: begin tx: %w", err)
@@ -476,37 +554,37 @@ func (r *WMSRepo) CancelStockReceipt(ctx context.Context, tenantID, id, userID, 
 
 	now := time.Now().UTC()
 	if rc.Status == domain.StockReceiptStatusPosted {
-		items, err := getStockReceiptItemsTx(ctx, tx, tenantID, id)
+		type origMovement struct {
+			productID  uuid.UUID
+			batchID    uuid.UUID
+			sourceID   uuid.UUID
+			destID     uuid.UUID
+			qty        decimal.Decimal
+			movNumber  string
+		}
+		rows, err := tx.QueryContext(ctx, `
+SELECT product_id, batch_id, source_location_id, dest_location_id, quantity, movement_number
+FROM stock_movements
+WHERE tenant_id = $1 AND reference_type = $2 AND reference_id = $3 AND status = 'DONE' AND movement_number LIKE 'GR-%'
+ORDER BY created_at, id`, tenantID, domain.StockRefGoodsReceipt, id)
 		if err != nil {
-			return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: items: %w", err)
+			return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: query movements: %w", err)
 		}
+		defer rows.Close()
 
-		// Reverse against the exact locations used at post time, read from this
-		// receipt's own ledger rows. Re-resolving @VENDOR/@SCRAP could return a
-		// different row if duplicate virtual locations exist (warehouse_id NULL
-		// is not deduplicated by the UNIQUE constraint).
-		if loc, ok, err := postedLocationTx(ctx, tx, tenantID, id, "GR-IN-%", true); err != nil {
-			return nil, err
-		} else if ok {
-			vendorLocID = loc
-		}
-		if loc, ok, err := postedLocationTx(ctx, tx, tenantID, id, "GR-REJ-%", false); err != nil {
-			return nil, err
-		} else if ok {
-			scrapLocID = loc
-		}
-
-		// Collect (location, product) pairs to lock; sort for deterministic lock order (deadlock avoidance).
+		var origs []origMovement
 		type lockKey struct{ loc, prod uuid.UUID }
 		var keys []lockKey
-		for _, it := range items {
-			if it.AcceptedQty.GreaterThan(decimal.Zero) {
-				keys = append(keys, lockKey{rc.DestLocationID, it.ProductID})
+		for rows.Next() {
+			var o origMovement
+			if err := rows.Scan(&o.productID, &o.batchID, &o.sourceID, &o.destID, &o.qty, &o.movNumber); err != nil {
+				return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: scan movement: %w", err)
 			}
-			if it.RejectedQty.GreaterThan(decimal.Zero) {
-				keys = append(keys, lockKey{scrapLocID, it.ProductID})
-			}
+			origs = append(origs, o)
+			keys = append(keys, lockKey{o.destID, o.productID})
 		}
+		_ = rows.Close()
+
 		sort.Slice(keys, func(a, b int) bool {
 			if keys[a].loc != keys[b].loc {
 				return keys[a].loc.String() < keys[b].loc.String()
@@ -519,42 +597,31 @@ func (r *WMSRepo) CancelStockReceipt(ctx context.Context, tenantID, id, userID, 
 			}
 		}
 
-		checkStock := func(loc, prod uuid.UUID, need decimal.Decimal) error {
+		for _, o := range origs {
 			var cur decimal.Decimal
-			if err := tx.QueryRowContext(ctx, deductStockCalcSQL, tenantID, loc, prod).Scan(&cur); err != nil {
-				return fmt.Errorf("WMSRepo.CancelStockReceipt: scan stock: %w", err)
+			calcSQL := `
+SELECT COALESCE(
+    SUM(CASE WHEN dest_location_id = $2 THEN quantity ELSE -quantity END),
+    0
+)
+FROM stock_movements
+WHERE tenant_id = $1 AND product_id = $3 AND batch_id = $4
+  AND (source_location_id = $2 OR dest_location_id = $2)
+  AND status = 'DONE'`
+			if err := tx.QueryRowContext(ctx, calcSQL, tenantID, o.destID, o.productID, o.batchID).Scan(&cur); err != nil {
+				return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: scan batch stock: %w", err)
 			}
-			if cur.LessThan(need) {
-				return fmt.Errorf("WMSRepo.CancelStockReceipt: product %s at location %s has %s, needs %s: %w",
-					prod, loc, cur.String(), need.String(), domain.ErrStockReceiptStockConsumed)
-			}
-			return nil
-		}
-		for _, it := range items {
-			if it.AcceptedQty.GreaterThan(decimal.Zero) {
-				if err := checkStock(rc.DestLocationID, it.ProductID, it.AcceptedQty); err != nil {
-					return nil, err
-				}
-			}
-			if it.RejectedQty.GreaterThan(decimal.Zero) {
-				if err := checkStock(scrapLocID, it.ProductID, it.RejectedQty); err != nil {
-					return nil, err
-				}
+			if cur.LessThan(o.qty) {
+				return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: batch %s at location %s has %s, needs %s: %w",
+					o.batchID, o.destID, cur.String(), o.qty.String(), domain.ErrStockReceiptStockConsumed)
 			}
 		}
 
-		for i, it := range items {
-			if it.AcceptedQty.GreaterThan(decimal.Zero) {
-				if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, it.ProductID, rc.DestLocationID, vendorLocID,
-					it.AcceptedQty, fmt.Sprintf("GR-REV-IN-%s-%d", rc.ReceiptNumber, i+1), now); err != nil {
-					return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: reverse accepted %d: %w", i, err)
-				}
-			}
-			if it.RejectedQty.GreaterThan(decimal.Zero) {
-				if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, it.ProductID, scrapLocID, vendorLocID,
-					it.RejectedQty, fmt.Sprintf("GR-REV-REJ-%s-%d", rc.ReceiptNumber, i+1), now); err != nil {
-					return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: reverse rejected %d: %w", i, err)
-				}
+		for i, o := range origs {
+			revNumber := fmt.Sprintf("GR-REV-%s-%d", rc.ReceiptNumber, i+1)
+			if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, o.productID, o.batchID, o.destID, o.sourceID,
+				o.qty, revNumber, now); err != nil {
+				return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: reverse movement %d: %w", i, err)
 			}
 		}
 	}
@@ -563,6 +630,15 @@ func (r *WMSRepo) CancelStockReceipt(ctx context.Context, tenantID, id, userID, 
 UPDATE stock_receipts SET status = $3, cancelled_by = $4, cancelled_at = $5, cancel_reason = $6, updated_at = $5
 WHERE id = $1 AND tenant_id = $2`, id, tenantID, domain.StockReceiptStatusCancelled, userID, now, reason); err != nil {
 		return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: update status: %w", err)
+	}
+
+	auditDetails, _ := json.Marshal(map[string]any{
+		"receipt_number": rc.ReceiptNumber,
+		"reason":         reason,
+		"prior_status":   rc.Status,
+	})
+	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "stock_receipt", id, "cancelled", auditDetails); err != nil {
+		return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: audit: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

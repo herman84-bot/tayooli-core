@@ -780,35 +780,81 @@ func (u *Usecase) ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUI
 		}
 	}
 
+	dispMovs, _ := u.repo.ListMovementsByReference(ctx, tenantID, domain.StockRefTransfer, t.ID)
+	prodDispatches := make(map[uuid.UUID][]domain.StockMovement)
+	for _, dm := range dispMovs {
+		if dm.DestLocationID == transitLoc.ID && dm.BatchID != nil {
+			prodDispatches[dm.ProductID] = append(prodDispatches[dm.ProductID], dm)
+		}
+	}
+
 	now := time.Now().UTC()
-	for i, item := range items {
+	movIdx := 0
+	for _, item := range items {
 		targetLocID := item.DestLocationID
 		if targetLocID == nil {
 			targetLocID = defaultTargetLocID
 		}
 
-		qty := item.SentQty
-		if qty.IsZero() {
-			qty = item.RequestedQty
-		}
-
-		mov := &domain.StockMovement{
-			ID:               uuid.New(),
-			TenantID:         tenantID,
-			MovementNumber:   fmt.Sprintf("TR-RECV-%s-%d", t.TransferNumber, i+1),
-			ProductID:        item.ProductID,
-			SourceLocationID: transitLoc.ID,
-			DestLocationID:   *targetLocID,
-			Quantity:         qty,
-			UnitCost:         decimal.Zero,
-			Status:           domain.StockMovementStatusDone,
-			ReferenceType:    domain.StockRefTransfer,
-			ReferenceID:      t.ID,
-			ExecutedBy:       &userID,
-			CreatedAt:        now,
-		}
-		if err := u.repo.CreateStockMovement(ctx, mov); err != nil {
-			return nil, fmt.Errorf("ReceiveTransfer: create stock movement: %w", err)
+		dispatched := prodDispatches[item.ProductID]
+		if len(dispatched) > 0 {
+			for _, dm := range dispatched {
+				movIdx++
+				mov := &domain.StockMovement{
+					ID:               uuid.New(),
+					TenantID:         tenantID,
+					MovementNumber:   fmt.Sprintf("TR-RECV-%s-%d", t.TransferNumber, movIdx),
+					ProductID:        item.ProductID,
+					BatchID:          dm.BatchID,
+					SourceLocationID: transitLoc.ID,
+					DestLocationID:   *targetLocID,
+					Quantity:         dm.Quantity,
+					UnitCost:         decimal.Zero,
+					Status:           domain.StockMovementStatusDone,
+					ReferenceType:    domain.StockRefTransfer,
+					ReferenceID:      t.ID,
+					ExecutedBy:       &userID,
+					CreatedAt:        now,
+				}
+				if err := u.repo.CreateStockMovement(ctx, mov); err != nil {
+					return nil, fmt.Errorf("ReceiveTransfer: create stock movement: %w", err)
+				}
+			}
+		} else {
+			movIdx++
+			qty := item.SentQty
+			if qty.IsZero() {
+				qty = item.RequestedQty
+			}
+			batch, err := u.repo.GetOrCreateBatch(ctx, &domain.StockBatch{
+				TenantID:    tenantID,
+				ProductID:   item.ProductID,
+				BatchNumber: fmt.Sprintf("TR-%s", t.TransferNumber),
+				Status:      domain.StockBatchStatusReleased,
+				CreatedBy:   &userID,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("ReceiveTransfer: get batch: %w", err)
+			}
+			mov := &domain.StockMovement{
+				ID:               uuid.New(),
+				TenantID:         tenantID,
+				MovementNumber:   fmt.Sprintf("TR-RECV-%s-%d", t.TransferNumber, movIdx),
+				ProductID:        item.ProductID,
+				BatchID:          &batch.ID,
+				SourceLocationID: transitLoc.ID,
+				DestLocationID:   *targetLocID,
+				Quantity:         qty,
+				UnitCost:         decimal.Zero,
+				Status:           domain.StockMovementStatusDone,
+				ReferenceType:    domain.StockRefTransfer,
+				ReferenceID:      t.ID,
+				ExecutedBy:       &userID,
+				CreatedAt:        now,
+			}
+			if err := u.repo.CreateStockMovement(ctx, mov); err != nil {
+				return nil, fmt.Errorf("ReceiveTransfer: create stock movement: %w", err)
+			}
 		}
 	}
 
