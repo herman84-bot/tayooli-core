@@ -726,6 +726,9 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                           {order.packed_by_name && (
                             <div className="text-emerald-700">Kemas: <span className="font-medium">{order.packed_by_name}</span></div>
                           )}
+                          {order.dispatched_by_name && (
+                            <div className="text-blue-700">Kirim: <span className="font-medium">{order.dispatched_by_name}</span></div>
+                          )}
                         </td>
                         <td className="py-3.5 px-4">
                           <span
