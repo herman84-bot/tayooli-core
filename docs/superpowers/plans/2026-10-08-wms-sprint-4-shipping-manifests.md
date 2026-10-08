@@ -223,25 +223,25 @@ git commit -m "feat(wms): add frontend API clients and TanStack Query hooks for 
 - Consumes: `useShippingManifests`, `useCreateShippingManifest`, `useDispatchShippingManifest`
 - Produces: Komponen Tab "Manifest Ekspedisi" terpasang di panel arus keluar
 
-- [ ] **Step 1: Buat komponen `SignatureCanvas.tsx`**
+- [x] **Step 1: Buat komponen `SignatureCanvas.tsx`**
 Kanvas tanda tangan HTML5 berbasis mouse/touch dengan tombol Clear, Undo, dan ekspor data URL / SVG string.
 
-- [ ] **Step 2: Buat komponen cetak A4 `PrintShippingManifest.tsx`**
+- [x] **Step 2: Buat komponen cetak A4 `PrintShippingManifest.tsx`**
 Layout resmi lembar manifest serah terima ekspedisi: data ekspedisi, armada, tabel daftar Surat Jalan, total koli/berat, kotak tanda tangan ganda (Gudang & Kurir).
 
-- [ ] **Step 3: Buat `ShippingManifestsPanel.tsx` & hubungkan ke `DeliveryOrdersPanel.tsx`**
+- [x] **Step 3: Buat `ShippingManifestsPanel.tsx` & hubungkan ke `DeliveryOrdersPanel.tsx`**
 - Tabel daftar manifest dengan filter ekspedisi dan status.
 - Modal Buat Manifest dengan seleksi multi-DO yang sudah dikemas (`PACKED`).
 - Drawer Detail Manifest: checklist koli ter-scan, progress pemuatan, tombol Buka Kanvas TTD untuk Dispatch.
 
-- [ ] **Step 4: Tulis Jest test untuk SignatureCanvas & ShippingManifestsPanel**
+- [x] **Step 4: Tulis Jest test untuk SignatureCanvas & ShippingManifestsPanel**
 Test render, interaksi tab, dan ekspor signature.
 
-- [ ] **Step 5: Jalankan pengujian Jest & typecheck**
+- [x] **Step 5: Jalankan pengujian Jest & typecheck**
 Run: `npx tsc --noEmit` && `npm test -- __tests__/wms-outbound-components.test.tsx`
 Expected: PASS
 
-- [ ] **Step 6: Commit komponen UI manifest**
+- [x] **Step 6: Commit komponen UI manifest**
 ```bash
 git add components/wms/ShippingManifestsPanel.tsx components/wms/SignatureCanvas.tsx components/wms/PrintShippingManifest.tsx components/wms/DeliveryOrdersPanel.tsx
 git commit -m "feat(wms): add shipping manifests management panel, signature canvas, and print view"
