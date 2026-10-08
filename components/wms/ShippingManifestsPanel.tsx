@@ -99,11 +99,9 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
   const effectiveWhForDO = selectedModalWhId || warehouseId || (warehouses[0]?.id ?? null)
   const { data: allDOs = [], isLoading: isDOsLoading } = useDeliveryOrders(effectiveWhForDO)
 
-  // Filter DOs ready for staging/manifest (PACKED preferred, or un-shipped DOs)
+  // Filter DOs ready for staging/manifest (only PACKED DOs ready for dispatch manifest)
   const availableDOs = useMemo(() => {
-    return allDOs.filter(
-      (d) => d.status === "PACKED" || d.status === "CONFIRMED" || d.status === "PICKED"
-    )
+    return allDOs.filter((d) => d.status === "PACKED")
   }, [allDOs])
 
   // ── Detail / Loading Scan Drawer State ──

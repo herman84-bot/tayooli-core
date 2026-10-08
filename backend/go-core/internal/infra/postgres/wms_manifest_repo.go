@@ -495,7 +495,9 @@ func (r *WMSRepo) ScanDOLoading(ctx context.Context, tenantID, manifestID uuid.U
 		"barcode":     bc,
 		"all_scanned": (unscannedCount == 0),
 	})
-	_ = r.WriteAuditTx(ctx, tx, tenantID, &userID, "shipping_manifest", manifestID, "loading_scan", auditDetails)
+	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "shipping_manifest", manifestID, "loading_scan", auditDetails); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ScanDOLoading: audit log: %w", err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("WMSRepo.ScanDOLoading: commit: %w", err)

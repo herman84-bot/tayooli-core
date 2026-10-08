@@ -167,13 +167,13 @@ export default function DashboardPage() {
   const status = (error as { response?: { status?: number } } | null)?.response?.status
   const needsLogin = status === 401
 
-  const dockToStock = kpis?.dock_to_stock_avg_minutes ?? 45
-  const receivingAcc = kpis?.receiving_accuracy_pct ?? 99.8
-  const poCompliance = kpis?.po_compliance_pct ?? 97.5
+  const dockToStock = kpis?.dock_to_stock_avg_minutes ?? 0
+  const receivingAcc = kpis?.receiving_accuracy_pct ?? 0
+  const poCompliance = kpis?.po_compliance_pct ?? 0
   const inboundBacklog = kpis?.backlog_inbound_count ?? 0
-  const orderToDispatch = kpis?.order_to_dispatch_avg_hours ?? 2.4
-  const pickingAcc = kpis?.picking_accuracy_pct ?? 99.9
-  const onTimeShipment = kpis?.on_time_shipment_pct ?? 98.6
+  const orderToDispatch = kpis?.order_to_dispatch_avg_hours ?? 0
+  const pickingAcc = kpis?.picking_accuracy_pct ?? 0
+  const onTimeShipment = kpis?.on_time_shipment_pct ?? 0
   const outboundBacklog = kpis?.backlog_outbound_count ?? 0
 
   return (

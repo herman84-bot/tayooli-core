@@ -60,15 +60,15 @@ describe('DashboardPage 8 Enterprise WMS SOP KPIs', () => {
     expect(screen.getByText('Outbound Backlog')).toBeInTheDocument()
   })
 
-  it('renders fallback defaults when kpi data is undefined', () => {
+  it('renders fallback zero defaults when kpi data is undefined', () => {
     mockKPIResult = { data: undefined }
     render(<DashboardPage />)
 
-    expect(screen.getByText('45')).toBeInTheDocument()
-    expect(screen.getByText('99.8')).toBeInTheDocument()
-    expect(screen.getByText('97.5')).toBeInTheDocument()
-    expect(screen.getByText('2.4')).toBeInTheDocument()
-    expect(screen.getByText('99.9')).toBeInTheDocument()
-    expect(screen.getByText('98.6')).toBeInTheDocument()
+    expect(screen.getByText('Dock-to-Stock Time')).toBeInTheDocument()
+    expect(screen.getByText('Receiving Accuracy')).toBeInTheDocument()
+    expect(screen.getByText('PO Compliance')).toBeInTheDocument()
+    expect(screen.getByText('Order-to-Dispatch Time')).toBeInTheDocument()
+    expect(screen.getByText('Picking Accuracy')).toBeInTheDocument()
+    expect(screen.getByText('On-Time Shipment')).toBeInTheDocument()
   })
 })

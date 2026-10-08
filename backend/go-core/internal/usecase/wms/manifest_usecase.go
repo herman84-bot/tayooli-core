@@ -25,11 +25,23 @@ func (u *Usecase) CreateShippingManifest(ctx context.Context, tenantID, userID u
 
 // GetShippingManifest retrieves full details of a manifest including its attached delivery orders.
 func (u *Usecase) GetShippingManifest(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.ShippingManifestDetail, error) {
-	return u.repo.GetShippingManifestByID(ctx, tenantID, id)
+	detail, err := u.repo.GetShippingManifestByID(ctx, tenantID, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.ValidateWarehouseAccess(ctx, tenantID, userID, role, detail.Manifest.WarehouseID); err != nil {
+		return nil, err
+	}
+	return detail, nil
 }
 
 // ListShippingManifests retrieves manifests filtered by tenant, warehouse, status, or expedition.
 func (u *Usecase) ListShippingManifests(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.ShippingManifestStatus, expeditionName *string) ([]domain.ShippingManifest, error) {
+	if warehouseID != nil {
+		if err := u.ValidateWarehouseAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
+			return nil, err
+		}
+	}
 	return u.repo.ListShippingManifests(ctx, tenantID, warehouseID, status, expeditionName)
 }
 
@@ -39,12 +51,26 @@ func (u *Usecase) ScanDOLoading(ctx context.Context, tenantID, userID uuid.UUID,
 	if barcode == "" {
 		return nil, domain.ErrInvalidInput
 	}
+	detail, err := u.repo.GetShippingManifestByID(ctx, tenantID, manifestID)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, detail.Manifest.WarehouseID); err != nil {
+		return nil, err
+	}
 	return u.repo.ScanDOLoading(ctx, tenantID, manifestID, barcode, userID)
 }
 
 // DispatchShippingManifest validates driver signature SVG and completes atomic dispatch handover.
 func (u *Usecase) DispatchShippingManifest(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.DispatchShippingManifestRequest) (*domain.ShippingManifest, error) {
 	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+	detail, err := u.repo.GetShippingManifestByID(ctx, tenantID, manifestID)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, detail.Manifest.WarehouseID); err != nil {
 		return nil, err
 	}
 	return u.repo.DispatchShippingManifest(ctx, tenantID, manifestID, userID, req)

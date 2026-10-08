@@ -36,12 +36,15 @@ func (m *mockWMSRepo) CreateShippingManifest(ctx context.Context, tenantID, user
 	}, nil
 }
 
+var testManifestWarehouseID uuid.UUID
+
 func (m *mockWMSRepo) GetShippingManifestByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.ShippingManifestDetail, error) {
 	now := time.Now().UTC()
 	return &domain.ShippingManifestDetail{
 		Manifest: domain.ShippingManifest{
 			ID:             id,
 			TenantID:       tenantID,
+			WarehouseID:    testManifestWarehouseID,
 			ManifestNumber: "SM-TEST-001",
 			Status:         domain.ShippingManifestStatusStaged,
 			CreatedAt:      now,
@@ -117,6 +120,7 @@ func TestManifestUsecase(t *testing.T) {
 	adminID := uuid.New()
 	auditorID := uuid.New()
 	whID := uuid.New()
+	testManifestWarehouseID = whID
 
 	repo := newMockWMSRepo()
 	repo.warehouses[whID] = domain.Warehouse{

@@ -52,7 +52,7 @@ DROP POLICY IF EXISTS shipping_manifests_tenant_isolation ON shipping_manifests;
 CREATE POLICY shipping_manifests_tenant_isolation ON shipping_manifests
     FOR ALL
     USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
-    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_setting', true), '')::uuid OR tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
 
 ALTER TABLE delivery_orders
     ADD COLUMN IF NOT EXISTS manifest_id UUID REFERENCES shipping_manifests(id) ON DELETE SET NULL,

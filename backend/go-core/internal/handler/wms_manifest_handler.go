@@ -126,6 +126,7 @@ func (h *WMSHandler) ScanDOLoading(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1MB limit
 	var req domain.LoadingScanRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		RespondError(w, r, http.StatusBadRequest, "invalid json payload")
@@ -156,6 +157,7 @@ func (h *WMSHandler) DispatchShippingManifest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 2<<20) // 2MB limit for signature SVG
 	var req domain.DispatchShippingManifestRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		RespondError(w, r, http.StatusBadRequest, "invalid json payload")
