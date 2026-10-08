@@ -560,7 +560,7 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [x] **CR-04a (BE):** Tambah `outbound_qty_today/month`, `top_outbound_products[10]`, `top_customers[10]` di `GET /dashboard/summary` dengan filter periode 7/30/90 hari.
 - [x] **CR-04c (FE):** Hapus blok P2P di Dashboard ("Pembelian Vendor (Procure-to-Pay)", "Faktur Vendor", "Vendor Teratas") untuk menjaga kepatuhan modul.
 - [x] **CR-04b (FE):** Kartu "Barang Keluar Hari Ini", tabel Top 10 Produk Keluar, dan Top 10 Pelanggan Teraktif di Dashboard.
-- [x] **CR-05b (FE):** Kolom "Dibuat oleh / Dikemas oleh" di tabel Surat Jalan + tracking actor.
+- [x] **CR-05b (FE):** Kolom "Dibuat oleh / Disetujui oleh / Dikemas oleh / Dikirim oleh" di tabel Surat Jalan & tabel Mutasi Stok + panel drawer "Riwayat Aktivitas & Jejak Audit" (`ActivityTimelineDrawer.tsx` timeline siapa, apa, kapan).
 - [x] **PDF-01:** Free item / bonus di baris Surat Jalan (`is_free_item`, harga 0, tetap potong stok per batch, tercetak "BONUS").
 - [x] **PDF-03/04:** Rusak saat pick/QC → Quarantine + Laporan Item Rusak + re-pick otomatis (`POST /wms/picking/damaged`).
 - [x] **PDF-05:** Wave dikelompokkan per jenis order (`DIRECT_DO`, `SALES_ORDER`, `MARKETPLACE`, `TRANSFER`).
