@@ -375,10 +375,10 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Top 10 Pelanggan Teraktif */}
+            {/* Top 10 Toko / Pelanggan Teraktif */}
             <div className="space-y-1.5">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
-                <span>Top 10 Pelanggan Teraktif ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
+                <span>Top 10 Toko / Pelanggan Teraktif ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
                 <span>Nilai Transaksi</span>
               </div>
               {s.outbound.top_customers.length > 0 ? (
