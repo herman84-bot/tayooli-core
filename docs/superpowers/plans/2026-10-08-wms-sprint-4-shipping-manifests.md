@@ -152,17 +152,17 @@ git commit -m "feat(wms): implement domain models and postgres repository for sh
 - Consumes: `domain.WMSOutboundRepository`, `domain.WMSRepository`
 - Produces: HTTP endpoints di `/api/v1/wms/outbound/manifests/*` dan `/api/v1/wms/outbound/kpi`
 
-- [ ] **Step 1: Tulis unit test usecase manifest**
+- [x] **Step 1: Tulis unit test usecase manifest**
 Verifikasi bahwa pembuatan manifest memvalidasi DO status `PACKED`, loading scan menolak DO yang tidak ada di manifest, dan dispatch mewajibkan tanda tangan.
 
-- [ ] **Step 2: Implementasikan `internal/usecase/wms/manifest_usecase.go`**
+- [x] **Step 2: Implementasikan `internal/usecase/wms/manifest_usecase.go`**
 Logika bisnis:
 - `CreateShippingManifest`: validasi warehouse write access, verifikasi seluruh DO milik tenant dan berstatus `PACKED`.
 - `ScanDOLoading`: pencocokan nomor DO / resi AWB, update status koli.
 - `DispatchShippingManifest`: validasi signature non-kosong, pemotongan stok keluar atomik.
 - `GetOutboundKPIs`: menghitung 8 metrik SLA & kepatuhan WMS.
 
-- [ ] **Step 3: Implementasikan REST handler di `internal/handler/wms_manifest_handler.go` & daftarkan rute di `wms_handler.go`**
+- [x] **Step 3: Implementasikan REST handler di `internal/handler/wms_manifest_handler.go` & daftarkan rute di `wms_handler.go`**
 Daftarkan rute:
 - `GET /delivery-orders/manifests` & `POST /delivery-orders/manifests`
 - `GET /delivery-orders/manifests/{id}`
@@ -170,11 +170,11 @@ Daftarkan rute:
 - `POST /delivery-orders/manifests/{id}/dispatch`
 - `GET /kpi`
 
-- [ ] **Step 4: Jalankan test handler & usecase**
+- [x] **Step 4: Jalankan test handler & usecase**
 Run: `go test -v ./internal/usecase/wms/... ./internal/handler/...`
 Expected: PASS
 
-- [ ] **Step 5: Commit backend usecase & handlers**
+- [x] **Step 5: Commit backend usecase & handlers**
 ```bash
 git add backend/go-core/internal/usecase/wms/manifest_usecase.go backend/go-core/internal/handler/wms_manifest_handler.go backend/go-core/internal/handler/wms_manifest_handler_test.go backend/go-core/internal/handler/wms_handler.go
 git commit -m "feat(wms): implement manifest usecase and REST handlers with loading scan and KPI"
