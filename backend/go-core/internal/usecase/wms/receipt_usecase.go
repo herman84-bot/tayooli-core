@@ -110,6 +110,8 @@ func (u *Usecase) validateStockReceiptRequest(ctx context.Context, tenantID, use
 	}
 	seen := make(map[productBatchKey]bool, len(req.Items))
 	items := make([]domain.StockReceiptItem, 0, len(req.Items))
+	totalReceived := decimal.Zero
+	totalRejected := decimal.Zero
 	for i, it := range req.Items {
 		line := i + 1
 		if it.ProductID == uuid.Nil {
@@ -140,6 +142,8 @@ func (u *Usecase) validateStockReceiptRequest(ctx context.Context, tenantID, use
 		if !it.RejectedQty.IsPositive() {
 			reason = nil
 		}
+		totalReceived = totalReceived.Add(it.AcceptedQty)
+		totalRejected = totalRejected.Add(it.RejectedQty)
 		items = append(items, domain.StockReceiptItem{
 			ProductID:    it.ProductID,
 			ExpectedQty:  it.ExpectedQty,
@@ -149,6 +153,10 @@ func (u *Usecase) validateStockReceiptRequest(ctx context.Context, tenantID, use
 			BatchNumber:  trimPtr(it.BatchNumber),
 			ExpiryDate:   it.ExpiryDate,
 		})
+	}
+
+	if !totalReceived.Add(totalRejected).IsPositive() {
+		return nil, receiptInvalid("Total barang diterima dan ditolak harus lebih dari 0")
 	}
 
 	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.WarehouseID); err != nil {

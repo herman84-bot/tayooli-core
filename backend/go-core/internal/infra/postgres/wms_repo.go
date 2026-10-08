@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -920,6 +921,20 @@ func (r *WMSRepo) CreateStockMovement(ctx context.Context, m *domain.StockMoveme
 		return fmt.Errorf("WMSRepo.CreateStockMovement: exec: %w", err)
 	}
 
+	auditDetails, _ := json.Marshal(map[string]any{
+		"movement_number":    m.MovementNumber,
+		"product_id":         m.ProductID,
+		"source_location_id": m.SourceLocationID,
+		"dest_location_id":   m.DestLocationID,
+		"quantity":           m.Quantity,
+		"reference_type":     m.ReferenceType,
+		"reference_id":       m.ReferenceID,
+		"batch_id":           m.BatchID,
+	})
+	if err := r.WriteAuditTx(ctx, tx, m.TenantID, m.ExecutedBy, "stock_movement", m.ID, "created", auditDetails); err != nil {
+		return fmt.Errorf("WMSRepo.CreateStockMovement: audit: %w", err)
+	}
+
 	return tx.Commit()
 }
 
@@ -1048,6 +1063,20 @@ WHERE tenant_id = $1 AND product_id = $3 AND batch_id = $4
 		if err != nil {
 			return fmt.Errorf("WMSRepo.DeductLocationStock: exec movement: %w", err)
 		}
+
+		auditDetails, _ := json.Marshal(map[string]any{
+			"movement_number":    mov.MovementNumber,
+			"product_id":         mov.ProductID,
+			"source_location_id": mov.SourceLocationID,
+			"dest_location_id":   mov.DestLocationID,
+			"quantity":           mov.Quantity,
+			"reference_type":     mov.ReferenceType,
+			"reference_id":       mov.ReferenceID,
+			"batch_id":           mov.BatchID,
+		})
+		if err := r.WriteAuditTx(ctx, tx, tenantID, mov.ExecutedBy, "stock_movement", mov.ID, "created", auditDetails); err != nil {
+			return fmt.Errorf("WMSRepo.DeductLocationStock: audit: %w", err)
+		}
 		return tx.Commit()
 	}
 
@@ -1116,6 +1145,20 @@ ORDER BY b.expiry_date ASC NULLS LAST, b.created_at ASC, b.id ASC`
 			ptrToNullUUID(m.ExecutedBy), ptrToNullUUID(m.BatchID), m.CreatedAt)
 		if err != nil {
 			return fmt.Errorf("WMSRepo.DeductLocationStock: insert movement %d: %w", i, err)
+		}
+
+		auditDetails, _ := json.Marshal(map[string]any{
+			"movement_number":    m.MovementNumber,
+			"product_id":         m.ProductID,
+			"source_location_id": m.SourceLocationID,
+			"dest_location_id":   m.DestLocationID,
+			"quantity":           m.Quantity,
+			"reference_type":     m.ReferenceType,
+			"reference_id":       m.ReferenceID,
+			"batch_id":           m.BatchID,
+		})
+		if err := r.WriteAuditTx(ctx, tx, tenantID, m.ExecutedBy, "stock_movement", m.ID, "created", auditDetails); err != nil {
+			return fmt.Errorf("WMSRepo.DeductLocationStock: audit movement %d: %w", i, err)
 		}
 	}
 
@@ -1211,11 +1254,23 @@ WITH movement_stock AS (
         loc.warehouse_id,
         loc.id AS location_id,
         loc.code AS location_code,
+        loc.type AS location_type,
         SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) AS qty
     FROM stock_movements sm
     JOIN warehouse_locations loc ON (loc.id = sm.dest_location_id OR loc.id = sm.source_location_id) AND loc.tenant_id = sm.tenant_id
     WHERE sm.tenant_id = $1 AND sm.status = 'DONE'
-    GROUP BY sm.product_id, loc.warehouse_id, loc.id, loc.code
+    GROUP BY sm.product_id, loc.warehouse_id, loc.id, loc.code, loc.type
+),
+allocated_stock AS (
+    SELECT
+        doi.product_id,
+        doi.location_id,
+        SUM(doi.quantity) AS allocated_qty
+    FROM delivery_order_items doi
+    JOIN delivery_orders do ON do.id = doi.delivery_order_id AND do.tenant_id = doi.tenant_id
+    WHERE doi.tenant_id = $1
+      AND do.status NOT IN ('SHIPPED', 'CANCELLED', 'RETURNED')
+    GROUP BY doi.product_id, doi.location_id
 )
 SELECT 
     p.id AS product_id,
@@ -1225,10 +1280,16 @@ SELECT
     COALESCE(w.name, 'Gudang Utama') AS warehouse_name,
     ms.location_id,
     COALESCE(ms.location_code, 'MAIN') AS location_code,
-    COALESCE(ms.qty, 0) AS quantity
+    COALESCE(ms.qty, 0) AS quantity,
+    COALESCE(als.allocated_qty, 0) AS allocated_qty,
+    CASE 
+        WHEN ms.location_type IN ('QUARANTINE', 'STAGING_INBOUND', 'STAGING') THEN 0
+        ELSE GREATEST(0, COALESCE(ms.qty, 0) - COALESCE(als.allocated_qty, 0))
+    END AS available_qty
 FROM movement_stock ms
 JOIN products p ON p.id = ms.product_id AND p.tenant_id = $1
 LEFT JOIN warehouses w ON w.id = ms.warehouse_id AND w.tenant_id = $1
+LEFT JOIN allocated_stock als ON als.product_id = ms.product_id AND als.location_id = ms.location_id
 WHERE ($2::uuid IS NULL OR ms.warehouse_id = $2)
   AND ms.qty > 0
 ORDER BY p.name ASC`
@@ -1247,7 +1308,7 @@ ORDER BY p.name ASC`
 			&s.ProductID, &s.SKU, &s.ProductName,
 			&whID, &s.WarehouseName,
 			&locID, &s.LocationCode,
-			&s.Quantity,
+			&s.Quantity, &s.AllocatedQty, &s.AvailableQty,
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListStockSummary: scan: %w", err)
 		}
@@ -1263,6 +1324,93 @@ ORDER BY p.name ASC`
 		return nil, fmt.Errorf("WMSRepo.ListStockSummary: commit: %w", err)
 	}
 	return result, nil
+}
+
+func (r *WMSRepo) GetAvailableStock(ctx context.Context, tenantID, warehouseID uuid.UUID, locationID *uuid.UUID, productID uuid.UUID) (decimal.Decimal, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return decimal.Zero, fmt.Errorf("WMSRepo.GetAvailableStock: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return decimal.Zero, fmt.Errorf("WMSRepo.GetAvailableStock: set tenant: %w", err)
+	}
+
+	if locationID != nil && *locationID != uuid.Nil {
+		var locType string
+		var onHand decimal.Decimal
+		err := tx.QueryRowContext(ctx, `
+SELECT loc.type,
+       COALESCE(SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END), 0)
+FROM warehouse_locations loc
+LEFT JOIN stock_movements sm ON (sm.dest_location_id = loc.id OR sm.source_location_id = loc.id)
+    AND sm.tenant_id = $1 AND sm.product_id = $3 AND sm.status = 'DONE'
+WHERE loc.id = $2 AND loc.tenant_id = $1
+GROUP BY loc.id, loc.type`, tenantID, *locationID, productID).Scan(&locType, &onHand)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return decimal.Zero, nil
+			}
+			return decimal.Zero, fmt.Errorf("WMSRepo.GetAvailableStock: query loc onhand: %w", err)
+		}
+		if locType != string(domain.LocationTypeInternal) {
+			_ = tx.Commit()
+			return decimal.Zero, nil
+		}
+
+		var allocated decimal.Decimal
+		err = tx.QueryRowContext(ctx, `
+SELECT COALESCE(SUM(doi.quantity), 0)
+FROM delivery_order_items doi
+JOIN delivery_orders do ON do.id = doi.delivery_order_id AND do.tenant_id = doi.tenant_id
+WHERE doi.tenant_id = $1 AND doi.location_id = $2 AND doi.product_id = $3
+  AND do.status NOT IN ('SHIPPED', 'CANCELLED', 'RETURNED')`, tenantID, *locationID, productID).Scan(&allocated)
+		if err != nil {
+			return decimal.Zero, fmt.Errorf("WMSRepo.GetAvailableStock: query loc allocated: %w", err)
+		}
+
+		avail := onHand.Sub(allocated)
+		if avail.IsNegative() {
+			avail = decimal.Zero
+		}
+		if err := tx.Commit(); err != nil {
+			return decimal.Zero, err
+		}
+		return avail, nil
+	}
+
+	// Warehouse level check across INTERNAL racks
+	var onHand decimal.Decimal
+	err = tx.QueryRowContext(ctx, `
+SELECT COALESCE(SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END), 0)
+FROM warehouse_locations loc
+JOIN stock_movements sm ON (sm.dest_location_id = loc.id OR sm.source_location_id = loc.id)
+    AND sm.tenant_id = $1 AND sm.product_id = $3 AND sm.status = 'DONE'
+WHERE loc.warehouse_id = $2 AND loc.tenant_id = $1 AND loc.type = 'INTERNAL'`, tenantID, warehouseID, productID).Scan(&onHand)
+	if err != nil {
+		return decimal.Zero, fmt.Errorf("WMSRepo.GetAvailableStock: query wh onhand: %w", err)
+	}
+
+	var allocated decimal.Decimal
+	err = tx.QueryRowContext(ctx, `
+SELECT COALESCE(SUM(doi.quantity), 0)
+FROM delivery_order_items doi
+JOIN delivery_orders do ON do.id = doi.delivery_order_id AND do.tenant_id = doi.tenant_id
+WHERE doi.tenant_id = $1 AND do.warehouse_id = $2 AND doi.product_id = $3
+  AND do.status NOT IN ('SHIPPED', 'CANCELLED', 'RETURNED')`, tenantID, warehouseID, productID).Scan(&allocated)
+	if err != nil {
+		return decimal.Zero, fmt.Errorf("WMSRepo.GetAvailableStock: query wh allocated: %w", err)
+	}
+
+	avail := onHand.Sub(allocated)
+	if avail.IsNegative() {
+		avail = decimal.Zero
+	}
+	if err := tx.Commit(); err != nil {
+		return decimal.Zero, err
+	}
+	return avail, nil
 }
 
 // -----------------------------------------------------------------------------
@@ -1598,6 +1746,18 @@ func (r *WMSRepo) CreateDeliveryOrder(ctx context.Context, do *domain.DeliveryOr
 		}
 	}
 
+	auditDetails, _ := json.Marshal(map[string]any{
+		"do_number":      do.DONumber,
+		"warehouse_id":   do.WarehouseID,
+		"order_type":     do.OrderType,
+		"item_count":     len(items),
+		"customer_id":    do.CustomerID,
+		"sales_order_id": do.SalesOrderID,
+	})
+	if err := r.WriteAuditTx(ctx, tx, do.TenantID, do.CreatedBy, "delivery_order", do.ID, "created", auditDetails); err != nil {
+		return fmt.Errorf("WMSRepo.CreateDeliveryOrder: audit: %w", err)
+	}
+
 	return tx.Commit()
 }
 
@@ -1733,6 +1893,55 @@ SET status = $3,
     updated_at = NOW()
 WHERE id = $1 AND tenant_id = $2`
 
+func (r *WMSRepo) ConfirmDeliveryOrder(ctx context.Context, tenantID, id, userID uuid.UUID) (*domain.DeliveryOrder, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ConfirmDeliveryOrder: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ConfirmDeliveryOrder: set tenant: %w", err)
+	}
+
+	var status string
+	var doNumber string
+	err = tx.QueryRowContext(ctx, `SELECT status, do_number FROM delivery_orders WHERE id = $1 AND tenant_id = $2 FOR UPDATE`, id, tenantID).Scan(&status, &doNumber)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrDeliveryOrderNotFound
+		}
+		return nil, fmt.Errorf("WMSRepo.ConfirmDeliveryOrder: query DO: %w", err)
+	}
+	if status != string(domain.DeliveryOrderStatusDraft) {
+		return nil, domain.ErrInvalidStatus
+	}
+
+	now := time.Now().UTC()
+	_, err = tx.ExecContext(ctx, `
+UPDATE delivery_orders
+SET status = 'CONFIRMED', confirmed_by = $3, updated_at = $4
+WHERE id = $1 AND tenant_id = $2`, id, tenantID, userID, now)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ConfirmDeliveryOrder: update status: %w", err)
+	}
+
+	auditDetails, _ := json.Marshal(map[string]any{
+		"do_number": doNumber,
+		"status":    domain.DeliveryOrderStatusConfirmed,
+	})
+	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "delivery_order", id, "confirmed", auditDetails); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ConfirmDeliveryOrder: audit: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ConfirmDeliveryOrder: commit: %w", err)
+	}
+
+	do, _, err := r.GetDeliveryOrderByID(ctx, tenantID, id)
+	return do, err
+}
+
 func (r *WMSRepo) UpdateDeliveryOrderStatus(ctx context.Context, tenantID, id uuid.UUID, status domain.DeliveryOrderStatus, receivedDate *time.Time) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -1754,6 +1963,19 @@ func (r *WMSRepo) UpdateDeliveryOrderStatus(ctx context.Context, tenantID, id uu
 	}
 	if rowsAff == 0 {
 		return domain.ErrDeliveryOrderNotFound
+	}
+
+	action := strings.ToLower(string(status))
+	if status == domain.DeliveryOrderStatusConfirmed {
+		action = "confirmed"
+	} else if status == domain.DeliveryOrderStatusShipped {
+		action = "dispatched"
+	}
+	auditDetails, _ := json.Marshal(map[string]any{
+		"status": status,
+	})
+	if err := r.WriteAuditTx(ctx, tx, tenantID, nil, "delivery_order", id, action, auditDetails); err != nil {
+		return fmt.Errorf("WMSRepo.UpdateDeliveryOrderStatus: audit: %w", err)
 	}
 
 	return tx.Commit()

@@ -80,7 +80,20 @@ func (r *WMSRepo) insertMovementTx(ctx context.Context, tx *sql.Tx, m *domain.St
 		m.SourceLocationID, m.DestLocationID, m.Quantity,
 		m.UnitCost, m.Status, m.ReferenceType, m.ReferenceID,
 		ptrToNullUUID(m.ExecutedBy), ptrToNullUUID(m.BatchID), m.CreatedAt)
-	return err
+	if err != nil {
+		return err
+	}
+	auditDetails, _ := json.Marshal(map[string]any{
+		"movement_number":    m.MovementNumber,
+		"product_id":         m.ProductID,
+		"source_location_id": m.SourceLocationID,
+		"dest_location_id":   m.DestLocationID,
+		"quantity":           m.Quantity,
+		"reference_type":     m.ReferenceType,
+		"reference_id":       m.ReferenceID,
+		"batch_id":           m.BatchID,
+	})
+	return r.WriteAuditTx(ctx, tx, m.TenantID, m.ExecutedBy, "stock_movement", m.ID, "created", auditDetails)
 }
 
 // SubmitQCInspection records the inspection and moves damaged qty STG-IN -> QRN atomically.

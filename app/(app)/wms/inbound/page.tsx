@@ -530,6 +530,7 @@ function ReceiptForm({
     for (const [i, l] of form.lines.entries()) {
       const a = num(l.accepted), r = num(l.rejected)
       if (a < 0 || r < 0) return `Baris ${i + 1}: jumlah tidak boleh bernilai negatif.`
+      if (!Number.isInteger(a) || !Number.isInteger(r)) return `Baris ${i + 1}: jumlah harus bilangan bulat.`
       if (a + r <= 0) return `Baris ${i + 1}: isi jumlah barang yang diterima.`
       if (r > 0 && !l.reject_reason.trim()) return `Baris ${i + 1}: isi alasan barang ditolak.`
     }

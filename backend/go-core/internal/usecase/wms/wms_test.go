@@ -430,6 +430,36 @@ func (m *mockWMSRepo) ListDeliveryOrders(ctx context.Context, tenantID uuid.UUID
 	return list, nil
 }
 
+func (m *mockWMSRepo) ConfirmDeliveryOrder(ctx context.Context, tenantID, id, userID uuid.UUID) (*domain.DeliveryOrder, error) {
+	do, ok := m.deliveryOrders[id]
+	if !ok || do.TenantID != tenantID {
+		return nil, domain.ErrDeliveryOrderNotFound
+	}
+	if do.Status != domain.DeliveryOrderStatusDraft {
+		return nil, domain.ErrInvalidStatus
+	}
+	do.Status = domain.DeliveryOrderStatusConfirmed
+	do.ConfirmedBy = &userID
+	return do, nil
+}
+
+func (m *mockWMSRepo) GetAvailableStock(ctx context.Context, tenantID, warehouseID uuid.UUID, locationID *uuid.UUID, productID uuid.UUID) (decimal.Decimal, error) {
+	var total decimal.Decimal
+	for k, qty := range m.stockLevels {
+		parts := strings.Split(k, ":")
+		if len(parts) == 3 && parts[0] == tenantID.String() && parts[2] == productID.String() {
+			if locationID != nil && parts[1] != locationID.String() {
+				continue
+			}
+			total = total.Add(qty)
+		}
+	}
+	if total.IsPositive() {
+		return total, nil
+	}
+	return decimal.NewFromInt(1000), nil
+}
+
 func (m *mockWMSRepo) CreateStockOpname(ctx context.Context, op *domain.StockOpname) error {
 	m.stockOpnames[op.ID] = op
 	return nil
@@ -1272,7 +1302,7 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 	repo.warehouses[whID] = domain.Warehouse{ID: whID, TenantID: tenantID, Code: "WH-DO", Name: "Distribution Center"}
 	repo.locations[locID] = domain.WarehouseLocation{ID: locID, TenantID: tenantID, WarehouseID: &whID, Code: "BIN-OUT", Name: "Outbound Bay"}
 
-	t.Run("Reject delivery order dispatch when stock is insufficient", func(t *testing.T) {
+	t.Run("Reject delivery order creation when available stock is insufficient", func(t *testing.T) {
 		// Only 2 units in stock
 		locKey := fmt.Sprintf("%s:%s:%s", tenantID, locID, productID)
 		repo.stockLevels[locKey] = decimal.NewFromInt(2)
@@ -1290,8 +1320,33 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 			},
 		}
 
+		_, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", req)
+		assert.ErrorIs(t, err, domain.ErrInsufficientStock)
+	})
+
+	t.Run("Reject delivery order dispatch when stock is insufficient", func(t *testing.T) {
+		// Sufficient stock at creation time
+		locKey := fmt.Sprintf("%s:%s:%s", tenantID, locID, productID)
+		repo.stockLevels[locKey] = decimal.NewFromInt(10)
+
+		req := uc.CreateDeliveryOrderRequest{
+			SalesOrderID: &salesOrderID,
+			WarehouseID:  whID,
+			DONumber:     "DO-FAIL-02",
+			Items: []uc.CreateDeliveryOrderItemRequest{
+				{
+					ProductID:  productID,
+					Quantity:   decimal.NewFromInt(10),
+					LocationID: locID,
+				},
+			},
+		}
+
 		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", req)
 		require.NoError(t, err)
+
+		// Stock drops before dispatch
+		repo.stockLevels[locKey] = decimal.NewFromInt(2)
 
 		// Attempt dispatch -> must fail with ErrInsufficientStock
 		_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)

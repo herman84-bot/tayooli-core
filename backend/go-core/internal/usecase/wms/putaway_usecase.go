@@ -169,9 +169,33 @@ func (u *Usecase) ConfirmPutaway(ctx context.Context, tenantID, userID uuid.UUID
 		}
 	}
 
-	// Invariant 4: Overriding default rack requires reason
-	if defaultLocID != nil && *defaultLocID != req.DestLocationID && reason == nil {
-		return nil, domain.ErrPutawayReasonRequired
+	// Invariant 4: Overriding default rack requires reason with trimmed length >= 5
+	if defaultLocID != nil && *defaultLocID != req.DestLocationID {
+		if reason == nil || len([]rune(*reason)) < 5 {
+			return nil, domain.ErrPutawayReasonRequired
+		}
+	}
+
+	// Staging batch balance check: prevent over-putaway
+	stagingBalances, err := u.repo.ListBatchBalances(ctx, tenantID, domain.BatchBalanceFilter{
+		LocationIDs: []uuid.UUID{stgLoc.ID},
+		WarehouseID: &req.WarehouseID,
+		ProductID:   &req.ProductID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ConfirmPutaway: list staging balances: %w", err)
+	}
+	var stagedQty decimal.Decimal
+	foundStagedBatch := false
+	for _, b := range stagingBalances {
+		if b.BatchID == req.BatchID {
+			stagedQty = b.Quantity
+			foundStagedBatch = true
+			break
+		}
+	}
+	if !foundStagedBatch || stagedQty.LessThan(req.Quantity) {
+		return nil, domain.ErrInsufficientStock
 	}
 
 	cmd := domain.PutawayCommand{

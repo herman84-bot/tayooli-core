@@ -40,6 +40,15 @@ jest.mock('@/hooks/useWMS', () => ({
   }),
 }))
 
+jest.mock('@/hooks/useWMSLedger', () => ({
+  useWMSStock: () => ({
+    data: [{ product_id: 'p-1', location_id: 'loc-1', quantity: 100, available_qty: 100 }],
+    isLoading: false,
+    isError: false,
+  }),
+  useWMSMovements: () => ({ data: [], isLoading: false }),
+}))
+
 // Mock useProducts
 jest.mock('@/hooks/useProducts', () => ({
   useProducts: () => ({
@@ -470,6 +479,33 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
       const closeBtn = screen.getByRole('button', { name: /Tutup panel/i })
       fireEvent.click(closeBtn)
       expect(onClose).toHaveBeenCalled()
+    })
+  })
+
+  describe('PackingStationSubView: error state & retry (CR inverted testing)', () => {
+    it('renders error alert with Coba Lagi button when order list fails, then retries', async () => {
+      const { api } = require('@/lib/api')
+      const origList = api.wms.deliveryOrders.list
+      api.wms.deliveryOrders.list = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Koneksi database terputus'))
+        .mockResolvedValueOnce({ data: [] })
+
+      render(<PackingStationSubView />)
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(/Gagal memuat antrean kemas/)
+      expect(alert).toHaveTextContent(/Koneksi database terputus/)
+
+      const retryBtn = screen.getByRole('button', { name: /Coba Lagi/i })
+      await React.act(async () => {
+        fireEvent.click(retryBtn)
+      })
+
+      expect(api.wms.deliveryOrders.list).toHaveBeenCalledTimes(2)
+      expect(await screen.findByText(/Tidak ada antrean kemas/i)).toBeInTheDocument()
+
+      api.wms.deliveryOrders.list = origList
     })
   })
 })

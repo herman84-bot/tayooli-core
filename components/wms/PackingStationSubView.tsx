@@ -295,6 +295,19 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
           <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
             {loadingOrders ? (
               <div className="p-8 text-center text-xs text-slate-400">Memuat pesanan...</div>
+            ) : ordersError ? (
+              <div role="alert" className="p-6 text-center text-xs space-y-2">
+                <AlertCircle className="h-7 w-7 mx-auto text-rose-500" />
+                <p className="font-semibold text-rose-700">Gagal memuat antrean kemas</p>
+                <p className="text-rose-600">{ordersError}</p>
+                <button
+                  type="button"
+                  onClick={loadOrders}
+                  className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-3 py-1.5 font-semibold text-rose-700 hover:bg-rose-50"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Coba Lagi
+                </button>
+              </div>
             ) : filteredOrders.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400 space-y-1">
                 <Box className="h-8 w-8 mx-auto text-slate-300 mb-1" />

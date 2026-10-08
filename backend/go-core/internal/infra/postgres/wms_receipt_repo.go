@@ -385,12 +385,47 @@ ORDER BY r.created_at DESC`
 	return result, nil
 }
 
-func insertReceiptMovementTx(ctx context.Context, tx *sql.Tx, tenantID, userID, receiptID, productID, batchID, src, dst uuid.UUID, qty decimal.Decimal, number string, now time.Time) error {
+func isDateBeforeToday(t *time.Time, now time.Time) bool {
+	if t == nil {
+		return false
+	}
+	y1, m1, d1 := t.UTC().Date()
+	y2, m2, d2 := now.UTC().Date()
+	if y1 < y2 {
+		return true
+	}
+	if y1 > y2 {
+		return false
+	}
+	if m1 < m2 {
+		return true
+	}
+	if m1 > m2 {
+		return false
+	}
+	return d1 < d2
+}
+
+func (r *WMSRepo) insertReceiptMovementTx(ctx context.Context, tx *sql.Tx, tenantID, userID, receiptID, productID, batchID, src, dst uuid.UUID, qty decimal.Decimal, number string, now time.Time) error {
+	movID := uuid.New()
 	_, err := tx.ExecContext(ctx, createStockMovementSQL,
-		uuid.New(), tenantID, number, productID, src, dst, qty, decimal.Zero,
+		movID, tenantID, number, productID, src, dst, qty, decimal.Zero,
 		domain.StockMovementStatusDone, domain.StockRefGoodsReceipt, receiptID,
 		ptrToNullUUID(&userID), ptrToNullUUID(&batchID), now)
-	return err
+	if err != nil {
+		return err
+	}
+	auditDetails, _ := json.Marshal(map[string]any{
+		"movement_number":    number,
+		"product_id":         productID,
+		"source_location_id": src,
+		"dest_location_id":   dst,
+		"quantity":           qty,
+		"reference_type":     domain.StockRefGoodsReceipt,
+		"reference_id":       receiptID,
+		"batch_id":           batchID,
+	})
+	return r.WriteAuditTx(ctx, tx, tenantID, &userID, "stock_movement", movID, "created", auditDetails)
 }
 
 // PostStockReceipt: DRAFT -> POSTED in a single transaction. The header row is
@@ -447,7 +482,7 @@ func (r *WMSRepo) PostStockReceipt(ctx context.Context, p domain.PostReceiptPara
 			batchNum = domain.AutoBatchNumber(rc.ReceiptNumber, i+1)
 		}
 		batchStatus := domain.StockBatchStatusReleased
-		if p.HoldForRelease {
+		if p.HoldForRelease || (it.ExpiryDate != nil && isDateBeforeToday(it.ExpiryDate, now)) {
 			batchStatus = domain.StockBatchStatusOnHold
 		}
 
@@ -476,13 +511,13 @@ WHERE id = $4 AND tenant_id = $5`,
 		}
 
 		if it.AcceptedQty.GreaterThan(decimal.Zero) {
-			if err := insertReceiptMovementTx(ctx, tx, p.TenantID, p.UserID, p.ReceiptID, it.ProductID, batch.ID, p.SourceLocID, targetStagingLoc,
+			if err := r.insertReceiptMovementTx(ctx, tx, p.TenantID, p.UserID, p.ReceiptID, it.ProductID, batch.ID, p.SourceLocID, targetStagingLoc,
 				it.AcceptedQty, fmt.Sprintf("GR-IN-%s-%d", rc.ReceiptNumber, i+1), now); err != nil {
 				return nil, fmt.Errorf("WMSRepo.PostStockReceipt: accepted movement %d: %w", i, err)
 			}
 		}
 		if it.RejectedQty.GreaterThan(decimal.Zero) {
-			if err := insertReceiptMovementTx(ctx, tx, p.TenantID, p.UserID, p.ReceiptID, it.ProductID, batch.ID, p.SourceLocID, p.ScrapLocID,
+			if err := r.insertReceiptMovementTx(ctx, tx, p.TenantID, p.UserID, p.ReceiptID, it.ProductID, batch.ID, p.SourceLocID, p.ScrapLocID,
 				it.RejectedQty, fmt.Sprintf("GR-REJ-%s-%d", rc.ReceiptNumber, i+1), now); err != nil {
 				return nil, fmt.Errorf("WMSRepo.PostStockReceipt: rejected movement %d: %w", i, err)
 			}
@@ -619,7 +654,7 @@ WHERE tenant_id = $1 AND product_id = $3 AND batch_id = $4
 
 		for i, o := range origs {
 			revNumber := fmt.Sprintf("GR-REV-%s-%d", rc.ReceiptNumber, i+1)
-			if err := insertReceiptMovementTx(ctx, tx, tenantID, userID, id, o.productID, o.batchID, o.destID, o.sourceID,
+			if err := r.insertReceiptMovementTx(ctx, tx, tenantID, userID, id, o.productID, o.batchID, o.destID, o.sourceID,
 				o.qty, revNumber, now); err != nil {
 				return nil, fmt.Errorf("WMSRepo.CancelStockReceipt: reverse movement %d: %w", i, err)
 			}

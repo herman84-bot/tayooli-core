@@ -13,9 +13,10 @@ export function useWMSMovements(params?: { product_id?: string; location_id?: st
   })
 }
 
-export function useWMSStock(warehouseId?: string) {
+export function useWMSStock(warehouseId?: string, enabled = true) {
   return useQuery<StockSummary[]>({
     queryKey: ["wms-stock", warehouseId],
+    enabled,
     queryFn: async (): Promise<StockSummary[]> => {
       const res = await api.wms.stock.list(warehouseId)
       return res.data ?? []

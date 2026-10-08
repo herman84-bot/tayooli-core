@@ -302,6 +302,20 @@ func (r *WMSRepo) CreateStockMovements(ctx context.Context, tenantID uuid.UUID, 
 		if err != nil {
 			return fmt.Errorf("WMSRepo.CreateStockMovements: exec movement %d: %w", i, err)
 		}
+
+		auditDetails, _ := json.Marshal(map[string]any{
+			"movement_number":    m.MovementNumber,
+			"product_id":         m.ProductID,
+			"source_location_id": m.SourceLocationID,
+			"dest_location_id":   m.DestLocationID,
+			"quantity":           m.Quantity,
+			"reference_type":     m.ReferenceType,
+			"reference_id":       m.ReferenceID,
+			"batch_id":           m.BatchID,
+		})
+		if err := r.WriteAuditTx(ctx, tx, m.TenantID, m.ExecutedBy, "stock_movement", m.ID, "created", auditDetails); err != nil {
+			return fmt.Errorf("WMSRepo.CreateStockMovements: audit movement %d: %w", i, err)
+		}
 	}
 
 	return tx.Commit()
@@ -462,6 +476,20 @@ ORDER BY b.expiry_date ASC NULLS LAST, b.created_at ASC, loc.code ASC, b.id ASC`
 		if err != nil {
 			return fmt.Errorf("WMSRepo.DeductWarehouseStock: insert movement %d: %w", i, err)
 		}
+
+		auditDetails, _ := json.Marshal(map[string]any{
+			"movement_number":    m.MovementNumber,
+			"product_id":         m.ProductID,
+			"source_location_id": m.SourceLocationID,
+			"dest_location_id":   m.DestLocationID,
+			"quantity":           m.Quantity,
+			"reference_type":     m.ReferenceType,
+			"reference_id":       m.ReferenceID,
+			"batch_id":           m.BatchID,
+		})
+		if err := r.WriteAuditTx(ctx, tx, tenantID, m.ExecutedBy, "stock_movement", m.ID, "created", auditDetails); err != nil {
+			return fmt.Errorf("WMSRepo.DeductWarehouseStock: audit movement %d: %w", i, err)
+		}
 	}
 
 	return tx.Commit()
@@ -578,9 +606,9 @@ func (r *WMSRepo) ConfirmPutaway(ctx context.Context, cmd domain.PutawayCommand)
 		return nil, domain.ErrInvalidPutawayLocation
 	}
 
-	// Validate default rack override
+	// Validate default rack override (trimmed reason >= 5 characters)
 	if cmd.DefaultLocationID != nil && *cmd.DefaultLocationID != cmd.DestLocationID {
-		if cmd.Reason == nil || strings.TrimSpace(*cmd.Reason) == "" {
+		if cmd.Reason == nil || len([]rune(strings.TrimSpace(*cmd.Reason))) < 5 {
 			return nil, domain.ErrPutawayReasonRequired
 		}
 	}
@@ -657,6 +685,9 @@ WHERE tenant_id = $1
 	if err := r.WriteAuditTx(ctx, tx, cmd.TenantID, &cmd.UserID, "putaway", mov.ID, "confirmed", auditDetails); err != nil {
 		return nil, fmt.Errorf("WMSRepo.ConfirmPutaway: audit log: %w", err)
 	}
+	if err := r.WriteAuditTx(ctx, tx, cmd.TenantID, &cmd.UserID, "stock_movement", mov.ID, "created", auditDetails); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ConfirmPutaway: movement audit log: %w", err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("WMSRepo.ConfirmPutaway: commit: %w", err)
@@ -700,11 +731,15 @@ func (r *WMSRepo) ReleaseStockReceipt(ctx context.Context, tenantID, receiptID, 
 	}
 
 	now := time.Now().UTC()
-	_, err = tx.ExecContext(ctx,
-		`UPDATE stock_batches SET status = 'RELEASED' WHERE source_receipt_id = $1 AND tenant_id = $2 AND status = 'ON_HOLD'`,
+	res, err := tx.ExecContext(ctx,
+		`UPDATE stock_batches SET status = 'RELEASED' WHERE source_receipt_id = $1 AND tenant_id = $2 AND status = 'ON_HOLD' AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)`,
 		receiptID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.ReleaseStockReceipt: update batches: %w", err)
+	}
+	releasedRows, _ := res.RowsAffected()
+	if releasedRows == 0 {
+		return nil, errors.New("tidak ada batch yang dapat dirilis (seluruh batch on-hold sudah kedaluwarsa)")
 	}
 
 	_, err = tx.ExecContext(ctx,
@@ -715,7 +750,7 @@ func (r *WMSRepo) ReleaseStockReceipt(ctx context.Context, tenantID, receiptID, 
 	}
 
 	auditDetails, _ := json.Marshal(map[string]any{
-		"released_batch_count": batchCount,
+		"released_batch_count": releasedRows,
 	})
 	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "stock_receipt", receiptID, "released", auditDetails); err != nil {
 		return nil, fmt.Errorf("WMSRepo.ReleaseStockReceipt: audit log: %w", err)

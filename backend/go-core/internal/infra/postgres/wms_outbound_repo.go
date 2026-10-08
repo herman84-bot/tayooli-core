@@ -6,6 +6,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -412,6 +413,17 @@ func (r *WMSRepo) CompleteDOPacking(ctx context.Context, tenantID, doID, userID 
 		SET status = 'COMPLETED', completed_at = NOW(), updated_at = NOW()
 		WHERE delivery_order_id = $1 AND tenant_id = $2 AND status != 'COMPLETED'`,
 		doID, tenantID)
+
+	auditDetails, _ := json.Marshal(map[string]any{
+		"package_weight_kg": req.PackageWeightKg,
+		"package_length_cm": req.PackageLengthCm,
+		"package_width_cm":  req.PackageWidthCm,
+		"package_height_cm": req.PackageHeightCm,
+		"packaging_type":    req.PackagingType,
+	})
+	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "delivery_order", doID, "pack_completed", auditDetails); err != nil {
+		return nil, fmt.Errorf("WMSRepo.CompleteDOPacking: audit log: %w", err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, err

@@ -949,14 +949,40 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 		return nil, domain.ErrInvalidInput
 	}
 
+	type prodLocKey struct {
+		prod uuid.UUID
+		loc  uuid.UUID
+	}
+	requestedTotals := make(map[prodLocKey]decimal.Decimal, len(req.Items))
 	// Validate items and location scoping
 	for _, itemReq := range req.Items {
-		if itemReq.ProductID == uuid.Nil || itemReq.Quantity.LessThanOrEqual(decimal.Zero) {
+		if itemReq.ProductID == uuid.Nil || !itemReq.Quantity.IsPositive() {
 			return nil, domain.ErrInvalidInput
 		}
 		if itemReq.LocationID != uuid.Nil {
 			if err := u.validateLocationWarehouse(ctx, tenantID, itemReq.LocationID, req.WarehouseID); err != nil {
 				return nil, err
+			}
+		}
+		key := prodLocKey{prod: itemReq.ProductID, loc: itemReq.LocationID}
+		requestedTotals[key] = requestedTotals[key].Add(itemReq.Quantity)
+	}
+
+	// Verify available stock (on_hand - allocated - quarantine) per product/location
+	for key, totalReqQty := range requestedTotals {
+		var locPtr *uuid.UUID
+		if key.loc != uuid.Nil {
+			locPtr = &key.loc
+		}
+		avail, err := u.repo.GetAvailableStock(ctx, tenantID, req.WarehouseID, locPtr, key.prod)
+		if err != nil {
+			return nil, fmt.Errorf("check available stock: %w", err)
+		}
+		if avail.LessThan(totalReqQty) {
+			return nil, &domain.InsufficientStockError{
+				Available: avail,
+				Requested: totalReqQty,
+				Msg:       fmt.Sprintf("stok tidak mencukupi (tersedia: %s, diminta: %s)", avail.String(), totalReqQty.String()),
 			}
 		}
 	}
@@ -1046,7 +1072,14 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 				})
 			}
 		} else {
-			// Fallback when batches are not yet initialized: record requested item line
+			// Fallback when batches are not yet initialized (only if explicit location is provided)
+			if itemReq.LocationID == uuid.Nil {
+				return nil, &domain.InsufficientStockError{
+					Available: decimal.Zero,
+					Requested: itemReq.Quantity,
+					Msg:       fmt.Sprintf("stok batch tidak ditemukan untuk alokasi otomatis produk %s", itemReq.ProductID),
+				}
+			}
 			items = append(items, domain.DeliveryOrderItem{
 				ID:              uuid.New(),
 				TenantID:        tenantID,
@@ -1069,6 +1102,21 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 	_, _ = u.repo.GetOrCreatePickingTask(ctx, tenantID, do.ID)
 
 	return do, nil
+}
+
+// ConfirmDeliveryOrder transitions a DRAFT Delivery Order to CONFIRMED.
+func (u *Usecase) ConfirmDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error) {
+	do, _, err := u.repo.GetDeliveryOrderByID(ctx, tenantID, doID)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, do.WarehouseID); err != nil {
+		return nil, err
+	}
+	if do.Status != domain.DeliveryOrderStatusDraft {
+		return nil, domain.ErrInvalidStatus
+	}
+	return u.repo.ConfirmDeliveryOrder(ctx, tenantID, doID, userID)
 }
 
 // DispatchDeliveryOrder transitions a DO to SHIPPED and deducts inventory from rack to @CUSTOMER.

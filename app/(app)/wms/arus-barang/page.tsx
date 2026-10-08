@@ -34,6 +34,7 @@ import {
 } from "@/hooks/useWMS"
 import { useProducts } from "@/hooks/useProducts"
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
+import { validateReceiptLines, isPastDate } from "@/lib/wms/validation"
 import {
   StockReceipt,
   StockReceiptInput,
@@ -745,8 +746,9 @@ function InboundReceiptForm({
       setError("Pilih rak/lokasi rencana penyimpanan.")
       return
     }
-    if (form.lines.length === 0) {
-      setError("Tambahkan minimal 1 item barang.")
+    const lineError = validateReceiptLines(form.lines)
+    if (lineError) {
+      setError(lineError)
       return
     }
 
@@ -957,14 +959,22 @@ function InboundReceiptForm({
                         type="date"
                         value={line.expiry_date}
                         onChange={(e) => updateLine(idx, { expiry_date: e.target.value })}
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-xs"
+                        aria-invalid={isPastDate(line.expiry_date)}
+                        className={`w-full px-2 py-1 border rounded text-xs ${
+                          isPastDate(line.expiry_date) ? "border-rose-400 bg-rose-50" : "border-slate-300"
+                        }`}
                       />
+                      {isPastDate(line.expiry_date) && (
+                        <div className="mt-0.5 text-[10px] text-rose-600">Sudah kedaluwarsa — catat sebagai ditolak</div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <input
                         type="number"
                         min="0"
-                        step="any"
+                        step="1"
+                        inputMode="numeric"
+                        aria-label={`Qty diterima ${line.product_name}`}
                         value={line.accepted}
                         onChange={(e) => updateLine(idx, { accepted: e.target.value })}
                         className="w-full px-2 py-1 border border-slate-300 rounded text-right font-semibold text-xs"
@@ -974,7 +984,9 @@ function InboundReceiptForm({
                       <input
                         type="number"
                         min="0"
-                        step="any"
+                        step="1"
+                        inputMode="numeric"
+                        aria-label={`Qty ditolak ${line.product_name}`}
                         value={line.rejected}
                         onChange={(e) => updateLine(idx, { rejected: e.target.value })}
                         className="w-full px-2 py-1 border border-slate-300 rounded text-right text-xs"
@@ -983,6 +995,8 @@ function InboundReceiptForm({
                     <td className="px-3 py-2">
                       {num(line.rejected) > 0 ? (
                         <select
+                          aria-label={`Alasan tolak ${line.product_name}`}
+                          aria-required="true"
                           value={line.reject_reason}
                           onChange={(e) => updateLine(idx, { reject_reason: e.target.value })}
                           className="w-full px-2 py-1 border border-rose-300 rounded bg-rose-50/40 text-xs"
@@ -1026,8 +1040,9 @@ function InboundReceiptForm({
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
-          className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm"
+          disabled={saving || !!validateReceiptLines(form.lines)}
+          title={validateReceiptLines(form.lines) ?? undefined}
+          className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm"
         >
           {saving ? "Menyimpan Draf..." : "Simpan Draf Penerimaan"}
         </button>

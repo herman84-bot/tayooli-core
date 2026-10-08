@@ -20,6 +20,7 @@ import {
   useProductDefaultLocations,
 } from "@/hooks/useWMS"
 import type { PutawayPendingLine, WarehouseLocation } from "@/lib/api"
+import { validatePutaway, parseQty, MIN_OVERRIDE_REASON_LEN } from "@/lib/wms/validation"
 
 interface PutawayViewProps {
   warehouseId: string | null
@@ -69,30 +70,28 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
     setErrorMsg(null)
   }
 
+  // Invariant 4 (CR-03): a destination other than the product's default rack needs a reason.
+  const isOverridingDefault = !!(
+    selectedLine?.default_location_id && destLocationId && destLocationId !== selectedLine.default_location_id
+  )
+  const putawayError = selectedLine
+    ? !destLocationId
+      ? "Pilih rak internal tujuan putaway"
+      : validatePutaway({
+          qty: putawayQty,
+          available: Number(selectedLine.quantity),
+          isOverride: isOverridingDefault,
+          reason,
+        })
+    : null
+
   const handleConfirm = () => {
     if (!selectedLine || !warehouseId) return
-    const qtyNum = parseFloat(putawayQty)
-    if (!qtyNum || qtyNum <= 0) {
-      setErrorMsg("Jumlah putaway harus lebih besar dari 0")
+    if (putawayError) {
+      setErrorMsg(putawayError)
       return
     }
-    if (qtyNum > Number(selectedLine.quantity)) {
-      setErrorMsg(`Jumlah putaway tidak boleh melebihi stok tersedia (${selectedLine.quantity})`)
-      return
-    }
-    if (!destLocationId) {
-      setErrorMsg("Pilih rak internal tujuan putaway")
-      return
-    }
-
-    // Invariant 4: If overriding default rack, reason is required
-    const isOverridingDefault =
-      selectedLine.default_location_id &&
-      destLocationId !== selectedLine.default_location_id
-    if (isOverridingDefault && !reason.trim()) {
-      setErrorMsg("Alasan wajib diisi jika lokasi tujuan berbeda dari rak default produk (ADR-014 Invariant 4)")
-      return
-    }
+    const qtyNum = parseQty(putawayQty)
 
     confirmPutaway(
       {
@@ -310,11 +309,15 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                 </label>
                 <input
                   type="number"
+                  min="0"
+                  max={Number(selectedLine.quantity) || undefined}
                   step="any"
+                  aria-label="Jumlah putaway"
                   value={putawayQty}
                   onChange={(e) => setPutawayQty(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-semibold"
                 />
+                <p className="mt-1 text-[11px] text-slate-500">Maksimal {selectedLine.quantity} unit (sisa di Staging).</p>
               </div>
 
               <div>
@@ -337,9 +340,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
               </div>
 
               {/* Invariant 4 Warning & Reason Field */}
-              {selectedLine.default_location_id &&
-                destLocationId &&
-                destLocationId !== selectedLine.default_location_id && (
+              {isOverridingDefault && (
                   <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 space-y-2">
                     <div className="flex items-center gap-2 text-xs font-semibold text-amber-800">
                       <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0" />
@@ -351,15 +352,19 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                     </p>
                     <div>
                       <label className="block text-xs font-medium text-amber-900 mb-1">
-                        Alasan Penyimpangan Rak <span className="text-rose-600">*</span>
+                        Alasan Pemindahan Rak <span className="text-rose-600">*</span>
                       </label>
-                      <input
-                        type="text"
+                      <textarea
+                        rows={2}
+                        aria-label="Alasan Pemindahan Rak"
                         placeholder="Contoh: Rak default penuh, sedang dalam perbaikan..."
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
                         className="w-full px-3 py-1.5 border border-amber-300 rounded bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
                       />
+                      <p className="mt-0.5 text-[10px] text-amber-700">
+                        Minimal {MIN_OVERRIDE_REASON_LEN} karakter ({reason.trim().length}/{MIN_OVERRIDE_REASON_LEN})
+                      </p>
                     </div>
                   </div>
                 )}
@@ -376,7 +381,8 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
               <button
                 type="button"
                 onClick={handleConfirm}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!putawayError}
+                title={putawayError ?? undefined}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 rounded-md transition-colors shadow-sm"
               >
                 {isSubmitting ? "Menyimpan..." : "Konfirmasi Putaway"}

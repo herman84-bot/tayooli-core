@@ -695,6 +695,10 @@ export interface StockSummary {
   location_id?: string | null
   location_code?: string
   quantity: number | string
+  /** Qty already reserved by open delivery orders / picking (backend >= CR inverted-testing fix). */
+  allocated_qty?: number | string
+  /** on_hand − allocated − quarantine, clamped at 0. */
+  available_qty?: number | string
 }
 
 export interface POSOrderItem {

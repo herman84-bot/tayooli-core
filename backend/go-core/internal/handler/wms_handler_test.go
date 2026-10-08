@@ -46,6 +46,7 @@ type mockWMSUsecase struct {
 	cancelTransferFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error)
 
 	createDeliveryOrderFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateDeliveryOrderRequest) (*domain.DeliveryOrder, error)
+	confirmDeliveryOrderFn  func(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
 	dispatchDeliveryOrderFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
 	getDeliveryOrderFn      func(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, []domain.DeliveryOrderItem, error)
 	listDeliveryOrdersFn    func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.DeliveryOrder, error)
@@ -206,6 +207,13 @@ func (m *mockWMSUsecase) CancelTransfer(ctx context.Context, tenantID, userID uu
 func (m *mockWMSUsecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateDeliveryOrderRequest) (*domain.DeliveryOrder, error) {
 	if m.createDeliveryOrderFn != nil {
 		return m.createDeliveryOrderFn(ctx, tenantID, userID, role, req)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) ConfirmDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error) {
+	if m.confirmDeliveryOrderFn != nil {
+		return m.confirmDeliveryOrderFn(ctx, tenantID, userID, role, doID)
 	}
 	return nil, nil
 }

@@ -234,5 +234,15 @@ func TestSprint1Endpoints(t *testing.T) {
 		auditRec := httptest.NewRecorder()
 		r.ServeHTTP(auditRec, auditReq)
 		assert.Equal(t, http.StatusOK, auditRec.Code)
+
+		auditSmReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/wms/audit-trail?entity_type=stock_movement&entity_id=%s", uuid.New()), nil)
+		auditSmRec := httptest.NewRecorder()
+		r.ServeHTTP(auditSmRec, auditSmReq)
+		assert.Equal(t, http.StatusOK, auditSmRec.Code)
+
+		auditDoReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/wms/audit-trail?entity_type=delivery_order&entity_id=%s", uuid.New()), nil)
+		auditDoRec := httptest.NewRecorder()
+		r.ServeHTTP(auditDoRec, auditDoReq)
+		assert.Equal(t, http.StatusOK, auditDoRec.Code)
 	})
 }

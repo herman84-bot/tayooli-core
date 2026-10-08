@@ -48,6 +48,8 @@ import { PrintThermalAWB } from "@/components/wms/PrintThermalAWB"
 import { PackStationModal } from "@/components/wms/PackStationModal"
 import { WaveReleaseModal } from "@/components/wms/WaveReleaseModal"
 import { ActivityTimelineDrawer } from "@/components/wms/ActivityTimelineDrawer"
+import { useWMSStock } from "@/hooks/useWMSLedger"
+import { availableFor, validateDOLineQty } from "@/lib/wms/validation"
 import { ExportModal, ExportButton, type ExportFilter } from "@/components/ui/ExportModal"
 import type { ExportColumn } from "@/lib/export"
 
@@ -189,6 +191,32 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
 
   // Locations for selected warehouse in create modal
   const { data: modalLocations = [] } = useWarehouseLocations(modalWarehouseId || null)
+  // Live stock for availability pre-check (only fetched while the create modal has a warehouse).
+  const {
+    data: modalStock,
+    isError: modalStockError,
+    isLoading: modalStockLoading,
+    isSuccess: modalStockSuccess,
+  } = useWMSStock(
+    showCreateModal && modalWarehouseId ? modalWarehouseId : undefined,
+    showCreateModal && !!modalWarehouseId
+  )
+
+  // Remaining availability per line, accounting for earlier lines that draw from the same pool.
+  const lineChecks = useMemo(() => {
+    const used = new Map<string, number>()
+    const stockReady = modalStockSuccess && !modalStockError && modalStock && !!modalWarehouseId
+    return lineItems.map((item) => {
+      const key = `${item.productId}|${item.locationId || "*"}`
+      const avail = stockReady ? availableFor(modalStock, item.productId, item.locationId) : undefined
+      const already = used.get(key) ?? 0
+      const remaining = avail === undefined ? undefined : Math.max(0, avail - already)
+      const error = validateDOLineQty(item.quantity, remaining)
+      if (!error && Number.isFinite(item.quantity)) used.set(key, already + item.quantity)
+      return { remaining, error }
+    })
+  }, [lineItems, modalStock, modalStockError, modalStockSuccess, modalWarehouseId])
+  const hasLineErrors = lineChecks.some((c) => c.error)
 
   // Mutations
   const createDoMutation = useCreateDeliveryOrder()
@@ -410,8 +438,9 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
 
     for (let i = 0; i < lineItems.length; i++) {
       const it = lineItems[i]
-      if (it.quantity <= 0) {
-        setModalError(`Baris ${i + 1}: Kuantitas barang harus lebih besar dari 0.`)
+      const qtyErr = lineChecks[i]?.error ?? validateDOLineQty(it.quantity)
+      if (qtyErr) {
+        setModalError(`Baris ${i + 1} (${it.productName || it.sku}): ${qtyErr}`)
         return
       }
       if (!it.locationId) {
@@ -842,7 +871,12 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
       {/* ── In-App Confirmation Modal for Dispatch (replaces confirm/alert) ── */}
       {orderToDispatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Konfirmasi Pengiriman"
+            className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4"
+          >
             <div className="flex items-center gap-3">
               <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
                 <Send className="w-6 h-6" />
@@ -855,6 +889,9 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
 
             <p className="text-sm text-slate-600 leading-relaxed">
               Konfirmasi pengiriman Surat Jalan ini? Status akan diperbarui menjadi <strong>SHIPPED</strong> dan stok gudang otomatis dipotong untuk pelanggan tujuan.
+            </p>
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+              Tindakan ini permanen: potongan stok di buku besar tidak dapat dibatalkan dari layar ini.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -1126,14 +1163,36 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                           <input
                             type="number"
                             min="1"
-                            value={item.quantity}
+                            step="1"
+                            inputMode="numeric"
+                            aria-label={`Qty baris ${idx + 1}`}
+                            aria-invalid={!!lineChecks[idx]?.error}
+                            value={Number.isFinite(item.quantity) ? item.quantity : ""}
                             onChange={(e) => {
-                              const updated = [...lineItems]
-                              updated[idx].quantity = Number(e.target.value)
-                              setLineItems(updated)
+                              const raw = e.target.value
+                              setLineItems((prev) =>
+                                prev.map((li, i) => (i === idx ? { ...li, quantity: raw === "" ? NaN : Number(raw) } : li))
+                              )
                             }}
-                            className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-900 text-right font-mono"
+                            className={`w-full bg-white border rounded-lg px-2 py-1.5 text-slate-900 text-right font-mono ${
+                              lineChecks[idx]?.error ? "border-rose-400 bg-rose-50" : "border-slate-200"
+                            }`}
                           />
+                        </div>
+
+                        {/* Availability feedback (pre-check) */}
+                        <div className="col-span-12 -mt-1 text-[10px]">
+                          {lineChecks[idx]?.error ? (
+                            <span role="alert" className="text-rose-600 font-semibold">{lineChecks[idx].error}</span>
+                          ) : lineChecks[idx]?.remaining !== undefined ? (
+                            <span className="text-slate-500">
+                              Sisa available {item.locationId ? "di rak ini" : "(semua rak)"}: {lineChecks[idx].remaining}
+                            </span>
+                          ) : modalStockLoading ? (
+                            <span className="text-slate-400">Memeriksa stok gudang...</span>
+                          ) : modalStockError ? (
+                            <span className="text-amber-600">Data stok gagal dimuat — validasi akhir dilakukan server.</span>
+                          ) : null}
                         </div>
 
                         {/* Bonus / Free Item Flag (PDF-01) */}
@@ -1182,7 +1241,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                 </button>
                 <button
                   type="submit"
-                  disabled={createDoMutation.isPending}
+                  disabled={createDoMutation.isPending || hasLineErrors}
                   className="px-4 py-2 rounded-lg bg-[#2563EB] text-white font-semibold hover:bg-[#1D4ED8] shadow-sm disabled:opacity-50 transition"
                 >
                   {createDoMutation.isPending ? "Menerbitkan..." : "Terbitkan Surat Jalan"}

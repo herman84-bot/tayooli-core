@@ -50,6 +50,7 @@ type WMSUsecase interface {
 
 	// Delivery Orders
 	CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateDeliveryOrderRequest) (*domain.DeliveryOrder, error)
+	ConfirmDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
 	DispatchDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
 	GetDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, []domain.DeliveryOrderItem, error)
 	ListDeliveryOrders(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.DeliveryOrder, error)
@@ -145,6 +146,7 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Get("/delivery-orders", h.ListDeliveryOrders)
 		r.Post("/delivery-orders", h.CreateDeliveryOrder)
 		r.Get("/delivery-orders/{id}", h.GetDeliveryOrder)
+		r.Post("/delivery-orders/{id}/confirm", h.ConfirmDeliveryOrder)
 		r.Post("/delivery-orders/{id}/dispatch", h.DispatchDeliveryOrder)
 		// Sprint 3 Outbound Picking & Pack Station
 		r.Get("/delivery-orders/{id}/picking", h.GetPickingTask)
@@ -227,11 +229,14 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 	var maxBytesErr *http.MaxBytesError
 	var receiptValErr *domain.StockReceiptValidationError
+	var insStockErr *domain.InsufficientStockError
 	switch {
 	case errors.As(err, &maxBytesErr):
 		RespondError(w, r, http.StatusRequestEntityTooLarge, "request entity too large")
 	case errors.As(err, &receiptValErr):
 		RespondError(w, r, http.StatusBadRequest, receiptValErr.Msg)
+	case errors.As(err, &insStockErr):
+		RespondError(w, r, http.StatusUnprocessableEntity, insStockErr.Error())
 	case errors.Is(err, domain.ErrStockReceiptNotFound):
 		RespondError(w, r, http.StatusNotFound, "Penerimaan barang tidak ditemukan")
 	case errors.Is(err, domain.ErrStockReceiptNotDraft):
@@ -309,7 +314,7 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, domain.ErrForbidden):
 		RespondError(w, r, http.StatusForbidden, "forbidden")
 	case errors.Is(err, domain.ErrInsufficientStock):
-		RespondError(w, r, http.StatusUnprocessableEntity, "insufficient stock at location")
+		RespondError(w, r, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, domain.ErrInvalidTransferStatus):
 		RespondError(w, r, http.StatusBadRequest, "invalid transfer status transition")
 	case errors.Is(err, domain.ErrSelfApprovalForbidden):
@@ -852,6 +857,31 @@ func (h *WMSHandler) GetDeliveryOrder(w http.ResponseWriter, r *http.Request) {
 		"delivery_order": do,
 		"items":          items,
 	})
+}
+
+// ConfirmDeliveryOrder handles POST /api/v1/wms/delivery-orders/{id}/confirm
+func (h *WMSHandler) ConfirmDeliveryOrder(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1024*1024)
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	doID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid delivery order id uuid")
+		return
+	}
+
+	do, err := h.uc.ConfirmDeliveryOrder(r.Context(), tenantID, userID, role, doID)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, do)
 }
 
 // DispatchDeliveryOrder handles POST /api/v1/wms/delivery-orders/{id}/dispatch

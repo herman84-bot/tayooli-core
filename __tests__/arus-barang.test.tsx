@@ -140,6 +140,11 @@ jest.mock('@/hooks/useWMS', () => ({
   useScrapQuarantine: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }))
 
+jest.mock('@/hooks/useWMSLedger', () => ({
+  useWMSStock: () => ({ data: [], isLoading: false, isError: false }),
+  useWMSMovements: () => ({ data: [], isLoading: false }),
+}))
+
 jest.mock('@/hooks/useProducts', () => ({
   useProducts: () => ({
     data: [{ id: 'p-1', name: 'Kopi Robusta 500g', sku: 'KOP-ROB-500' }],

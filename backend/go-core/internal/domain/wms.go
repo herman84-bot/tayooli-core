@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -344,6 +345,26 @@ type StockSummary struct {
 	LocationID    *uuid.UUID      `json:"location_id,omitempty"`
 	LocationCode  string          `json:"location_code,omitempty"`
 	Quantity      decimal.Decimal `json:"quantity"`
+	AllocatedQty  decimal.Decimal `json:"allocated_qty"`
+	AvailableQty  decimal.Decimal `json:"available_qty"`
+}
+
+// InsufficientStockError carries available and requested quantities for stock failures.
+type InsufficientStockError struct {
+	Available decimal.Decimal
+	Requested decimal.Decimal
+	Msg       string
+}
+
+func (e *InsufficientStockError) Error() string {
+	if e.Msg != "" {
+		return e.Msg
+	}
+	return fmt.Sprintf("stok tidak mencukupi (tersedia: %s, diminta: %s)", e.Available.String(), e.Requested.String())
+}
+
+func (e *InsufficientStockError) Unwrap() error {
+	return ErrInsufficientStock
 }
 
 // StockTransfer represents inter-warehouse transfer header.
@@ -655,8 +676,10 @@ type WMSRepository interface {
 	// Delivery Orders
 	CreateDeliveryOrder(ctx context.Context, do *DeliveryOrder, items []DeliveryOrderItem) error
 	GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UUID) (*DeliveryOrder, []DeliveryOrderItem, error)
+	ConfirmDeliveryOrder(ctx context.Context, tenantID, id, userID uuid.UUID) (*DeliveryOrder, error)
 	UpdateDeliveryOrderStatus(ctx context.Context, tenantID, id uuid.UUID, status DeliveryOrderStatus, receivedDate *time.Time) error
 	ListDeliveryOrders(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID) ([]DeliveryOrder, error)
+	GetAvailableStock(ctx context.Context, tenantID, warehouseID uuid.UUID, locationID *uuid.UUID, productID uuid.UUID) (decimal.Decimal, error)
 
 	// Stock Opname
 	CreateStockOpname(ctx context.Context, op *StockOpname) error
