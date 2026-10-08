@@ -106,9 +106,14 @@ export function PackStationModal({
     }
   }
 
-  // Auto focus input on mount & reset error timer
+  // Auto focus input on mount & cleanup AudioContext on unmount
   useEffect(() => {
     barcodeInputRef.current?.focus()
+    return () => {
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+        audioCtxRef.current.close().catch(() => {})
+      }
+    }
   }, [])
 
   // Calculate scan progress

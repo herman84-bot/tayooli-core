@@ -35,6 +35,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
   const [searchQuery, setSearchQuery] = useState("")
   const [orders, setOrders] = useState<DeliveryOrder[]>([])
   const [loadingOrders, setLoadingOrders] = useState(false)
+  const [ordersError, setOrdersError] = useState<string | null>(null)
 
   // Selected Order for Packing
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null)
@@ -72,17 +73,26 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
     loadOrders()
   }, [selectedWarehouseId])
 
+  useEffect(() => {
+    return () => {
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+        audioCtxRef.current.close().catch(() => {})
+      }
+    }
+  }, [])
+
   const loadOrders = async () => {
     try {
       setLoadingOrders(true)
+      setOrdersError(null)
       const res = await api.wms.deliveryOrders.list(selectedWarehouseId || undefined)
       // Filter orders ready for packing: CONFIRMED, PICKED, or PACKED
       const packable = (res.data || []).filter(
         (o) => o.status === "CONFIRMED" || o.status === "PICKED" || o.status === "PACKED"
       )
       setOrders(packable)
-    } catch {
-      // silently fail list
+    } catch (err: any) {
+      setOrdersError(err?.message || "Gagal memuat daftar pesanan siap kemas")
     } finally {
       setLoadingOrders(false)
     }
@@ -199,6 +209,14 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
   // Complete Packing (Transitions to PACKED)
   const handleCompletePack = async () => {
     if (!selectedOrder || completing) return
+
+    const numWeight = Number(weightKg)
+    if (isNaN(numWeight) || numWeight <= 0) {
+      playSound(false)
+      setScanMessage({ type: "error", text: "Berat paket fisik harus lebih dari 0 kg!" })
+      return
+    }
+
     setCompleting(true)
     setScanMessage(null)
 
