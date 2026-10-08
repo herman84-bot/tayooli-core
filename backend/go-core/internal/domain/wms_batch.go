@@ -34,6 +34,10 @@ func AllocateFEFO(balances []BatchBalance, qty decimal.Decimal, includeOnHold bo
 		if b.Status == StockBatchStatusOnHold && !includeOnHold {
 			continue
 		}
+		// Outbound picking strictly restricts to RELEASED / AVAILABLE batches
+		if b.Status != "" && b.Status != StockBatchStatusReleased && b.Status != StockBatchStatusAvailable && !includeOnHold {
+			continue
+		}
 		cands = append(cands, b)
 	}
 	sort.SliceStable(cands, func(i, j int) bool {

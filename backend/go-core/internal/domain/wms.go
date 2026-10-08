@@ -57,8 +57,9 @@ var (
 type StockBatchStatus string
 
 const (
-	StockBatchStatusReleased StockBatchStatus = "RELEASED"
-	StockBatchStatusOnHold   StockBatchStatus = "ON_HOLD"
+	StockBatchStatusReleased  StockBatchStatus = "RELEASED"
+	StockBatchStatusAvailable StockBatchStatus = "AVAILABLE"
+	StockBatchStatusOnHold    StockBatchStatus = "ON_HOLD"
 )
 
 // LegacyBatchNumber marks the batch backfilled by migration 033 for pre-batch movements.
