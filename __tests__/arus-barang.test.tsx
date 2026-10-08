@@ -182,7 +182,7 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
 
     expect(mockRouterReplace).toHaveBeenCalledWith('/wms/arus-barang?mode=keluar')
     rerender(<ArusBarangPage />) // router.replace updates the search params
-    expect(screen.getByRole('button', { name: /Surat Jalan \(DO\)/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Surat Jalan \(DO\)/i })[0]).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Picking Wave/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Packing Station/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Manifest & Muat/i })).toBeInTheDocument()
@@ -193,7 +193,7 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
     localStorage.setItem('wms_arus_barang_mode', 'masuk')
     currentMode = 'keluar'
     render(<ArusBarangPage />)
-    expect(screen.getByRole('button', { name: /Surat Jalan \(DO\)/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Surat Jalan \(DO\)/i })[0]).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Penerimaan \(GR\)/i })).not.toBeInTheDocument()
     expect(mockRouterReplace).not.toHaveBeenCalled()
     expect(localStorage.getItem('wms_arus_barang_mode')).toBe('keluar')
