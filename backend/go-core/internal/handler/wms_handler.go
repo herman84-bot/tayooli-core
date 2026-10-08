@@ -116,6 +116,14 @@ type WMSUsecase interface {
 	TraceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.BatchTrace, error)
 	TraceDocument(ctx context.Context, tenantID, userID uuid.UUID, role string, refType string, refID uuid.UUID) (*domain.DocumentTrace, error)
 	ListAuditTrail(ctx context.Context, tenantID, userID uuid.UUID, role string, entityType string, entityID uuid.UUID) ([]domain.AuditTrailEntry, error)
+
+	// Shipping Manifests (Sprint 4 Outbound Tahap 5-6)
+	CreateShippingManifest(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateShippingManifestRequest) (*domain.ShippingManifest, error)
+	GetShippingManifest(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.ShippingManifestDetail, error)
+	ListShippingManifests(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.ShippingManifestStatus, expeditionName *string) ([]domain.ShippingManifest, error)
+	ScanDOLoading(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.LoadingScanRequest) (*domain.ShippingManifestDetail, error)
+	DispatchShippingManifest(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.DispatchShippingManifestRequest) (*domain.ShippingManifest, error)
+	GetWMSOutboundKPIs(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) (*domain.WMSOutboundKPISummary, error)
 }
 
 type WMSHandler struct {
@@ -162,6 +170,26 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Post("/pick-waves", h.CreatePickWave)
 		r.Get("/pick-waves/{id}", h.GetPickWave)
 		r.Post("/pick-waves/{id}/release", h.ReleasePickWave)
+
+		// Shipping Manifests (Sprint 4 Outbound Tahap 5-6)
+		r.Get("/manifests", h.ListShippingManifests)
+		r.Post("/manifests", h.CreateShippingManifest)
+		r.Get("/manifests/{id}", h.GetShippingManifest)
+		r.Post("/manifests/{id}/loading-scan", h.ScanDOLoading)
+		r.Post("/manifests/{id}/dispatch", h.DispatchShippingManifest)
+		r.Get("/kpi", h.GetWMSOutboundKPIs)
+		// Aliases under /delivery-orders/manifests
+		r.Get("/delivery-orders/manifests", h.ListShippingManifests)
+		r.Post("/delivery-orders/manifests", h.CreateShippingManifest)
+		// Aliases under /outbound
+		r.Route("/outbound", func(r chi.Router) {
+			r.Get("/manifests", h.ListShippingManifests)
+			r.Post("/manifests", h.CreateShippingManifest)
+			r.Get("/manifests/{id}", h.GetShippingManifest)
+			r.Post("/manifests/{id}/loading-scan", h.ScanDOLoading)
+			r.Post("/manifests/{id}/dispatch", h.DispatchShippingManifest)
+			r.Get("/kpi", h.GetWMSOutboundKPIs)
+		})
 
 		// Stock Opnames
 		r.Get("/opnames", h.ListStockOpnames)
@@ -275,6 +303,16 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusUnprocessableEntity, "Jumlah pemindaian melebihi sisa yang harus dikemas")
 	case errors.Is(err, domain.ErrPickingTaskNotFound):
 		RespondError(w, r, http.StatusNotFound, "Dokumen picking task tidak ditemukan")
+	case errors.Is(err, domain.ErrManifestNotFound):
+		RespondError(w, r, http.StatusNotFound, "shipping manifest tidak ditemukan")
+	case errors.Is(err, domain.ErrInvalidManifestStatus):
+		RespondError(w, r, http.StatusConflict, "status manifest tidak valid untuk operasi ini")
+	case errors.Is(err, domain.ErrManifestSignatureRequired):
+		RespondError(w, r, http.StatusBadRequest, "tanda tangan sopir ekspedisi wajib diisi")
+	case errors.Is(err, domain.ErrDOMisload):
+		RespondError(w, r, http.StatusUnprocessableEntity, "nomor Surat Jalan tidak terdaftar dalam manifest ini atau ekspedisi berbeda")
+	case errors.Is(err, domain.ErrManifestEmpty):
+		RespondError(w, r, http.StatusBadRequest, "manifest minimal harus memuat 1 Surat Jalan")
 	case errors.Is(err, domain.ErrScrapNotesRequired):
 		RespondError(w, r, http.StatusBadRequest, "Catatan wajib diisi untuk memusnahkan stok karantina")
 	case errors.Is(err, domain.ErrBatchRequired):

@@ -634,6 +634,7 @@ type WMSRepository interface {
 	WMSBatchRepository
 	WMSQCRepository
 	WMSOutboundRepository
+	WMSManifestRepository
 
 	// Regional
 	CreateRegional(ctx context.Context, r *Regional) error

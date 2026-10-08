@@ -76,6 +76,13 @@ type mockWMSUsecase struct {
 	listMarketplaceOrdersFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID, batchID *uuid.UUID, status *domain.MarketplaceOrderStatus) ([]domain.MarketplaceOrder, error)
 	getMarketplaceOrderFn     func(ctx context.Context, tenantID, userID uuid.UUID, role string, orderID uuid.UUID) (*domain.MarketplaceOrder, error)
 	listSKUMappingsFn         func(ctx context.Context, tenantID uuid.UUID, channelName string) ([]domain.ProductSKUMapping, error)
+
+	createShippingManifestFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateShippingManifestRequest) (*domain.ShippingManifest, error)
+	getShippingManifestFn      func(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.ShippingManifestDetail, error)
+	listShippingManifestsFn    func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.ShippingManifestStatus, expeditionName *string) ([]domain.ShippingManifest, error)
+	scanDOLoadingFn            func(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.LoadingScanRequest) (*domain.ShippingManifestDetail, error)
+	dispatchShippingManifestFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.DispatchShippingManifestRequest) (*domain.ShippingManifest, error)
+	getWMSOutboundKPIsFn       func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) (*domain.WMSOutboundKPISummary, error)
 }
 
 func (m *mockWMSUsecase) CreateWarehouse(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateWarehouseRequest) (*domain.Warehouse, error) {
@@ -376,6 +383,48 @@ func (m *mockWMSUsecase) GetPickWaveByID(ctx context.Context, tenantID, userID u
 }
 func (m *mockWMSUsecase) ReleasePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, waveID uuid.UUID, pickerID *uuid.UUID) (*domain.PickWave, error) {
 	return &domain.PickWave{ID: waveID, Status: domain.PickWaveStatusReleased}, nil
+}
+
+func (m *mockWMSUsecase) CreateShippingManifest(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateShippingManifestRequest) (*domain.ShippingManifest, error) {
+	if m.createShippingManifestFn != nil {
+		return m.createShippingManifestFn(ctx, tenantID, userID, role, req)
+	}
+	return &domain.ShippingManifest{ID: uuid.New(), ManifestNumber: "SM-TEST-001", Status: domain.ShippingManifestStatusStaged}, nil
+}
+
+func (m *mockWMSUsecase) GetShippingManifest(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.ShippingManifestDetail, error) {
+	if m.getShippingManifestFn != nil {
+		return m.getShippingManifestFn(ctx, tenantID, userID, role, id)
+	}
+	return &domain.ShippingManifestDetail{Manifest: domain.ShippingManifest{ID: id, ManifestNumber: "SM-TEST-001"}}, nil
+}
+
+func (m *mockWMSUsecase) ListShippingManifests(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, status *domain.ShippingManifestStatus, expeditionName *string) ([]domain.ShippingManifest, error) {
+	if m.listShippingManifestsFn != nil {
+		return m.listShippingManifestsFn(ctx, tenantID, userID, role, warehouseID, status, expeditionName)
+	}
+	return []domain.ShippingManifest{}, nil
+}
+
+func (m *mockWMSUsecase) ScanDOLoading(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.LoadingScanRequest) (*domain.ShippingManifestDetail, error) {
+	if m.scanDOLoadingFn != nil {
+		return m.scanDOLoadingFn(ctx, tenantID, userID, role, manifestID, req)
+	}
+	return &domain.ShippingManifestDetail{Manifest: domain.ShippingManifest{ID: manifestID, Status: domain.ShippingManifestStatusLoaded}}, nil
+}
+
+func (m *mockWMSUsecase) DispatchShippingManifest(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.DispatchShippingManifestRequest) (*domain.ShippingManifest, error) {
+	if m.dispatchShippingManifestFn != nil {
+		return m.dispatchShippingManifestFn(ctx, tenantID, userID, role, manifestID, req)
+	}
+	return &domain.ShippingManifest{ID: manifestID, Status: domain.ShippingManifestStatusDispatched}, nil
+}
+
+func (m *mockWMSUsecase) GetWMSOutboundKPIs(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) (*domain.WMSOutboundKPISummary, error) {
+	if m.getWMSOutboundKPIsFn != nil {
+		return m.getWMSOutboundKPIsFn(ctx, tenantID, userID, role, warehouseID)
+	}
+	return &domain.WMSOutboundKPISummary{DockToStockAvgMinutes: 30.0, PickingAccuracyPct: 99.0}, nil
 }
 
 func withWMSAuth(r *http.Request, tenantID, userID uuid.UUID, role string) *http.Request {
