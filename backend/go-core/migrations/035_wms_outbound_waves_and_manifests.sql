@@ -29,11 +29,44 @@ ALTER TABLE delivery_order_items
 
 CREATE INDEX IF NOT EXISTS idx_doi_batch ON delivery_order_items(tenant_id, batch_id);
 
--- 3. Tabel picking_tasks: dokumen instruksi pengambilan barang terurut rak
+-- 3. Tabel pick_waves: gelombang pelepasan pesanan (Wave Release) per tipe order / rute (OCA §1.3, PDF-05)
+CREATE TABLE IF NOT EXISTS pick_waves (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id          UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    warehouse_id       UUID NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
+    wave_number        VARCHAR(100) NOT NULL,
+    order_type         VARCHAR(50) NOT NULL DEFAULT 'DIRECT_DO'
+                       CHECK (order_type IN ('DIRECT_DO', 'SALES_ORDER', 'MARKETPLACE', 'TRANSFER')),
+    status             VARCHAR(50) NOT NULL DEFAULT 'OPEN'
+                       CHECK (status IN ('OPEN', 'RELEASED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+    picker_id          UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_by         UUID REFERENCES users(id) ON DELETE SET NULL,
+    started_at         TIMESTAMPTZ NULL,
+    completed_at       TIMESTAMPTZ NULL,
+    notes              TEXT NULL,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (tenant_id, wave_number)
+);
+
+ALTER TABLE pick_waves ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pick_waves FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS pick_waves_tenant_isolation ON pick_waves;
+CREATE POLICY pick_waves_tenant_isolation ON pick_waves
+    FOR ALL
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid)
+    WITH CHECK (tenant_id = NULLIF(current_setting('app.current_setting', true), '')::uuid OR tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid);
+
+CREATE INDEX IF NOT EXISTS idx_pick_waves_tenant_status ON pick_waves(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_pick_waves_tenant_wh ON pick_waves(tenant_id, warehouse_id);
+
+-- 4. Tabel picking_tasks: dokumen instruksi pengambilan barang terurut rak
 CREATE TABLE IF NOT EXISTS picking_tasks (
     id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id          UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     delivery_order_id  UUID NOT NULL REFERENCES delivery_orders(id) ON DELETE CASCADE,
+    wave_id            UUID REFERENCES pick_waves(id) ON DELETE SET NULL,
     task_number        VARCHAR(100) NOT NULL,
     status             VARCHAR(50) NOT NULL DEFAULT 'PENDING'
                        CHECK (status IN ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'SHORTAGE', 'CANCELLED')),
@@ -46,6 +79,9 @@ CREATE TABLE IF NOT EXISTS picking_tasks (
     UNIQUE (tenant_id, task_number),
     UNIQUE (tenant_id, delivery_order_id)
 );
+
+ALTER TABLE picking_tasks ADD COLUMN IF NOT EXISTS wave_id UUID REFERENCES pick_waves(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_picking_tasks_wave ON picking_tasks(tenant_id, wave_id);
 
 ALTER TABLE picking_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE picking_tasks FORCE ROW LEVEL SECURITY;
@@ -92,6 +128,7 @@ COMMIT;
 BEGIN;
 DROP TABLE IF EXISTS picking_task_items CASCADE;
 DROP TABLE IF EXISTS picking_tasks CASCADE;
+DROP TABLE IF EXISTS pick_waves CASCADE;
 ALTER TABLE delivery_order_items DROP COLUMN IF EXISTS packed_qty;
 ALTER TABLE delivery_order_items DROP COLUMN IF EXISTS is_free_item;
 ALTER TABLE delivery_order_items DROP COLUMN IF EXISTS batch_id;
