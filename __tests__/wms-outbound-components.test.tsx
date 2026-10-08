@@ -4,7 +4,17 @@ import '@testing-library/jest-dom'
 import { PrintPickingList } from '@/components/wms/PrintPickingList'
 import { PrintThermalAWB } from '@/components/wms/PrintThermalAWB'
 import { WaveReleaseModal } from '@/components/wms/WaveReleaseModal'
+import { WavePickingSubView } from '@/components/wms/WavePickingSubView'
+import { PackingStationSubView } from '@/components/wms/PackingStationSubView'
 import { PickingTaskDetail, DeliveryOrder, DeliveryOrderItem } from '@/lib/api'
+
+// Mock useWarehouses
+jest.mock('@/hooks/useWMS', () => ({
+  useWarehouses: () => ({
+    data: [{ id: 'wh-1', code: 'WH-MAIN', name: 'Gudang Utama', is_active: true }],
+    isLoading: false,
+  }),
+}))
 
 // Mock api
 jest.mock('@/lib/api', () => ({
@@ -12,7 +22,22 @@ jest.mock('@/lib/api', () => ({
   api: {
     wms: {
       pickWaves: {
-        list: jest.fn().mockResolvedValue({ data: [] }),
+        list: jest.fn().mockResolvedValue({
+          data: [
+            {
+              id: 'w-1',
+              wave_number: 'WAVE-20261008-001',
+              order_type: 'MARKETPLACE',
+              expedition_name: 'JNE',
+              route_zone: 'JABODETABEK',
+              status: 'OPEN',
+              total_orders: 2,
+              total_lines: 4,
+              created_at: '2026-10-08T08:00:00Z',
+              updated_at: '2026-10-08T08:00:00Z',
+            },
+          ],
+        }),
         create: jest.fn().mockResolvedValue({
           data: {
             id: 'w-1',
@@ -32,10 +57,42 @@ jest.mock('@/lib/api', () => ({
         release: jest.fn().mockResolvedValue({ data: { id: 'w-1', status: 'RELEASED' } }),
       },
       deliveryOrders: {
+        list: jest.fn().mockResolvedValue({
+          data: [
+            {
+              id: 'do-123',
+              do_number: 'DO-20261008-0001',
+              warehouse_id: 'wh-1',
+              customer_name: 'PT Maju Bersama',
+              recipient_name: 'Bpk. Budi Santoso',
+              order_type: 'DIRECT_DO',
+              status: 'CONFIRMED',
+              created_at: '2026-10-08T08:00:00Z',
+            },
+          ],
+        }),
+        get: jest.fn().mockResolvedValue({
+          delivery_order: {
+            id: 'do-123',
+            do_number: 'DO-20261008-0001',
+            status: 'CONFIRMED',
+          },
+          items: [
+            {
+              id: 'doi-1',
+              delivery_order_id: 'do-123',
+              product_id: 'prod-1',
+              product_name: 'Beras Ramos 5kg',
+              product_sku: 'BRS-RAMOS-5K',
+              quantity: '2',
+              packed_qty: '0',
+            },
+          ],
+        }),
         scanPackItem: jest.fn().mockResolvedValue({
           data: { item_id: 'doi-1', packed_qty: '1', product_name: 'Beras 5kg', product_sku: 'BRS-01', item_completed: false },
         }),
-        completePack: jest.fn().mockResolvedValue({ data: { id: 'do-1', status: 'PACKED' } }),
+        completePack: jest.fn().mockResolvedValue({ data: { id: 'do-123', status: 'PACKED' } }),
       },
     },
   },
@@ -242,6 +299,37 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
 
       expect(screen.getByText(/Tipe Pesanan \/ Saluran \(Order Type\)/i)).toBeInTheDocument()
       expect(screen.getByText(/Surat Jalan Langsung \(DIRECT_DO\)/i)).toBeInTheDocument()
+    })
+  })
+
+  describe('FE-07: WavePickingSubView & PackingStationSubView Real UI', () => {
+    it('renders WavePickingSubView with metrics, wave list, and release buttons', async () => {
+      await React.act(async () => {
+        render(<WavePickingSubView warehouseId="wh-1" />)
+      })
+
+      expect(screen.getByText(/Total Gelombang/i)).toBeInTheDocument()
+      expect(screen.getByText(/WAVE-20261008-001/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /\+ Buat Wave Baru/i })).toBeInTheDocument()
+    })
+
+    it('renders PackingStationSubView with order selection, scanner prompt, and audio beeper toggle', async () => {
+      await React.act(async () => {
+        render(<PackingStationSubView warehouseId="wh-1" />)
+      })
+
+      expect(screen.getByText(/Pesanan Siap Kemas/i)).toBeInTheDocument()
+      expect(screen.getByText('DO-20261008-0001')).toBeInTheDocument()
+
+      // Select order
+      const orderBtn = screen.getByText('DO-20261008-0001')
+      await React.act(async () => {
+        fireEvent.click(orderBtn)
+      })
+
+      expect(screen.getByText(/Pindai Barcode \/ SKU Barang/i)).toBeInTheDocument()
+      expect(screen.getByText(/Kemajuan Pemeriksaan Kemasan/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Audio Aktif/i })).toBeInTheDocument()
     })
   })
 })

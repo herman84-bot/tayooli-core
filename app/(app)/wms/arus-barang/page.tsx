@@ -45,6 +45,8 @@ import { TraceBatchView } from "@/components/wms/TraceBatchView"
 import { WMSSettingsModal } from "@/components/wms/WMSSettingsModal"
 import { QCQuarantineView } from "@/components/wms/QCQuarantineView"
 import DeliveryOrdersPanel from "@/components/wms/DeliveryOrdersPanel"
+import { WavePickingSubView } from "@/components/wms/WavePickingSubView"
+import { PackingStationSubView } from "@/components/wms/PackingStationSubView"
 
 // ---------------------------------------------------------------------------
 // Helpers & Badges
@@ -357,23 +359,10 @@ export default function ArusBarangPage() {
             <DeliveryOrdersPanel embedded />
           )}
           {keluarTab === "picking" && (
-            <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-400">
-              <Boxes className="mx-auto h-12 w-12 text-slate-300 mb-2" />
-              <h3 className="text-base font-semibold text-slate-800">Wave Picking & List (Sprint 3)</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Alur pengelompokan picking wave dan rute terpendek per rak FEFO akan diaktifkan pada Sprint 3. Saat
-                ini alokasi FEFO bekerja otomatis saat pengiriman Surat Jalan.
-              </p>
-            </div>
+            <WavePickingSubView warehouseId={selectedWarehouseId} />
           )}
           {keluarTab === "packing" && (
-            <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-400">
-              <ClipboardList className="mx-auto h-12 w-12 text-slate-300 mb-2" />
-              <h3 className="text-base font-semibold text-slate-800">Packing Station & Cetak Label (Sprint 3)</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Pemeriksaan kemasan 100% scan barcode dan cetak thermal AWB 100x150 akan diaktifkan pada Sprint 3.
-              </p>
-            </div>
+            <PackingStationSubView warehouseId={selectedWarehouseId} />
           )}
           {keluarTab === "manifest" && (
             <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-400">
