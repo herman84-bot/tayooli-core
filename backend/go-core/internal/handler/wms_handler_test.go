@@ -336,6 +336,25 @@ func (m *mockWMSUsecase) ListSKUMappings(ctx context.Context, tenantID uuid.UUID
 	return nil, nil
 }
 
+func (m *mockWMSUsecase) GetPickingTask(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.PickingTaskDetail, error) {
+	return &domain.PickingTaskDetail{Task: domain.PickingTask{ID: uuid.New(), DeliveryOrderID: doID}}, nil
+}
+func (m *mockWMSUsecase) StartPickingTask(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.PickingTaskDetail, error) {
+	return m.GetPickingTask(ctx, tenantID, userID, role, doID)
+}
+func (m *mockWMSUsecase) RecordPickingItem(ctx context.Context, tenantID, userID uuid.UUID, role string, doID, taskItemID uuid.UUID, pickedQty decimal.Decimal) (*domain.PickingTaskDetail, error) {
+	return m.GetPickingTask(ctx, tenantID, userID, role, doID)
+}
+func (m *mockWMSUsecase) ReportPickingDamaged(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PickingDamagedReportRequest) (*domain.PickingDamagedReportResult, error) {
+	return &domain.PickingDamagedReportResult{MovementID: uuid.New(), DamagedQty: req.DamagedQty}, nil
+}
+func (m *mockWMSUsecase) ScanPackStationItem(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackScanRequest) (*domain.PackScanResult, error) {
+	return &domain.PackScanResult{ProductID: uuid.New(), PackedQty: req.Quantity}, nil
+}
+func (m *mockWMSUsecase) CompletePackStation(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackCompleteRequest) (*domain.DeliveryOrder, error) {
+	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusPacked}, nil
+}
+
 func withWMSAuth(r *http.Request, tenantID, userID uuid.UUID, role string) *http.Request {
 	ctx := context.WithValue(r.Context(), appMiddleware.TenantIDKey, tenantID)
 	ctx = context.WithValue(ctx, appMiddleware.UserIDKey, userID)

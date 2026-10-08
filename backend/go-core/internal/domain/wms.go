@@ -381,20 +381,36 @@ type StockTransferItem struct {
 
 // DeliveryOrder represents outbound delivery order (Surat Jalan).
 type DeliveryOrder struct {
-	ID             uuid.UUID           `json:"id"`
-	TenantID       uuid.UUID           `json:"tenant_id"`
-	SalesOrderID   *uuid.UUID          `json:"sales_order_id"` // nil = direct Surat Jalan (no SO)
-	WarehouseID    uuid.UUID           `json:"warehouse_id"`
-	DONumber       string              `json:"do_number"`
-	Status         DeliveryOrderStatus `json:"status"`
-	ExpeditionName *string             `json:"expedition_name,omitempty"`
-	TrackingNumber *string             `json:"tracking_number,omitempty"`
-	DriverName     *string             `json:"driver_name,omitempty"`
-	VehiclePlate   *string             `json:"vehicle_plate,omitempty"`
-	RecipientName  *string             `json:"recipient_name,omitempty"`
-	ReceivedDate   *time.Time          `json:"received_date,omitempty"`
-	CreatedAt      time.Time           `json:"created_at"`
-	UpdatedAt      time.Time           `json:"updated_at"`
+	ID               uuid.UUID           `json:"id"`
+	TenantID         uuid.UUID           `json:"tenant_id"`
+	SalesOrderID     *uuid.UUID          `json:"sales_order_id"` // nil = direct Surat Jalan (no SO)
+	WarehouseID      uuid.UUID           `json:"warehouse_id"`
+	DONumber         string              `json:"do_number"`
+	Status           DeliveryOrderStatus `json:"status"`
+	CustomerID       *uuid.UUID          `json:"customer_id,omitempty"`
+	CustomerName     *string             `json:"customer_name,omitempty"`
+	CreatedBy        *uuid.UUID          `json:"created_by,omitempty"`
+	CreatedByName    *string             `json:"created_by_name,omitempty"`
+	ConfirmedBy      *uuid.UUID          `json:"confirmed_by,omitempty"`
+	ConfirmedByName  *string             `json:"confirmed_by_name,omitempty"`
+	PackedBy         *uuid.UUID          `json:"packed_by,omitempty"`
+	PackedByName     *string             `json:"packed_by_name,omitempty"`
+	DispatchedBy     *uuid.UUID          `json:"dispatched_by,omitempty"`
+	DispatchedByName *string             `json:"dispatched_by_name,omitempty"`
+	PackageWeightKg  *decimal.Decimal    `json:"package_weight_kg,omitempty"`
+	PackageLengthCm  *decimal.Decimal    `json:"package_length_cm,omitempty"`
+	PackageWidthCm   *decimal.Decimal    `json:"package_width_cm,omitempty"`
+	PackageHeightCm  *decimal.Decimal    `json:"package_height_cm,omitempty"`
+	PackagingType    *string             `json:"packaging_type,omitempty"`
+	OrderType        string              `json:"order_type"`
+	ExpeditionName   *string             `json:"expedition_name,omitempty"`
+	TrackingNumber   *string             `json:"tracking_number,omitempty"`
+	DriverName       *string             `json:"driver_name,omitempty"`
+	VehiclePlate     *string             `json:"vehicle_plate,omitempty"`
+	RecipientName    *string             `json:"recipient_name,omitempty"`
+	ReceivedDate     *time.Time          `json:"received_date,omitempty"`
+	CreatedAt        time.Time           `json:"created_at"`
+	UpdatedAt        time.Time           `json:"updated_at"`
 }
 
 // DeliveryOrderItem represents individual line items dispatched in a delivery order.
@@ -405,6 +421,11 @@ type DeliveryOrderItem struct {
 	ProductID       uuid.UUID       `json:"product_id"`
 	Quantity        decimal.Decimal `json:"quantity"`
 	LocationID      uuid.UUID       `json:"location_id"`
+	BatchID         *uuid.UUID      `json:"batch_id,omitempty"`
+	BatchNumber     *string         `json:"batch_number,omitempty"`
+	ExpiryDate      *time.Time      `json:"expiry_date,omitempty"`
+	IsFreeItem      bool            `json:"is_free_item"`
+	PackedQty       decimal.Decimal `json:"packed_qty"`
 	CreatedAt       time.Time       `json:"created_at"`
 	ProductName     *string         `json:"product_name,omitempty"`
 	ProductSKU      *string         `json:"product_sku,omitempty"`
@@ -590,6 +611,7 @@ type MarketplaceOrderItem struct {
 type WMSRepository interface {
 	WMSBatchRepository
 	WMSQCRepository
+	WMSOutboundRepository
 
 	// Regional
 	CreateRegional(ctx context.Context, r *Regional) error

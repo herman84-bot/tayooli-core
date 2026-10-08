@@ -922,12 +922,16 @@ type CreateDeliveryOrderItemRequest struct {
 	ProductID  uuid.UUID       `json:"product_id"`
 	Quantity   decimal.Decimal `json:"quantity"`
 	LocationID uuid.UUID       `json:"location_id"`
+	BatchID    *uuid.UUID      `json:"batch_id,omitempty"`
+	IsFreeItem bool            `json:"is_free_item,omitempty"`
 }
 
 type CreateDeliveryOrderRequest struct {
 	SalesOrderID   *uuid.UUID                       `json:"sales_order_id,omitempty"` // optional
+	CustomerID     *uuid.UUID                       `json:"customer_id,omitempty"`    // CR-02a
 	WarehouseID    uuid.UUID                        `json:"warehouse_id"`
 	DONumber       string                           `json:"do_number"`
+	OrderType      *string                          `json:"order_type,omitempty"`
 	Status         *domain.DeliveryOrderStatus      `json:"status,omitempty"`
 	ExpeditionName *string                          `json:"expedition_name,omitempty"`
 	TrackingNumber *string                          `json:"tracking_number,omitempty"`
@@ -947,11 +951,13 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 
 	// Validate items and location scoping
 	for _, itemReq := range req.Items {
-		if itemReq.ProductID == uuid.Nil || itemReq.LocationID == uuid.Nil || itemReq.Quantity.LessThanOrEqual(decimal.Zero) {
+		if itemReq.ProductID == uuid.Nil || itemReq.Quantity.LessThanOrEqual(decimal.Zero) {
 			return nil, domain.ErrInvalidInput
 		}
-		if err := u.validateLocationWarehouse(ctx, tenantID, itemReq.LocationID, req.WarehouseID); err != nil {
-			return nil, err
+		if itemReq.LocationID != uuid.Nil {
+			if err := u.validateLocationWarehouse(ctx, tenantID, itemReq.LocationID, req.WarehouseID); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -964,6 +970,11 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 		req.SalesOrderID = nil
 	}
 
+	orderType := "DIRECT_DO"
+	if req.OrderType != nil && strings.TrimSpace(*req.OrderType) != "" {
+		orderType = strings.TrimSpace(*req.OrderType)
+	}
+
 	// Force status to DRAFT on creation - do NOT accept SHIPPED or DELIVERED from request
 	status := domain.DeliveryOrderStatusDraft
 
@@ -971,8 +982,11 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 		ID:             uuid.New(),
 		TenantID:       tenantID,
 		SalesOrderID:   req.SalesOrderID,
+		CustomerID:     req.CustomerID,
+		CreatedBy:      &userID,
 		WarehouseID:    req.WarehouseID,
 		DONumber:       doNumber,
+		OrderType:      orderType,
 		Status:         status,
 		ExpeditionName: req.ExpeditionName,
 		TrackingNumber: req.TrackingNumber,
@@ -985,20 +999,74 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 
 	var items []domain.DeliveryOrderItem
 	for _, itemReq := range req.Items {
-		items = append(items, domain.DeliveryOrderItem{
-			ID:              uuid.New(),
-			TenantID:        tenantID,
-			DeliveryOrderID: do.ID,
-			ProductID:       itemReq.ProductID,
-			Quantity:        itemReq.Quantity,
-			LocationID:      itemReq.LocationID,
-			CreatedAt:       time.Now().UTC(),
-		})
+		if itemReq.BatchID != nil && *itemReq.BatchID != uuid.Nil && itemReq.LocationID != uuid.Nil {
+			// Specific batch + location provided
+			items = append(items, domain.DeliveryOrderItem{
+				ID:              uuid.New(),
+				TenantID:        tenantID,
+				DeliveryOrderID: do.ID,
+				ProductID:       itemReq.ProductID,
+				Quantity:        itemReq.Quantity,
+				LocationID:      itemReq.LocationID,
+				BatchID:         itemReq.BatchID,
+				IsFreeItem:      itemReq.IsFreeItem,
+				CreatedAt:       time.Now().UTC(),
+			})
+			continue
+		}
+
+		// Auto FEFO allocation (BE-06): query INTERNAL rack batch balances and pick earliest expiry
+		locTypeInternal := domain.LocationTypeInternal
+		filter := domain.BatchBalanceFilter{
+			WarehouseID:  &req.WarehouseID,
+			ProductID:    &itemReq.ProductID,
+			LocationType: &locTypeInternal,
+		}
+		if itemReq.LocationID != uuid.Nil {
+			filter.LocationIDs = []uuid.UUID{itemReq.LocationID}
+		}
+		balances, err := u.repo.ListBatchBalances(ctx, tenantID, filter)
+		if err != nil {
+			return nil, fmt.Errorf("auto FEFO allocation: list balances: %w", err)
+		}
+		allocs, err := domain.AllocateFEFO(balances, itemReq.Quantity, false)
+		if err == nil && len(allocs) > 0 {
+			for _, al := range allocs {
+				bID := al.BatchID
+				items = append(items, domain.DeliveryOrderItem{
+					ID:              uuid.New(),
+					TenantID:        tenantID,
+					DeliveryOrderID: do.ID,
+					ProductID:       itemReq.ProductID,
+					Quantity:        al.Quantity,
+					LocationID:      al.LocationID,
+					BatchID:         &bID,
+					IsFreeItem:      itemReq.IsFreeItem,
+					CreatedAt:       time.Now().UTC(),
+				})
+			}
+		} else {
+			// Fallback when batches are not yet initialized: record requested item line
+			items = append(items, domain.DeliveryOrderItem{
+				ID:              uuid.New(),
+				TenantID:        tenantID,
+				DeliveryOrderID: do.ID,
+				ProductID:       itemReq.ProductID,
+				Quantity:        itemReq.Quantity,
+				LocationID:      itemReq.LocationID,
+				BatchID:         nil,
+				IsFreeItem:      itemReq.IsFreeItem,
+				CreatedAt:       time.Now().UTC(),
+			})
+		}
 	}
 
 	if err := u.repo.CreateDeliveryOrder(ctx, do, items); err != nil {
 		return nil, err
 	}
+
+	// Also generate initial Picking Task automatically so warehouse crew can pick
+	_, _ = u.repo.GetOrCreatePickingTask(ctx, tenantID, do.ID)
 
 	return do, nil
 }
@@ -1048,6 +1116,7 @@ func (u *Usecase) DispatchDeliveryOrder(ctx context.Context, tenantID, userID uu
 			Status:           domain.StockMovementStatusDone,
 			ReferenceType:    domain.StockRefDeliveryOrder,
 			ReferenceID:      do.ID,
+			BatchID:          item.BatchID, // KO-1: batch preserved on dispatch
 			ExecutedBy:       &userID,
 			CreatedAt:        now,
 		}
@@ -1062,6 +1131,7 @@ func (u *Usecase) DispatchDeliveryOrder(ctx context.Context, tenantID, userID uu
 	}
 
 	do.Status = newStatus
+	do.DispatchedBy = &userID
 	return do, nil
 }
 

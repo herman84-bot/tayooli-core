@@ -19,9 +19,9 @@ func New(repo domain.DashboardRepository) *Usecase {
 	return &Usecase{repo: repo}
 }
 
-// GetSummary returns aggregated dashboard metrics for a tenant.
-func (u *Usecase) GetSummary(ctx context.Context, tenantID uuid.UUID) (*domain.DashboardSummary, error) {
-	s, err := u.repo.GetSummary(ctx, tenantID)
+// GetSummary returns aggregated dashboard metrics for a tenant with a period filter.
+func (u *Usecase) GetSummary(ctx context.Context, tenantID uuid.UUID, days int) (*domain.DashboardSummary, error) {
+	s, err := u.repo.GetSummary(ctx, tenantID, days)
 	if err != nil {
 		return nil, err
 	}

@@ -1510,12 +1510,21 @@ ORDER BY created_at DESC`
 // -----------------------------------------------------------------------------
 
 const createDeliveryOrderSQL = `
-INSERT INTO delivery_orders (id, tenant_id, sales_order_id, warehouse_id, do_number, status, expedition_name, tracking_number, driver_name, vehicle_plate, recipient_name, received_date, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
+INSERT INTO delivery_orders (
+    id, tenant_id, sales_order_id, warehouse_id, do_number, status,
+    expedition_name, tracking_number, driver_name, vehicle_plate, recipient_name, received_date,
+    customer_id, created_by, confirmed_by, packed_by, dispatched_by,
+    package_weight_kg, package_length_cm, package_width_cm, package_height_cm, packaging_type, order_type,
+    created_at, updated_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`
 
 const createDeliveryOrderItemSQL = `
-INSERT INTO delivery_order_items (id, tenant_id, delivery_order_id, product_id, quantity, location_id, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)`
+INSERT INTO delivery_order_items (
+    id, tenant_id, delivery_order_id, product_id, quantity, location_id,
+    batch_id, is_free_item, packed_qty, created_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
 
 func (r *WMSRepo) CreateDeliveryOrder(ctx context.Context, do *domain.DeliveryOrder, items []domain.DeliveryOrderItem) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -1541,18 +1550,25 @@ func (r *WMSRepo) CreateDeliveryOrder(ctx context.Context, do *domain.DeliveryOr
 	if do.Status == "" {
 		do.Status = domain.DeliveryOrderStatusDraft
 	}
+	if do.OrderType == "" {
+		do.OrderType = "DIRECT_DO"
+	}
 
 	_, err = tx.ExecContext(ctx, createDeliveryOrderSQL,
 		do.ID, do.TenantID, ptrToNullUUID(do.SalesOrderID), do.WarehouseID, do.DONumber,
 		do.Status, ptrToNullString(do.ExpeditionName), ptrToNullString(do.TrackingNumber),
 		ptrToNullString(do.DriverName), ptrToNullString(do.VehiclePlate),
 		ptrToNullString(do.RecipientName), ptrToNullTime(do.ReceivedDate),
+		ptrToNullUUID(do.CustomerID), ptrToNullUUID(do.CreatedBy), ptrToNullUUID(do.ConfirmedBy),
+		ptrToNullUUID(do.PackedBy), ptrToNullUUID(do.DispatchedBy),
+		decPtr(do.PackageWeightKg), decPtr(do.PackageLengthCm), decPtr(do.PackageWidthCm), decPtr(do.PackageHeightCm),
+		ptrToNullString(do.PackagingType), do.OrderType,
 		do.CreatedAt, do.UpdatedAt)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) {
 			switch pqErr.Code {
-			case "23503": // FK violation: only blame the SO when that is the column that failed
+			case "23503": // FK violation
 				if strings.Contains(pqErr.Constraint, "sales_order") || strings.Contains(pqErr.Detail, "sales_order_id") {
 					return &domain.StockReceiptValidationError{Msg: "Ref. Sales Order tidak ditemukan. Kosongkan jika Surat Jalan tanpa Sales Order."}
 				}
@@ -1575,7 +1591,8 @@ func (r *WMSRepo) CreateDeliveryOrder(ctx context.Context, do *domain.DeliveryOr
 		}
 
 		_, err = tx.ExecContext(ctx, createDeliveryOrderItemSQL,
-			it.ID, it.TenantID, it.DeliveryOrderID, it.ProductID, it.Quantity, it.LocationID, it.CreatedAt)
+			it.ID, it.TenantID, it.DeliveryOrderID, it.ProductID, it.Quantity, it.LocationID,
+			ptrToNullUUID(it.BatchID), it.IsFreeItem, it.PackedQty, it.CreatedAt)
 		if err != nil {
 			return fmt.Errorf("WMSRepo.CreateDeliveryOrder: exec item %d: %w", i, err)
 		}
@@ -1585,16 +1602,33 @@ func (r *WMSRepo) CreateDeliveryOrder(ctx context.Context, do *domain.DeliveryOr
 }
 
 const getDeliveryOrderByIDSQL = `
-SELECT id, tenant_id, sales_order_id, warehouse_id, do_number, status, expedition_name, tracking_number, driver_name, vehicle_plate, recipient_name, received_date, created_at, updated_at
-FROM delivery_orders
-WHERE id = $1 AND tenant_id = $2`
+SELECT d.id, d.tenant_id, d.sales_order_id, d.warehouse_id, d.do_number, d.status,
+       d.expedition_name, d.tracking_number, d.driver_name, d.vehicle_plate, d.recipient_name, d.received_date,
+       d.customer_id, COALESCE(c.name, ''),
+       d.created_by, COALESCE(u_cr.full_name, u_cr.email, ''),
+       d.confirmed_by, COALESCE(u_cf.full_name, u_cf.email, ''),
+       d.packed_by, COALESCE(u_pk.full_name, u_pk.email, ''),
+       d.dispatched_by, COALESCE(u_ds.full_name, u_ds.email, ''),
+       d.package_weight_kg, d.package_length_cm, d.package_width_cm, d.package_height_cm,
+       d.packaging_type, COALESCE(d.order_type, 'DIRECT_DO'),
+       d.created_at, d.updated_at
+FROM delivery_orders d
+LEFT JOIN customers c ON c.id = d.customer_id AND c.tenant_id = d.tenant_id
+LEFT JOIN users u_cr ON u_cr.id = d.created_by AND u_cr.tenant_id = d.tenant_id
+LEFT JOIN users u_cf ON u_cf.id = d.confirmed_by AND u_cf.tenant_id = d.tenant_id
+LEFT JOIN users u_pk ON u_pk.id = d.packed_by AND u_pk.tenant_id = d.tenant_id
+LEFT JOIN users u_ds ON u_ds.id = d.dispatched_by AND u_ds.tenant_id = d.tenant_id
+WHERE d.id = $1 AND d.tenant_id = $2`
 
 const getDeliveryOrderItemsSQL = `
-SELECT doi.id, doi.tenant_id, doi.delivery_order_id, doi.product_id, doi.quantity, doi.location_id, doi.created_at,
-       p.name, p.sku, wl.code
+SELECT doi.id, doi.tenant_id, doi.delivery_order_id, doi.product_id, doi.quantity, doi.location_id,
+       doi.batch_id, doi.is_free_item, doi.packed_qty, doi.created_at,
+       p.name, p.sku, wl.code,
+       sb.batch_number, sb.expiry_date
 FROM delivery_order_items doi
 LEFT JOIN products p ON p.id = doi.product_id AND p.tenant_id = doi.tenant_id
 LEFT JOIN warehouse_locations wl ON wl.id = doi.location_id AND wl.tenant_id = doi.tenant_id
+LEFT JOIN stock_batches sb ON sb.id = doi.batch_id AND sb.tenant_id = doi.tenant_id
 WHERE doi.delivery_order_id = $1 AND doi.tenant_id = $2`
 
 func (r *WMSRepo) GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.DeliveryOrder, []domain.DeliveryOrderItem, error) {
@@ -1610,12 +1644,19 @@ func (r *WMSRepo) GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UU
 
 	row := tx.QueryRowContext(ctx, getDeliveryOrderByIDSQL, id, tenantID)
 	var do domain.DeliveryOrder
-	var soID, exp, trk, drv, veh, rec sql.NullString
+	var soID, exp, trk, drv, veh, rec, cID, cName sql.NullString
+	var uCr, uCrName, uCf, uCfName, uPk, uPkName, uDs, uDsName sql.NullString
+	var pkgType sql.NullString
 	var recDate sql.NullTime
+	var pWeight, pLength, pWidth, pHeight decimal.NullDecimal
 
 	err = row.Scan(
 		&do.ID, &do.TenantID, &soID, &do.WarehouseID, &do.DONumber,
 		&do.Status, &exp, &trk, &drv, &veh, &rec, &recDate,
+		&cID, &cName,
+		&uCr, &uCrName, &uCf, &uCfName, &uPk, &uPkName, &uDs, &uDsName,
+		&pWeight, &pLength, &pWidth, &pHeight,
+		&pkgType, &do.OrderType,
 		&do.CreatedAt, &do.UpdatedAt,
 	)
 	if err != nil {
@@ -1631,6 +1672,21 @@ func (r *WMSRepo) GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UU
 	do.VehiclePlate = nullStringToPtr(veh)
 	do.RecipientName = nullStringToPtr(rec)
 	do.ReceivedDate = nullTimeToPtr(recDate)
+	do.CustomerID = nullUUIDToPtr(cID)
+	do.CustomerName = nullStringToPtr(cName)
+	do.CreatedBy = nullUUIDToPtr(uCr)
+	do.CreatedByName = nullStringToPtr(uCrName)
+	do.ConfirmedBy = nullUUIDToPtr(uCf)
+	do.ConfirmedByName = nullStringToPtr(uCfName)
+	do.PackedBy = nullUUIDToPtr(uPk)
+	do.PackedByName = nullStringToPtr(uPkName)
+	do.DispatchedBy = nullUUIDToPtr(uDs)
+	do.DispatchedByName = nullStringToPtr(uDsName)
+	do.PackageWeightKg = nullDecimalToPtr(pWeight)
+	do.PackageLengthCm = nullDecimalToPtr(pLength)
+	do.PackageWidthCm = nullDecimalToPtr(pWidth)
+	do.PackageHeightCm = nullDecimalToPtr(pHeight)
+	do.PackagingType = nullStringToPtr(pkgType)
 
 	rows, err := tx.QueryContext(ctx, getDeliveryOrderItemsSQL, id, tenantID)
 	if err != nil {
@@ -1641,17 +1697,22 @@ func (r *WMSRepo) GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UU
 	var items []domain.DeliveryOrderItem
 	for rows.Next() {
 		var it domain.DeliveryOrderItem
-		var prodName, prodSKU, locCode sql.NullString
+		var bID, prodName, prodSKU, locCode, bNum sql.NullString
+		var expDate sql.NullTime
 		if err := rows.Scan(
-			&it.ID, &it.TenantID, &it.DeliveryOrderID, &it.ProductID,
-			&it.Quantity, &it.LocationID, &it.CreatedAt,
+			&it.ID, &it.TenantID, &it.DeliveryOrderID, &it.ProductID, &it.Quantity, &it.LocationID,
+			&bID, &it.IsFreeItem, &it.PackedQty, &it.CreatedAt,
 			&prodName, &prodSKU, &locCode,
+			&bNum, &expDate,
 		); err != nil {
 			return nil, nil, fmt.Errorf("WMSRepo.GetDeliveryOrderByID: scan item: %w", err)
 		}
+		it.BatchID = nullUUIDToPtr(bID)
 		it.ProductName = nullStringToPtr(prodName)
 		it.ProductSKU = nullStringToPtr(prodSKU)
 		it.LocationCode = nullStringToPtr(locCode)
+		it.BatchNumber = nullStringToPtr(bNum)
+		it.ExpiryDate = nullTimeToPtr(expDate)
 		items = append(items, it)
 	}
 	if err := rows.Err(); err != nil {
@@ -1709,11 +1770,25 @@ func (r *WMSRepo) ListDeliveryOrders(ctx context.Context, tenantID uuid.UUID, wa
 	}
 
 	query := `
-SELECT id, tenant_id, sales_order_id, warehouse_id, do_number, status, expedition_name, tracking_number, driver_name, vehicle_plate, recipient_name, received_date, created_at, updated_at
-FROM delivery_orders
-WHERE tenant_id = $1
-  AND ($2::uuid IS NULL OR warehouse_id = $2)
-ORDER BY created_at DESC`
+SELECT d.id, d.tenant_id, d.sales_order_id, d.warehouse_id, d.do_number, d.status,
+       d.expedition_name, d.tracking_number, d.driver_name, d.vehicle_plate, d.recipient_name, d.received_date,
+       d.customer_id, COALESCE(c.name, ''),
+       d.created_by, COALESCE(u_cr.full_name, u_cr.email, ''),
+       d.confirmed_by, COALESCE(u_cf.full_name, u_cf.email, ''),
+       d.packed_by, COALESCE(u_pk.full_name, u_pk.email, ''),
+       d.dispatched_by, COALESCE(u_ds.full_name, u_ds.email, ''),
+       d.package_weight_kg, d.package_length_cm, d.package_width_cm, d.package_height_cm,
+       d.packaging_type, COALESCE(d.order_type, 'DIRECT_DO'),
+       d.created_at, d.updated_at
+FROM delivery_orders d
+LEFT JOIN customers c ON c.id = d.customer_id AND c.tenant_id = d.tenant_id
+LEFT JOIN users u_cr ON u_cr.id = d.created_by AND u_cr.tenant_id = d.tenant_id
+LEFT JOIN users u_cf ON u_cf.id = d.confirmed_by AND u_cf.tenant_id = d.tenant_id
+LEFT JOIN users u_pk ON u_pk.id = d.packed_by AND u_pk.tenant_id = d.tenant_id
+LEFT JOIN users u_ds ON u_ds.id = d.dispatched_by AND u_ds.tenant_id = d.tenant_id
+WHERE d.tenant_id = $1
+  AND ($2::uuid IS NULL OR d.warehouse_id = $2)
+ORDER BY d.created_at DESC`
 
 	rows, err := tx.QueryContext(ctx, query, tenantID, ptrToNullUUID(warehouseID))
 	if err != nil {
@@ -1724,12 +1799,19 @@ ORDER BY created_at DESC`
 	var result []domain.DeliveryOrder
 	for rows.Next() {
 		var do domain.DeliveryOrder
-		var soID, exp, trk, drv, veh, rec sql.NullString
+		var soID, exp, trk, drv, veh, rec, cID, cName sql.NullString
+		var uCr, uCrName, uCf, uCfName, uPk, uPkName, uDs, uDsName sql.NullString
+		var pkgType sql.NullString
 		var recDate sql.NullTime
+		var pWeight, pLength, pWidth, pHeight decimal.NullDecimal
 
 		if err := rows.Scan(
 			&do.ID, &do.TenantID, &soID, &do.WarehouseID, &do.DONumber,
 			&do.Status, &exp, &trk, &drv, &veh, &rec, &recDate,
+			&cID, &cName,
+			&uCr, &uCrName, &uCf, &uCfName, &uPk, &uPkName, &uDs, &uDsName,
+			&pWeight, &pLength, &pWidth, &pHeight,
+			&pkgType, &do.OrderType,
 			&do.CreatedAt, &do.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListDeliveryOrders: scan: %w", err)
@@ -1741,6 +1823,21 @@ ORDER BY created_at DESC`
 		do.VehiclePlate = nullStringToPtr(veh)
 		do.RecipientName = nullStringToPtr(rec)
 		do.ReceivedDate = nullTimeToPtr(recDate)
+		do.CustomerID = nullUUIDToPtr(cID)
+		do.CustomerName = nullStringToPtr(cName)
+		do.CreatedBy = nullUUIDToPtr(uCr)
+		do.CreatedByName = nullStringToPtr(uCrName)
+		do.ConfirmedBy = nullUUIDToPtr(uCf)
+		do.ConfirmedByName = nullStringToPtr(uCfName)
+		do.PackedBy = nullUUIDToPtr(uPk)
+		do.PackedByName = nullStringToPtr(uPkName)
+		do.DispatchedBy = nullUUIDToPtr(uDs)
+		do.DispatchedByName = nullStringToPtr(uDsName)
+		do.PackageWeightKg = nullDecimalToPtr(pWeight)
+		do.PackageLengthCm = nullDecimalToPtr(pLength)
+		do.PackageWidthCm = nullDecimalToPtr(pWidth)
+		do.PackageHeightCm = nullDecimalToPtr(pHeight)
+		do.PackagingType = nullStringToPtr(pkgType)
 
 		result = append(result, do)
 	}

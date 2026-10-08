@@ -52,6 +52,30 @@ func (m *mockWMSRepo) MoveQuarantineStock(ctx context.Context, p domain.Quaranti
 	return &domain.StockMovement{ID: uuid.New(), SourceLocationID: p.SourceLocID, DestLocationID: p.DestLocID, Quantity: p.Input.Quantity}, nil
 }
 
+func (m *mockWMSRepo) GetOrCreatePickingTask(ctx context.Context, tenantID uuid.UUID, doID uuid.UUID) (*domain.PickingTaskDetail, error) {
+	return &domain.PickingTaskDetail{Task: domain.PickingTask{ID: uuid.New(), DeliveryOrderID: doID}}, nil
+}
+
+func (m *mockWMSRepo) GetPickingTaskByDO(ctx context.Context, tenantID uuid.UUID, doID uuid.UUID) (*domain.PickingTaskDetail, error) {
+	return &domain.PickingTaskDetail{Task: domain.PickingTask{ID: uuid.New(), DeliveryOrderID: doID}}, nil
+}
+
+func (m *mockWMSRepo) UpdatePickingTaskStatus(ctx context.Context, tenantID, taskID uuid.UUID, status domain.PickingTaskStatus, pickerID *uuid.UUID) error {
+	return nil
+}
+
+func (m *mockWMSRepo) RecordPickingItemProgress(ctx context.Context, tenantID, taskItemID uuid.UUID, pickedQty decimal.Decimal) error {
+	return nil
+}
+
+func (m *mockWMSRepo) UpdateDOPackScan(ctx context.Context, tenantID, doID, itemID uuid.UUID, addPackedQty decimal.Decimal) (*domain.DeliveryOrderItem, error) {
+	return &domain.DeliveryOrderItem{ID: itemID, DeliveryOrderID: doID, PackedQty: addPackedQty, Quantity: decimal.NewFromInt(10)}, nil
+}
+
+func (m *mockWMSRepo) CompleteDOPacking(ctx context.Context, tenantID, doID, userID uuid.UUID, req domain.PackCompleteRequest) (*domain.DeliveryOrder, error) {
+	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusPacked}, nil
+}
+
 func TestQCUsecase(t *testing.T) {
 	ctx := context.Background()
 	tenantID, adminID, outsiderID := uuid.New(), uuid.New(), uuid.New()

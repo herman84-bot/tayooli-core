@@ -112,6 +112,28 @@ export const SalesOrderStatsSchema = z.object({
   pending: safeCount.default(0),
 })
 
+export const TopOutboundProductSchema = z.object({
+  product_id: z.string(),
+  product_name: z.string().default(''),
+  product_sku: z.string().default(''),
+  quantity: amountString.default('0'),
+})
+
+export const TopCustomerSchema = z.object({
+  customer_id: z.string().nullable().optional(),
+  customer_name: z.string().default(''),
+  order_count: safeCount.default(0),
+  total_revenue: amountString.default('0'),
+})
+
+export const OutboundStatsSchema = z.object({
+  qty_today: amountString.default('0'),
+  qty_month: amountString.default('0'),
+  top_products: z.array(TopOutboundProductSchema).default([]),
+  top_customers: z.array(TopCustomerSchema).default([]),
+})
+export type OutboundStats = z.infer<typeof OutboundStatsSchema>
+
 export const FinancialOverviewSchema = z.object({
   total_revenue: amountString.default('0'),
   cash_inflow: amountString.default('0'),
@@ -124,6 +146,12 @@ export const FinancialOverviewSchema = z.object({
 export type FinancialOverview = z.infer<typeof FinancialOverviewSchema>
 
 const EMPTY_SALES_ORDERS = { total: 0, confirmed: 0, pending: 0 }
+const EMPTY_OUTBOUND: OutboundStats = {
+  qty_today: '0',
+  qty_month: '0',
+  top_products: [],
+  top_customers: [],
+}
 const EMPTY_FINANCIAL: FinancialOverview = {
   total_revenue: '0', cash_inflow: '0', accounts_receivable: '0',
   total_expense: '0', cash_outflow: '0', accounts_payable: '0', net_cash_balance: '0',
@@ -143,6 +171,7 @@ export const DashboardSummarySchema = z.object({
   sales_invoices: SalesInvoiceStatsSchema,
   // .default keeps the UI working against a backend deployed before these fields existed.
   sales_orders: SalesOrderStatsSchema.default(EMPTY_SALES_ORDERS),
+  outbound: OutboundStatsSchema.default(EMPTY_OUTBOUND),
   financial_overview: FinancialOverviewSchema.default(EMPTY_FINANCIAL),
 })
 export type DashboardSummary = z.infer<typeof DashboardSummarySchema>
@@ -165,5 +194,6 @@ export const EMPTY_DASHBOARD_SUMMARY: DashboardSummary = {
   customers: { active: 0 },
   sales_invoices: { total_invoiced: '0', paid_amount: '0', accounts_receivable: '0', total_count: 0 },
   sales_orders: EMPTY_SALES_ORDERS,
+  outbound: EMPTY_OUTBOUND,
   financial_overview: EMPTY_FINANCIAL,
 }

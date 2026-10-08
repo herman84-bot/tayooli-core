@@ -94,6 +94,13 @@ type WMSUsecase interface {
 	ListQuarantineStock(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID) ([]domain.BatchBalance, error)
 	ReleaseQuarantine(ctx context.Context, tenantID, userID uuid.UUID, role string, in domain.QuarantineActionInput) (*domain.StockMovement, error)
 	ScrapQuarantine(ctx context.Context, tenantID, userID uuid.UUID, role string, in domain.QuarantineActionInput) (*domain.StockMovement, error)
+	// Outbound Sprint 3: Picking Tasks & Pack Station
+	GetPickingTask(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.PickingTaskDetail, error)
+	StartPickingTask(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.PickingTaskDetail, error)
+	RecordPickingItem(ctx context.Context, tenantID, userID uuid.UUID, role string, doID, taskItemID uuid.UUID, pickedQty decimal.Decimal) (*domain.PickingTaskDetail, error)
+	ReportPickingDamaged(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PickingDamagedReportRequest) (*domain.PickingDamagedReportResult, error)
+	ScanPackStationItem(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackScanRequest) (*domain.PackScanResult, error)
+	CompletePackStation(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackCompleteRequest) (*domain.DeliveryOrder, error)
 	ReleaseStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, error)
 	GetWMSSettings(ctx context.Context, tenantID, userID uuid.UUID, role string) (*domain.WMSSettings, error)
 	UpdateWMSSettings(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.UpdateWMSSettingsRequest) (*domain.WMSSettings, error)
@@ -134,6 +141,13 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Post("/delivery-orders", h.CreateDeliveryOrder)
 		r.Get("/delivery-orders/{id}", h.GetDeliveryOrder)
 		r.Post("/delivery-orders/{id}/dispatch", h.DispatchDeliveryOrder)
+		// Sprint 3 Outbound Picking & Pack Station
+		r.Get("/delivery-orders/{id}/picking", h.GetPickingTask)
+		r.Post("/delivery-orders/{id}/picking/start", h.StartPickingTask)
+		r.Post("/delivery-orders/{id}/picking/items/{itemId}", h.RecordPickingItem)
+		r.Post("/delivery-orders/{id}/picking/damaged", h.ReportPickingDamaged)
+		r.Post("/delivery-orders/{id}/pack/scan", h.ScanPackStationItem)
+		r.Post("/delivery-orders/{id}/pack/complete", h.CompletePackStation)
 
 		// Stock Opnames
 		r.Get("/opnames", h.ListStockOpnames)
@@ -236,6 +250,14 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusConflict, "Jumlah melebihi stok karantina batch ini")
 	case errors.Is(err, domain.ErrQuarantineStockBlocked):
 		RespondError(w, r, http.StatusConflict, "Stok di area karantina tidak bisa diambil, dijual, atau dipindahkan. Gunakan menu QC & Karantina untuk rilis atau musnahkan.")
+	case errors.Is(err, domain.ErrPackStationIncomplete):
+		RespondError(w, r, http.StatusBadRequest, "Semua item harus dipindai 100% sebelum menyelesaikan pengemasan")
+	case errors.Is(err, domain.ErrPackBarcodeMismatch):
+		RespondError(w, r, http.StatusUnprocessableEntity, "Barcode tidak cocok dengan item pesanan ini atau item sudah selesai dikemas")
+	case errors.Is(err, domain.ErrPackQtyExceeded):
+		RespondError(w, r, http.StatusUnprocessableEntity, "Jumlah pemindaian melebihi sisa yang harus dikemas")
+	case errors.Is(err, domain.ErrPickingTaskNotFound):
+		RespondError(w, r, http.StatusNotFound, "Dokumen picking task tidak ditemukan")
 	case errors.Is(err, domain.ErrScrapNotesRequired):
 		RespondError(w, r, http.StatusBadRequest, "Catatan wajib diisi untuk memusnahkan stok karantina")
 	case errors.Is(err, domain.ErrBatchRequired):

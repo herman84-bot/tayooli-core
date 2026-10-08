@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useDashboardSummary } from '@/lib/queries/dashboard'
 import { TooltipWalkthrough } from '@/components/tutorial/TooltipWalkthrough'
@@ -14,15 +15,16 @@ import {
   RefreshCw,
   ArrowLeftRight,
   ArrowDownLeft,
-  ShoppingCart,
+  Truck,
+  Users,
 } from 'lucide-react'
 import { EMPTY_DASHBOARD_SUMMARY } from '@/lib/schemas/dashboard'
 import { formatCurrency } from '@/lib/currency'
 
 // Dashboard tayooli-core: 4 area ringkasan.
-// 1) Ribbon keuangan (penjualan, kas masuk, valuasi stok, pengeluaran vendor)
+// 1) Ribbon keuangan & mutasi fisik (penjualan, kas masuk, valuasi stok, barang keluar)
 // 2) POS kasir & penjualan  3) Gudang & monitoring stok (WMS)
-// 4) Pembelian & vendor (procure-to-pay), tampil read-only tanpa tautan modul.
+// 4) Aktivitas Barang Keluar & Pemenuhan (Outbound Wave, DO, Top Produk & Top Pelanggan)
 
 function formatTime(createdAt: string): string {
   if (!createdAt) return ''
@@ -91,7 +93,8 @@ function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function DashboardPage() {
-  const { data: summary, isLoading, error, refetch } = useDashboardSummary()
+  const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
+  const { data: summary, isLoading, error, refetch } = useDashboardSummary(period)
   const s = summary ?? EMPTY_DASHBOARD_SUMMARY
   const loading = isLoading && !summary
   const status = (error as { response?: { status?: number } } | null)?.response?.status
@@ -105,7 +108,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-lg font-bold tracking-tight text-foreground">Dashboard</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Ringkasan kasir POS, gudang dan stok, penjualan, serta pembelian dari vendor.
+            Ringkasan kasir POS, gudang dan stok, penjualan, serta aktivitas barang keluar.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -187,12 +190,12 @@ export default function DashboardPage() {
           subtext={`${s.wms.total_physical_units} unit di ${s.wms.total_warehouses} gudang`}
         />
         <StatCard
-          label="Pengeluaran Vendor"
-          value={formatCurrency(s.financial_overview.total_expense, { compact: true })}
-          icon={Receipt}
-          iconClass="text-slate-600"
-          bg="bg-slate-100 dark:bg-slate-900/40"
-          subtext={`Dibayar: ${formatCurrency(s.financial_overview.cash_outflow, { compact: true })}`}
+          label="Barang Keluar Hari Ini"
+          value={`${s.outbound.qty_today} unit`}
+          icon={Truck}
+          iconClass="text-indigo-600"
+          bg="bg-indigo-50 dark:bg-indigo-950/30"
+          subtext={`Bulan ini: ${s.outbound.qty_month} unit`}
         />
       </div>
 
@@ -301,40 +304,103 @@ export default function DashboardPage() {
       </div>
 
       <section className={`border border-border/60 rounded-lg bg-card ${loading ? 'opacity-50' : ''}`}>
-        <SectionHeader icon={ShoppingCart} title="Pembelian & Vendor (Procure-to-Pay)" />
-        <div className="p-5 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
-            <MiniStat label="Faktur Vendor" value={s.invoices.total} />
-            <MiniStat label="Disetujui" value={s.invoices.approved} />
-            <MiniStat label="Menunggu" value={s.invoices.pending} />
-            <MiniStat label="Vendor Aktif" value={s.vendors.active} />
-            <MiniStat label="PO" value={s.purchase_orders.total} />
-            <MiniStat label="Penerimaan Barang" value={s.goods_receipts.total} />
-            <MiniStat label="Hutang Belum Dibayar" value={formatCurrency(s.payments.pending_amount, { compact: true })} />
+        <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Truck className="h-4 w-4 text-indigo-600" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Aktivitas Barang Keluar & Pemenuhan (WMS Outbound)
+            </h2>
           </div>
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1.5">
-              Vendor Teratas
+          <div className="flex items-center gap-2">
+            <div className="inline-flex rounded-lg border border-border/60 p-0.5 bg-muted/40 text-[11px]">
+              {(['7d', '30d', '90d'] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPeriod(p)}
+                  className={`px-2.5 py-0.5 rounded-md font-medium transition ${
+                    period === p
+                      ? 'bg-background text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {p === '7d' ? '7 Hari' : p === '30d' ? '30 Hari' : '90 Hari'}
+                </button>
+              ))}
             </div>
-            {s.top_vendors.length > 0 ? (
-              <ul className="divide-y divide-border/40 border border-border/50 rounded-lg overflow-hidden">
-                {s.top_vendors.map((v) => (
-                  <li key={v.vendor_id} className="px-3 py-2 flex items-center justify-between gap-2 text-[12px]">
-                    <div className="min-w-0">
-                      <div className="font-medium text-foreground truncate">{v.vendor_name}</div>
-                      <div className="text-[10px] text-muted-foreground">{v.invoice_count} faktur</div>
-                    </div>
-                    <span className="font-mono font-semibold text-foreground tabular-nums shrink-0">
-                      {formatCurrency(v.total_amount)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="px-3 py-6 text-center text-xs text-muted-foreground bg-muted/20 rounded-lg">
-                Belum ada faktur vendor.
+            <Link
+              href="/wms/arus-barang"
+              className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
+            >
+              Buka Arus Barang →
+            </Link>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            <MiniStat label="Keluar Hari Ini" value={`${s.outbound.qty_today} unit`} />
+            <MiniStat label="Keluar Bulan Ini" value={`${s.outbound.qty_month} unit`} />
+            <MiniStat label="Total Surat Jalan" value={s.sales_orders.total} />
+            <MiniStat label="DO Dikonfirmasi" value={s.sales_orders.confirmed} />
+            <MiniStat label="DO Pending" value={s.sales_orders.pending} />
+            <MiniStat label="Pelanggan Aktif" value={s.customers.active} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+            {/* Top 10 Produk Keluar */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
+                <span>Top 10 Produk Keluar ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
+                <span>Jumlah Fisik</span>
               </div>
-            )}
+              {s.outbound.top_products.length > 0 ? (
+                <ul className="divide-y divide-border/40 border border-border/50 rounded-lg overflow-hidden max-h-60 overflow-y-auto">
+                  {s.outbound.top_products.map((p, idx) => (
+                    <li key={p.product_id || idx} className="px-3 py-2 flex items-center justify-between gap-2 text-[12px] hover:bg-muted/30">
+                      <div className="min-w-0">
+                        <div className="font-medium text-foreground truncate">{p.product_name || 'Produk Tanpa Nama'}</div>
+                        <div className="text-[10px] text-muted-foreground font-mono">{p.product_sku || '-'}</div>
+                      </div>
+                      <span className="font-mono font-bold text-indigo-600 tabular-nums shrink-0">
+                        {p.quantity} unit
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="px-3 py-6 text-center text-xs text-muted-foreground bg-muted/20 rounded-lg">
+                  Belum ada transaksi barang keluar pada periode ini.
+                </div>
+              )}
+            </div>
+
+            {/* Top 10 Pelanggan Teraktif */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
+                <span>Top 10 Pelanggan Teraktif ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
+                <span>Nilai Transaksi</span>
+              </div>
+              {s.outbound.top_customers.length > 0 ? (
+                <ul className="divide-y divide-border/40 border border-border/50 rounded-lg overflow-hidden max-h-60 overflow-y-auto">
+                  {s.outbound.top_customers.map((c, idx) => (
+                    <li key={c.customer_id || idx} className="px-3 py-2 flex items-center justify-between gap-2 text-[12px] hover:bg-muted/30">
+                      <div className="min-w-0">
+                        <div className="font-medium text-foreground truncate">{c.customer_name || 'Pelanggan'}</div>
+                        <div className="text-[10px] text-muted-foreground">{c.order_count} pesanan</div>
+                      </div>
+                      <span className="font-mono font-bold text-emerald-600 tabular-nums shrink-0">
+                        {formatCurrency(c.total_revenue)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="px-3 py-6 text-center text-xs text-muted-foreground bg-muted/20 rounded-lg">
+                  Belum ada transaksi pelanggan pada periode ini.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>

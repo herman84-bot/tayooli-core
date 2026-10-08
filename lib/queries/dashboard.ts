@@ -2,13 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import apiClient from '@/lib/api/client'
 import { DashboardSummarySchema, type DashboardSummary } from '@/lib/schemas/dashboard'
 
-const DASHBOARD_KEY = ['dashboard'] as const
-
-export function useDashboardSummary() {
+export function useDashboardSummary(period: string = '30d') {
   return useQuery({
-    queryKey: DASHBOARD_KEY,
+    queryKey: ['dashboard', period] as const,
     queryFn: async (): Promise<DashboardSummary> => {
-      const res = await apiClient.get<unknown>('/api/v1/dashboard/summary')
+      const res = await apiClient.get<unknown>(`/api/v1/dashboard/summary?period=${encodeURIComponent(period)}`)
       return DashboardSummarySchema.parse(res.data)
     },
     // Retry transient failures (e.g. auth cookie not yet hydrated on first load),

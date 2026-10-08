@@ -147,9 +147,40 @@ SELECT
 FROM sales_invoices
 WHERE tenant_id = $1`
 
+const dashboardOutboundCounts = `
+SELECT
+  COALESCE(SUM(quantity) FILTER (WHERE created_at >= CURRENT_DATE), 0) AS qty_today,
+  COALESCE(SUM(quantity) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)), 0) AS qty_month
+FROM stock_movements
+WHERE tenant_id = $1 AND status = 'DONE'
+  AND reference_type IN ('DELIVERY_ORDER', 'POS_SALE')`
+
+const dashboardTopOutboundProducts = `
+SELECT sm.product_id, COALESCE(p.name, ''), COALESCE(p.sku, ''), SUM(sm.quantity) AS total_qty
+FROM stock_movements sm
+JOIN products p ON p.id = sm.product_id AND p.tenant_id = sm.tenant_id
+WHERE sm.tenant_id = $1 AND sm.status = 'DONE'
+  AND sm.reference_type IN ('DELIVERY_ORDER', 'POS_SALE')
+  AND sm.created_at >= NOW() - ($2 || ' days')::interval
+GROUP BY sm.product_id, p.name, p.sku
+ORDER BY total_qty DESC
+LIMIT 10`
+
+const dashboardTopCustomers = `
+SELECT c.id, c.name, COUNT(*), COALESCE(SUM(so.total_amount), 0)
+FROM sales_orders so
+JOIN customers c ON c.id = so.customer_id AND c.tenant_id = so.tenant_id
+WHERE so.tenant_id = $1 AND so.created_at >= NOW() - ($2 || ' days')::interval
+GROUP BY c.id, c.name
+ORDER BY SUM(so.total_amount) DESC
+LIMIT 10`
+
 // ── GetSummary ───────────────────────────────────────────────────────────────
 
-func (r *DashboardRepo) GetSummary(ctx context.Context, tenantID uuid.UUID) (*domain.DashboardSummary, error) {
+func (r *DashboardRepo) GetSummary(ctx context.Context, tenantID uuid.UUID, days int) (*domain.DashboardSummary, error) {
+	if days <= 0 {
+		days = 30
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("DashboardRepo.GetSummary: begin tx: %w", err)
@@ -353,6 +384,41 @@ func (r *DashboardRepo) GetSummary(ctx context.Context, tenantID uuid.UUID) (*do
 		return nil, fmt.Errorf("DashboardRepo.GetSummary: sales order stats: %w", err)
 	}
 
+	// 15. Outbound metrics (CR-04a)
+	err = tx.QueryRowContext(ctx, dashboardOutboundCounts, tenantID).Scan(
+		&summary.Outbound.QtyToday,
+		&summary.Outbound.QtyMonth,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("DashboardRepo.GetSummary: outbound counts: %w", err)
+	}
+
+	topProdRows, err := tx.QueryContext(ctx, dashboardTopOutboundProducts, tenantID, days)
+	if err == nil {
+		defer topProdRows.Close()
+		for topProdRows.Next() {
+			var tp domain.TopOutboundProduct
+			if err := topProdRows.Scan(&tp.ProductID, &tp.ProductName, &tp.ProductSKU, &tp.Quantity); err == nil {
+				summary.Outbound.TopProducts = append(summary.Outbound.TopProducts, tp)
+			}
+		}
+		_ = topProdRows.Close()
+	}
+
+	topCustRows, err := tx.QueryContext(ctx, dashboardTopCustomers, tenantID, days)
+	if err == nil {
+		defer topCustRows.Close()
+		for topCustRows.Next() {
+			var tc domain.TopCustomer
+			var cID sql.NullString
+			if err := topCustRows.Scan(&cID, &tc.CustomerName, &tc.OrderCount, &tc.TotalRevenue); err == nil {
+				tc.CustomerID = nullUUIDToPtr(cID)
+				summary.Outbound.TopCustomers = append(summary.Outbound.TopCustomers, tc)
+			}
+		}
+		_ = topCustRows.Close()
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("DashboardRepo.GetSummary: commit: %w", err)
 	}
@@ -369,6 +435,12 @@ func (r *DashboardRepo) GetSummary(ctx context.Context, tenantID uuid.UUID) (*do
 	}
 	if summary.WMS.LowStockItems == nil {
 		summary.WMS.LowStockItems = []domain.LowStockItem{}
+	}
+	if summary.Outbound.TopProducts == nil {
+		summary.Outbound.TopProducts = []domain.TopOutboundProduct{}
+	}
+	if summary.Outbound.TopCustomers == nil {
+		summary.Outbound.TopCustomers = []domain.TopCustomer{}
 	}
 
 	return summary, nil

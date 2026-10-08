@@ -14,7 +14,7 @@ import (
 
 // dashboardUsecase groups the operations the handler needs.
 type dashboardUsecase interface {
-	GetSummary(ctx context.Context, tenantID uuid.UUID) (*domain.DashboardSummary, error)
+	GetSummary(ctx context.Context, tenantID uuid.UUID, days int) (*domain.DashboardSummary, error)
 }
 
 // DashboardHandler handles HTTP requests for dashboard analytics.
@@ -126,6 +126,27 @@ type customerStatsView struct {
 	Active int `json:"active"`
 }
 
+type outboundStatsView struct {
+	QtyToday     string                   `json:"qty_today"`
+	QtyMonth     string                   `json:"qty_month"`
+	TopProducts  []topOutboundProductView `json:"top_products"`
+	TopCustomers []topCustomerView        `json:"top_customers"`
+}
+
+type topOutboundProductView struct {
+	ProductID   string `json:"product_id"`
+	ProductName string `json:"product_name"`
+	ProductSKU  string `json:"product_sku"`
+	Quantity    string `json:"quantity"`
+}
+
+type topCustomerView struct {
+	CustomerID   *string `json:"customer_id,omitempty"`
+	CustomerName string  `json:"customer_name"`
+	OrderCount   int     `json:"order_count"`
+	TotalRevenue string  `json:"total_revenue"`
+}
+
 type salesInvoiceStatsView struct {
 	TotalInvoiced      string `json:"total_invoiced"`
 	PaidAmount         string `json:"paid_amount"`
@@ -146,6 +167,7 @@ type dashboardSummaryView struct {
 	Customers      customerStatsView     `json:"customers"`
 	SalesInvoices  salesInvoiceStatsView `json:"sales_invoices"`
 	SalesOrders    salesOrderStatsView   `json:"sales_orders"`
+	Outbound       outboundStatsView     `json:"outbound"`
 	Financial      financialOverviewView `json:"financial_overview"`
 }
 
@@ -248,6 +270,34 @@ func toDashboardSummaryView(s *domain.DashboardSummary) dashboardSummaryView {
 		Pending:   s.SalesOrders.Pending,
 	}
 
+	v.Outbound = outboundStatsView{
+		QtyToday:     s.Outbound.QtyToday.String(),
+		QtyMonth:     s.Outbound.QtyMonth.String(),
+		TopProducts:  make([]topOutboundProductView, len(s.Outbound.TopProducts)),
+		TopCustomers: make([]topCustomerView, len(s.Outbound.TopCustomers)),
+	}
+	for i, tp := range s.Outbound.TopProducts {
+		v.Outbound.TopProducts[i] = topOutboundProductView{
+			ProductID:   tp.ProductID.String(),
+			ProductName: tp.ProductName,
+			ProductSKU:  tp.ProductSKU,
+			Quantity:    tp.Quantity.String(),
+		}
+	}
+	for i, tc := range s.Outbound.TopCustomers {
+		var cID *string
+		if tc.CustomerID != nil {
+			s := tc.CustomerID.String()
+			cID = &s
+		}
+		v.Outbound.TopCustomers[i] = topCustomerView{
+			CustomerID:   cID,
+			CustomerName: tc.CustomerName,
+			OrderCount:   tc.OrderCount,
+			TotalRevenue: tc.TotalRevenue.String(),
+		}
+	}
+
 	f := s.Financial
 	v.Financial = financialOverviewView{
 		TotalRevenue:       f.TotalRevenue.String(),
@@ -272,7 +322,15 @@ func (h *DashboardHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	summary, err := h.uc.GetSummary(r.Context(), tenantID)
+	days := 30
+	period := r.URL.Query().Get("period")
+	if period == "7d" {
+		days = 7
+	} else if period == "90d" {
+		days = 90
+	}
+
+	summary, err := h.uc.GetSummary(r.Context(), tenantID, days)
 	if err != nil {
 		log.Error().Err(err).Str("handler", "GetSummary").Msg("usecase failed")
 		respondError(w, r, http.StatusInternalServerError, "internal server error")

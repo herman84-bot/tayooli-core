@@ -17,11 +17,11 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockDashboardRepo struct {
-	getSummaryFn func(ctx context.Context, tenantID uuid.UUID) (*domain.DashboardSummary, error)
+	getSummaryFn func(ctx context.Context, tenantID uuid.UUID, days int) (*domain.DashboardSummary, error)
 }
 
-func (m *mockDashboardRepo) GetSummary(ctx context.Context, tenantID uuid.UUID) (*domain.DashboardSummary, error) {
-	return m.getSummaryFn(ctx, tenantID)
+func (m *mockDashboardRepo) GetSummary(ctx context.Context, tenantID uuid.UUID, days int) (*domain.DashboardSummary, error) {
+	return m.getSummaryFn(ctx, tenantID, days)
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ func TestGetSummary_OK(t *testing.T) {
 	expected := fakeSummary()
 
 	repo := &mockDashboardRepo{
-		getSummaryFn: func(_ context.Context, tid uuid.UUID) (*domain.DashboardSummary, error) {
+		getSummaryFn: func(_ context.Context, tid uuid.UUID, _ int) (*domain.DashboardSummary, error) {
 			if tid != tenantID {
 				t.Errorf("expected tenantID=%s, got %s", tenantID, tid)
 			}
@@ -82,7 +82,7 @@ func TestGetSummary_OK(t *testing.T) {
 	}
 
 	uc := dashboard.New(repo)
-	result, err := uc.GetSummary(context.Background(), tenantID)
+	result, err := uc.GetSummary(context.Background(), tenantID, 30)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -110,9 +110,9 @@ func TestGetSummary_FinancialOverview_NoPOSDoubleCount(t *testing.T) {
 		Invoices: domain.InvoiceStats{ApprovedAmount: decimal.NewFromInt(1_500_000)},
 		Payments: domain.PaymentStats{PaidAmount: decimal.NewFromInt(1_500_000), PendingAmount: decimal.NewFromInt(250_000)},
 	}
-	uc := dashboard.New(&mockDashboardRepo{getSummaryFn: func(context.Context, uuid.UUID) (*domain.DashboardSummary, error) { return s, nil }})
+	uc := dashboard.New(&mockDashboardRepo{getSummaryFn: func(context.Context, uuid.UUID, int) (*domain.DashboardSummary, error) { return s, nil }})
 
-	got, err := uc.GetSummary(context.Background(), uuid.New())
+	got, err := uc.GetSummary(context.Background(), uuid.New(), 30)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -136,10 +136,10 @@ func TestGetSummary_FinancialOverview_NoPOSDoubleCount(t *testing.T) {
 }
 
 func TestGetSummary_AverageBasketZeroOrders(t *testing.T) {
-	uc := dashboard.New(&mockDashboardRepo{getSummaryFn: func(context.Context, uuid.UUID) (*domain.DashboardSummary, error) {
+	uc := dashboard.New(&mockDashboardRepo{getSummaryFn: func(context.Context, uuid.UUID, int) (*domain.DashboardSummary, error) {
 		return &domain.DashboardSummary{}, nil
 	}})
-	got, err := uc.GetSummary(context.Background(), uuid.New())
+	got, err := uc.GetSummary(context.Background(), uuid.New(), 30)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -150,13 +150,13 @@ func TestGetSummary_AverageBasketZeroOrders(t *testing.T) {
 
 func TestGetSummary_RepoError(t *testing.T) {
 	repo := &mockDashboardRepo{
-		getSummaryFn: func(_ context.Context, _ uuid.UUID) (*domain.DashboardSummary, error) {
+		getSummaryFn: func(_ context.Context, _ uuid.UUID, _ int) (*domain.DashboardSummary, error) {
 			return nil, errors.New("db connection lost")
 		},
 	}
 
 	uc := dashboard.New(repo)
-	_, err := uc.GetSummary(context.Background(), uuid.New())
+	_, err := uc.GetSummary(context.Background(), uuid.New(), 30)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -164,7 +164,7 @@ func TestGetSummary_RepoError(t *testing.T) {
 
 func TestGetSummary_EmptyResult(t *testing.T) {
 	repo := &mockDashboardRepo{
-		getSummaryFn: func(_ context.Context, _ uuid.UUID) (*domain.DashboardSummary, error) {
+		getSummaryFn: func(_ context.Context, _ uuid.UUID, _ int) (*domain.DashboardSummary, error) {
 			return &domain.DashboardSummary{
 				MonthlyTrend: []domain.MonthlyTrend{},
 				TopVendors:   []domain.TopVendor{},
@@ -173,7 +173,7 @@ func TestGetSummary_EmptyResult(t *testing.T) {
 	}
 
 	uc := dashboard.New(repo)
-	result, err := uc.GetSummary(context.Background(), uuid.New())
+	result, err := uc.GetSummary(context.Background(), uuid.New(), 30)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

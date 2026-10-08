@@ -409,6 +409,22 @@ export interface DeliveryOrder {
   tenant_id: string
   /** null = direct Surat Jalan without a Sales Order */
   sales_order_id: string | null
+  customer_id?: string | null
+  customer_name?: string | null
+  created_by?: string | null
+  created_by_name?: string | null
+  confirmed_by?: string | null
+  confirmed_by_name?: string | null
+  packed_by?: string | null
+  packed_by_name?: string | null
+  dispatched_by?: string | null
+  dispatched_by_name?: string | null
+  package_weight_kg?: string | number | null
+  package_length_cm?: string | number | null
+  package_width_cm?: string | number | null
+  package_height_cm?: string | number | null
+  packaging_type?: string | null
+  order_type?: string
   warehouse_id: string
   do_number: string
   status: DeliveryOrderStatus
@@ -429,6 +445,11 @@ export interface DeliveryOrderItem {
   product_id: string
   quantity: string | number
   location_id: string
+  batch_id?: string | null
+  batch_number?: string | null
+  expiry_date?: string | null
+  is_free_item?: boolean
+  packed_qty?: string | number
   created_at: string
   product_name?: string
   product_sku?: string
@@ -438,12 +459,16 @@ export interface DeliveryOrderItem {
 export interface CreateDeliveryOrderItemInput {
   product_id: string
   quantity: number | string
-  location_id: string
+  location_id?: string
+  batch_id?: string
+  is_free_item?: boolean
 }
 
 export interface CreateDeliveryOrderInput {
   /** Optional Sales Order UUID; omit for a direct Surat Jalan */
   sales_order_id?: string
+  customer_id?: string
+  order_type?: string
   warehouse_id: string
   do_number: string
   status?: DeliveryOrderStatus
@@ -453,6 +478,72 @@ export interface CreateDeliveryOrderInput {
   vehicle_plate?: string
   recipient_name?: string
   items: CreateDeliveryOrderItemInput[]
+}
+
+export interface PickingTaskItem {
+  id: string
+  task_id: string
+  product_id: string
+  batch_id: string
+  source_location_id: string
+  requested_qty: string | number
+  picked_qty: string | number
+  damaged_qty: string | number
+  status: "PENDING" | "PICKED" | "SHORTAGE" | "DAMAGED"
+  shelf_order: number
+  product_name?: string
+  product_sku?: string
+  location_code?: string
+  batch_number?: string
+  expiry_date?: string
+}
+
+export interface PickingTask {
+  id: string
+  delivery_order_id: string
+  task_number: string
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED" | "SHORTAGE" | "CANCELLED"
+  picker_id?: string | null
+  picker_name?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  notes?: string | null
+}
+
+export interface PickingTaskDetail {
+  task: PickingTask
+  items: PickingTaskItem[]
+  delivery_order: DeliveryOrder
+}
+
+export interface Customer {
+  id: string
+  tenant_id?: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  address?: string | null
+}
+
+export interface CreateCustomerInput {
+  name: string
+  email?: string
+  phone?: string
+  address?: string
+}
+
+export interface PackScanResult {
+  item_id: string
+  product_id: string
+  product_name: string
+  product_sku: string
+  scanned_qty: string | number
+  packed_qty: string | number
+  requested_qty: string | number
+  item_completed: boolean
+  order_completed: boolean
+  total_items: number
+  packed_items: number
 }
 
 export interface DeliveryOrderDetailResponse {
@@ -1249,6 +1340,51 @@ export const api = {
         request<DeliveryOrder>(`/wms/delivery-orders/${id}/dispatch`, {
           method: "POST",
         }),
+      getPickingTask: (id: string) =>
+        request<{ data: PickingTaskDetail }>(`/wms/delivery-orders/${id}/picking`),
+      startPickingTask: (id: string) =>
+        request<{ data: PickingTaskDetail }>(`/wms/delivery-orders/${id}/picking/start`, {
+          method: "POST",
+        }),
+      recordPickingItem: (id: string, itemId: string, pickedQty: number | string) =>
+        request<{ data: PickingTaskDetail }>(`/wms/delivery-orders/${id}/picking/items/${itemId}`, {
+          method: "POST",
+          body: JSON.stringify({ picked_qty: pickedQty }),
+        }),
+      reportPickingDamaged: (
+        id: string,
+        payload: {
+          task_item_id: string
+          product_id: string
+          batch_id: string
+          source_location_id: string
+          damaged_qty: number | string
+          reason: string
+        }
+      ) =>
+        request<{ data: any }>(`/wms/delivery-orders/${id}/picking/damaged`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      scanPackItem: (id: string, barcode: string, quantity: number = 1) =>
+        request<{ data: PackScanResult }>(`/wms/delivery-orders/${id}/pack/scan`, {
+          method: "POST",
+          body: JSON.stringify({ barcode, quantity }),
+        }),
+      completePack: (
+        id: string,
+        payload: {
+          package_weight_kg?: number | string
+          package_length_cm?: number | string
+          package_width_cm?: number | string
+          package_height_cm?: number | string
+          packaging_type?: string
+        }
+      ) =>
+        request<{ data: DeliveryOrder }>(`/wms/delivery-orders/${id}/pack/complete`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
     },
     opnames: {
       list: (warehouseId?: string) =>
@@ -1469,6 +1605,19 @@ export const api = {
     simulatePayment: (orderId: string) =>
       request<{ status: string }>(`/pos/payments/${encodeURIComponent(orderId)}/simulate`, {
         method: "POST",
+      }),
+  },
+  customers: {
+    list: async () => {
+      const res = await request<any>("/customers")
+      if (Array.isArray(res)) return { data: res as Customer[] }
+      if (res && Array.isArray(res.data)) return { data: res.data as Customer[] }
+      return { data: [] }
+    },
+    create: (data: CreateCustomerInput) =>
+      request<Customer>("/customers", {
+        method: "POST",
+        body: JSON.stringify(data),
       }),
   },
   payments: {

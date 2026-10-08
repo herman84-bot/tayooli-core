@@ -20,11 +20,14 @@ import (
 // ---------------------------------------------------------------------------
 
 type mockDashboardUsecase struct {
-	getSummaryFn func(ctx context.Context, tenantID uuid.UUID) (*domain.DashboardSummary, error)
+	getSummaryFn func(ctx context.Context, tenantID uuid.UUID, days int) (*domain.DashboardSummary, error)
 }
 
-func (m *mockDashboardUsecase) GetSummary(ctx context.Context, tenantID uuid.UUID) (*domain.DashboardSummary, error) {
-	return m.getSummaryFn(ctx, tenantID)
+func (m *mockDashboardUsecase) GetSummary(ctx context.Context, tenantID uuid.UUID, days int) (*domain.DashboardSummary, error) {
+	if m.getSummaryFn != nil {
+		return m.getSummaryFn(ctx, tenantID, days)
+	}
+	return nil, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +99,7 @@ func TestGetSummary_OK(t *testing.T) {
 	summary := fakeDashboardSummary()
 
 	uc := &mockDashboardUsecase{
-		getSummaryFn: func(_ context.Context, tid uuid.UUID) (*domain.DashboardSummary, error) {
+		getSummaryFn: func(_ context.Context, tid uuid.UUID, _ int) (*domain.DashboardSummary, error) {
 			if tid != tenantID {
 				t.Errorf("expected tenantID=%s, got %s", tenantID, tid)
 			}
@@ -223,7 +226,7 @@ func TestGetSummary_ExposesCrossModuleSections(t *testing.T) {
 		NetCashBalance: decimal.NewFromInt(-1_412_920),
 	}
 	h := handler.NewDashboardHandler(&mockDashboardUsecase{
-		getSummaryFn: func(context.Context, uuid.UUID) (*domain.DashboardSummary, error) { return s, nil },
+		getSummaryFn: func(context.Context, uuid.UUID, int) (*domain.DashboardSummary, error) { return s, nil },
 	})
 	rr := httptest.NewRecorder()
 	h.GetSummary(rr, withTenant(httptest.NewRequest(http.MethodGet, "/api/v1/dashboard/summary", nil), uuid.New()))
@@ -269,7 +272,7 @@ func TestGetSummary_Unauthorized(t *testing.T) {
 
 func TestGetSummary_InternalError(t *testing.T) {
 	uc := &mockDashboardUsecase{
-		getSummaryFn: func(_ context.Context, _ uuid.UUID) (*domain.DashboardSummary, error) {
+		getSummaryFn: func(_ context.Context, _ uuid.UUID, _ int) (*domain.DashboardSummary, error) {
 			return nil, errors.New("db unavailable")
 		},
 	}
@@ -287,7 +290,7 @@ func TestGetSummary_InternalError(t *testing.T) {
 
 func TestGetSummary_EmptyResult(t *testing.T) {
 	uc := &mockDashboardUsecase{
-		getSummaryFn: func(_ context.Context, _ uuid.UUID) (*domain.DashboardSummary, error) {
+		getSummaryFn: func(_ context.Context, _ uuid.UUID, _ int) (*domain.DashboardSummary, error) {
 			return &domain.DashboardSummary{
 				MonthlyTrend: []domain.MonthlyTrend{},
 				TopVendors:   []domain.TopVendor{},

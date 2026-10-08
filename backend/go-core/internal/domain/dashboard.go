@@ -22,8 +22,33 @@ type DashboardSummary struct {
 	Customers      CustomerStats    `json:"customers"`
 	SalesInvoices  SalesInvoiceDashStats `json:"sales_invoices"`
 	SalesOrders    SalesOrderDashStats   `json:"sales_orders"`
+	Outbound       OutboundDashStats     `json:"outbound"`
 	// Financial is derived by the usecase from the raw stats above.
 	Financial FinancialOverview `json:"financial_overview"`
+}
+
+// OutboundDashStats holds aggregated outbound metrics (CR-04a).
+type OutboundDashStats struct {
+	QtyToday     decimal.Decimal      `json:"qty_today"`
+	QtyMonth     decimal.Decimal      `json:"qty_month"`
+	TopProducts  []TopOutboundProduct `json:"top_products"`
+	TopCustomers []TopCustomer        `json:"top_customers"`
+}
+
+// TopOutboundProduct ranks top dispatched products over the period.
+type TopOutboundProduct struct {
+	ProductID   uuid.UUID       `json:"product_id"`
+	ProductName string          `json:"product_name"`
+	ProductSKU  string          `json:"product_sku"`
+	Quantity    decimal.Decimal `json:"quantity"`
+}
+
+// TopCustomer ranks top buyers over the period.
+type TopCustomer struct {
+	CustomerID   *uuid.UUID      `json:"customer_id,omitempty"`
+	CustomerName string          `json:"customer_name"`
+	OrderCount   int             `json:"order_count"`
+	TotalRevenue decimal.Decimal `json:"total_revenue"`
 }
 
 // SalesOrderDashStats holds Order-to-Cash sales order counts.
@@ -152,5 +177,5 @@ type TopVendor struct {
 
 // DashboardRepository is the persistence port for dashboard aggregation queries.
 type DashboardRepository interface {
-	GetSummary(ctx context.Context, tenantID uuid.UUID) (*DashboardSummary, error)
+	GetSummary(ctx context.Context, tenantID uuid.UUID, days int) (*DashboardSummary, error)
 }
