@@ -52,6 +52,7 @@ import { useWMSStock } from "@/hooks/useWMSLedger"
 import { availableFor, validateDOLineQty } from "@/lib/wms/validation"
 import { ExportModal, ExportButton, type ExportFilter } from "@/components/ui/ExportModal"
 import type { ExportColumn } from "@/lib/export"
+import { ShippingManifestsPanel } from "@/components/wms/ShippingManifestsPanel"
 
 // Backend stores sales_order_id as a UUID FK; anything else is rejected with 400.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -71,6 +72,7 @@ interface LineItemDraft {
  * the legacy route and embedded (header hidden) inside /wms/arus-barang KELUAR.
  */
 export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: boolean } = {}) {
+  const [mainTab, setMainTab] = useState<"DO" | "MANIFEST">("DO")
   const [selectedWarehouseFilter, setSelectedWarehouseFilter] = useState<string>("ALL")
   const activeWhId = selectedWarehouseFilter === "ALL" ? null : selectedWarehouseFilter
 
@@ -554,38 +556,76 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => refetch()}
-              disabled={isFetching}
-              className="p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors disabled:opacity-50"
-              title="Segarkan data"
-            >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-            </button>
-            <ExportButton onClick={() => setExporting(true)} disabled={deliveryOrders.length === 0} />
+            {mainTab === "DO" && (
+              <>
+                <button
+                  onClick={() => refetch()}
+                  disabled={isFetching}
+                  className="p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors disabled:opacity-50"
+                  title="Segarkan data"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+                </button>
+                <ExportButton onClick={() => setExporting(true)} disabled={deliveryOrders.length === 0} />
 
-            <button
-              onClick={() => setIsWaveModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-lg font-semibold text-xs border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95 transition-all shadow-xs"
-              title="Kelompokkan DO menjadi batch picking (Wave Release - PDF-05)"
-            >
-              <Layers className="h-4 w-4 text-indigo-600" />
-              <span>Wave Release (PDF-05)</span>
-            </button>
+                <button
+                  onClick={() => setIsWaveModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-lg font-semibold text-xs border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95 transition-all shadow-xs"
+                  title="Kelompokkan DO menjadi batch picking (Wave Release - PDF-05)"
+                >
+                  <Layers className="h-4 w-4 text-indigo-600" />
+                  <span>Wave Release (PDF-05)</span>
+                </button>
 
-            <button
-              onClick={handleOpenCreateModal}
-              className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg font-semibold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-sm"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Buat Surat Jalan Baru</span>
-            </button>
+                <button
+                  onClick={handleOpenCreateModal}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg font-semibold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Buat Surat Jalan Baru</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
-        {/* ── Metrics Summary ── */}
+        {/* ── Submodule Tab Toggle ── */}
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+          <button
+            type="button"
+            onClick={() => setMainTab("DO")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+              mainTab === "DO"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
+          >
+            <FileCheck className="w-4 h-4" />
+            <span>Surat Jalan (DO)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMainTab("MANIFEST")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+              mainTab === "MANIFEST"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            }`}
+          >
+            <Truck className="w-4 h-4" />
+            <span>Manifest Ekspedisi</span>
+          </button>
+        </div>
+
+        {mainTab === "MANIFEST" ? (
+          <ShippingManifestsPanel
+            warehouseId={selectedWarehouseFilter !== "ALL" ? selectedWarehouseFilter : undefined}
+          />
+        ) : (
+          <>
+            {/* ── Metrics Summary ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-xs">
             <div className="flex items-center justify-between text-slate-500 text-xs mb-1">
@@ -841,6 +881,8 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
             </div>
           )}
         </div>
+        </>
+      )}
       </div>
 
       {/* ── Activity Timeline & Audit Drawer (CR-05b) ── */}
