@@ -73,6 +73,7 @@ type PickingTaskItem struct {
 	DamagedQty       decimal.Decimal       `json:"damaged_qty"`
 	Status           PickingTaskItemStatus `json:"status"`
 	ShelfOrder       int                   `json:"shelf_order"`
+	IsFreeItem       bool                  `json:"is_free_item"`
 	CreatedAt        time.Time             `json:"created_at"`
 }
 

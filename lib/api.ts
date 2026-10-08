@@ -491,6 +491,7 @@ export interface PickingTaskItem {
   damaged_qty: string | number
   status: "PENDING" | "PICKED" | "SHORTAGE" | "DAMAGED"
   shelf_order: number
+  is_free_item?: boolean
   product_name?: string
   product_sku?: string
   location_code?: string

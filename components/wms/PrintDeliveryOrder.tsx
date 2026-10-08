@@ -287,7 +287,19 @@ export function PrintDeliveryOrder({
                           {item.product_sku || item.product_id.slice(0, 8).toUpperCase()}
                         </td>
                         <td className="border-r border-zinc-300 py-1.5 px-2 font-medium text-zinc-900">
-                          {item.product_name || `Barang Master (${item.product_id.slice(0, 8)})`}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{item.product_name || `Barang Master (${item.product_id.slice(0, 8)})`}</span>
+                            {item.is_free_item && (
+                              <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[9px] uppercase tracking-wider">
+                                BONUS
+                              </span>
+                            )}
+                          </div>
+                          {item.batch_number && (
+                            <div className="text-[9px] font-mono text-zinc-500 mt-0.5">
+                              Batch: {item.batch_number} {item.expiry_date ? `(Exp: ${item.expiry_date.slice(0, 10)})` : ''}
+                            </div>
+                          )}
                         </td>
                         <td className="border-r border-zinc-300 py-1.5 px-2 text-center font-mono font-medium text-zinc-700 bg-zinc-50/60">
                           {item.location_code || 'BIN-A-01'}

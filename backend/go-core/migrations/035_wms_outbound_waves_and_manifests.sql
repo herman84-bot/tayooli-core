@@ -108,8 +108,11 @@ CREATE TABLE IF NOT EXISTS picking_task_items (
     status             VARCHAR(50) NOT NULL DEFAULT 'PENDING'
                        CHECK (status IN ('PENDING', 'PICKED', 'SHORTAGE', 'DAMAGED')),
     shelf_order        INT NOT NULL DEFAULT 0,
+    is_free_item       BOOLEAN NOT NULL DEFAULT FALSE,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE picking_task_items ADD COLUMN IF NOT EXISTS is_free_item BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE picking_task_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE picking_task_items FORCE ROW LEVEL SECURITY;

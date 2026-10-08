@@ -71,7 +71,7 @@ func (r *WMSRepo) GetOrCreatePickingTask(ctx context.Context, tenantID uuid.UUID
 	// Fetch items from DO ordered by location code ASC
 	rows, err := tx.QueryContext(ctx, `
 		SELECT doi.product_id, COALESCE(doi.batch_id, '00000000-0000-0000-0000-000000000000'::uuid),
-		       doi.location_id, doi.quantity, wl.code
+		       doi.location_id, doi.quantity, wl.code, COALESCE(doi.is_free_item, false)
 		FROM delivery_order_items doi
 		JOIN warehouse_locations wl ON wl.id = doi.location_id AND wl.tenant_id = doi.tenant_id
 		WHERE doi.delivery_order_id = $1 AND doi.tenant_id = $2
@@ -85,11 +85,12 @@ func (r *WMSRepo) GetOrCreatePickingTask(ctx context.Context, tenantID uuid.UUID
 		prodID, batchID, locID uuid.UUID
 		qty                    decimal.Decimal
 		locCode                string
+		isFreeItem             bool
 	}
 	var drafts []itemDraft
 	for rows.Next() {
 		var d itemDraft
-		if err := rows.Scan(&d.prodID, &d.batchID, &d.locID, &d.qty, &d.locCode); err != nil {
+		if err := rows.Scan(&d.prodID, &d.batchID, &d.locID, &d.qty, &d.locCode, &d.isFreeItem); err != nil {
 			return nil, fmt.Errorf("WMSRepo.GetOrCreatePickingTask: scan do item: %w", err)
 		}
 		drafts = append(drafts, d)
@@ -99,9 +100,9 @@ func (r *WMSRepo) GetOrCreatePickingTask(ctx context.Context, tenantID uuid.UUID
 	for i, d := range drafts {
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO picking_task_items
-				(id, tenant_id, task_id, product_id, batch_id, source_location_id, requested_qty, picked_qty, status, shelf_order, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 'PENDING', $8, $9)`,
-			uuid.New(), tenantID, taskID, d.prodID, d.batchID, d.locID, d.qty, i+1, now)
+				(id, tenant_id, task_id, product_id, batch_id, source_location_id, requested_qty, picked_qty, status, shelf_order, is_free_item, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 'PENDING', $8, $9, $10)`,
+			uuid.New(), tenantID, taskID, d.prodID, d.batchID, d.locID, d.qty, i+1, d.isFreeItem, now)
 		if err != nil {
 			return nil, fmt.Errorf("WMSRepo.GetOrCreatePickingTask: insert task item %d: %w", i, err)
 		}
@@ -170,7 +171,8 @@ func (r *WMSRepo) fetchPickingTaskByDOTx(ctx context.Context, tx *sql.Tx, tenant
 		SELECT pti.id, pti.tenant_id, pti.task_id, pti.product_id, COALESCE(p.name, ''), COALESCE(p.sku, ''),
 		       pti.batch_id, COALESCE(sb.batch_number, ''), sb.expiry_date,
 		       pti.source_location_id, COALESCE(wl.code, ''),
-		       pti.requested_qty, pti.picked_qty, pti.damaged_qty, pti.status, pti.shelf_order, pti.created_at
+		       pti.requested_qty, pti.picked_qty, pti.damaged_qty, pti.status, pti.shelf_order,
+		       COALESCE(pti.is_free_item, false), pti.created_at
 		FROM picking_task_items pti
 		LEFT JOIN products p ON p.id = pti.product_id AND p.tenant_id = pti.tenant_id
 		LEFT JOIN stock_batches sb ON sb.id = pti.batch_id AND sb.tenant_id = pti.tenant_id
@@ -191,7 +193,8 @@ func (r *WMSRepo) fetchPickingTaskByDOTx(ctx context.Context, tx *sql.Tx, tenant
 			&it.ID, &it.TenantID, &it.TaskID, &it.ProductID, &pName, &pSKU,
 			&it.BatchID, &bNum, &expDate,
 			&it.SourceLocationID, &lCode,
-			&it.RequestedQty, &it.PickedQty, &it.DamagedQty, &it.Status, &it.ShelfOrder, &it.CreatedAt,
+			&it.RequestedQty, &it.PickedQty, &it.DamagedQty, &it.Status, &it.ShelfOrder,
+			&it.IsFreeItem, &it.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("fetchPickingTaskByDOTx: scan item: %w", err)
 		}

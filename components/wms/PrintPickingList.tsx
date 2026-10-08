@@ -123,7 +123,14 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        <div className="font-bold text-zinc-800">{item.product_name}</div>
+                        <div className="font-bold text-zinc-800 flex items-center gap-1.5 flex-wrap">
+                          <span>{item.product_name}</span>
+                          {item.is_free_item && (
+                            <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[9px] uppercase tracking-wider">
+                              BONUS
+                            </span>
+                          )}
+                        </div>
                         <div className="text-zinc-500 font-mono text-[11px]">{item.product_sku}</div>
                       </td>
                       <td className="py-3 px-3">
