@@ -60,7 +60,10 @@ func (r *WMSRepo) CreateDock(ctx context.Context, tenantID uuid.UUID, req domain
 		dockCode = fmt.Sprintf("DOCK-%02d", count+1)
 		for i := 0; i < 20; i++ {
 			var exists bool
-			_ = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM inbound_docks WHERE tenant_id = $1 AND warehouse_id = $2 AND dock_code = $3)`, tenantID, req.WarehouseID, dockCode).Scan(&exists)
+			err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM inbound_docks WHERE tenant_id = $1 AND warehouse_id = $2 AND dock_code = $3)`, tenantID, req.WarehouseID, dockCode).Scan(&exists)
+			if err != nil {
+				return nil, fmt.Errorf("WMSRepo.CreateDock: check dock code exists: %w", err)
+			}
 			if !exists {
 				break
 			}
@@ -116,17 +119,27 @@ func (r *WMSRepo) CreateDock(ctx context.Context, tenantID uuid.UUID, req domain
 
 // GetDockByID retrieves a dock with warehouse name by ID.
 func (r *WMSRepo) GetDockByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.InboundDock, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetDockByID: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetDockByID: set tenant: %w", err)
+	}
+
 	query := `
 	SELECT d.id, d.tenant_id, d.warehouse_id, w.name, d.dock_code, d.dock_name, d.dock_type,
 	       d.max_tonnage, d.status, d.notes, d.created_at, d.updated_at
 	FROM inbound_docks d
-	JOIN warehouses w ON w.id = d.warehouse_id
+	JOIN warehouses w ON w.id = d.warehouse_id AND w.tenant_id = $2
 	WHERE d.id = $1 AND d.tenant_id = $2`
 
 	var d domain.InboundDock
 	var notes sql.NullString
 	var whName sql.NullString
-	err := r.db.QueryRowContext(ctx, query, id, tenantID).Scan(
+	err = tx.QueryRowContext(ctx, query, id, tenantID).Scan(
 		&d.ID, &d.TenantID, &d.WarehouseID, &whName, &d.DockCode, &d.DockName, &d.DockType,
 		&d.MaxTonnage, &d.Status, &notes, &d.CreatedAt, &d.UpdatedAt,
 	)
@@ -138,16 +151,31 @@ func (r *WMSRepo) GetDockByID(ctx context.Context, tenantID, id uuid.UUID) (*dom
 	}
 	d.WarehouseName = nullStringToPtr(whName)
 	d.Notes = nullStringToPtr(notes)
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetDockByID: commit: %w", err)
+	}
+
 	return &d, nil
 }
 
 // ListDocks selects docks filtered by warehouse and optional status.
 func (r *WMSRepo) ListDocks(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *domain.DockStatus) ([]domain.InboundDock, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListDocks: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListDocks: set tenant: %w", err)
+	}
+
 	query := `
 	SELECT d.id, d.tenant_id, d.warehouse_id, w.name, d.dock_code, d.dock_name, d.dock_type,
 	       d.max_tonnage, d.status, d.notes, d.created_at, d.updated_at
 	FROM inbound_docks d
-	JOIN warehouses w ON w.id = d.warehouse_id
+	JOIN warehouses w ON w.id = d.warehouse_id AND w.tenant_id = $1
 	WHERE d.tenant_id = $1`
 
 	args := []any{tenantID}
@@ -166,7 +194,7 @@ func (r *WMSRepo) ListDocks(ctx context.Context, tenantID uuid.UUID, warehouseID
 
 	query += " ORDER BY d.dock_code ASC"
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.ListDocks: query: %w", err)
 	}
@@ -189,6 +217,10 @@ func (r *WMSRepo) ListDocks(ctx context.Context, tenantID uuid.UUID, warehouseID
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("WMSRepo.ListDocks: rows err: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListDocks: commit: %w", err)
 	}
 
 	return docks, nil
@@ -347,15 +379,25 @@ func (r *WMSRepo) CreateAppointment(ctx context.Context, tenantID, userID uuid.U
 
 // GetAppointmentByID selects appointment with dock and warehouse details.
 func (r *WMSRepo) GetAppointmentByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.DockAppointment, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetAppointmentByID: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetAppointmentByID: set tenant: %w", err)
+	}
+
 	query := `
 	SELECT a.id, a.tenant_id, a.warehouse_id, w.name, a.dock_id, d.dock_code, d.dock_name,
 	       a.appointment_number, a.vendor_name, a.vehicle_plate, a.driver_name, a.driver_phone,
 	       a.po_reference, a.estimated_arrival, a.actual_arrival, a.start_unloading_at, a.completed_at,
 	       a.status, a.notes, a.created_by, u.name, a.created_at, a.updated_at
 	FROM dock_appointments a
-	JOIN warehouses w ON w.id = a.warehouse_id
-	LEFT JOIN inbound_docks d ON d.id = a.dock_id
-	LEFT JOIN users u ON u.id = a.created_by
+	JOIN warehouses w ON w.id = a.warehouse_id AND w.tenant_id = $2
+	LEFT JOIN inbound_docks d ON d.id = a.dock_id AND d.tenant_id = $2
+	LEFT JOIN users u ON u.id = a.created_by AND u.tenant_id = $2
 	WHERE a.id = $1 AND a.tenant_id = $2`
 
 	var a domain.DockAppointment
@@ -372,7 +414,7 @@ func (r *WMSRepo) GetAppointmentByID(ctx context.Context, tenantID, id uuid.UUID
 	var createdBy sql.NullString
 	var createdByName sql.NullString
 
-	err := r.db.QueryRowContext(ctx, query, id, tenantID).Scan(
+	err = tx.QueryRowContext(ctx, query, id, tenantID).Scan(
 		&a.ID, &a.TenantID, &a.WarehouseID, &whName, &dockID, &dockCode, &dockName,
 		&a.AppointmentNumber, &a.VendorName, &a.VehiclePlate, &a.DriverName, &driverPhone,
 		&poRef, &a.EstimatedArrival, &actualArrival, &startUnloading, &completedAt,
@@ -398,20 +440,34 @@ func (r *WMSRepo) GetAppointmentByID(ctx context.Context, tenantID, id uuid.UUID
 	a.CreatedBy = nullUUIDToPtr(createdBy)
 	a.CreatedByName = nullStringToPtr(createdByName)
 
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetAppointmentByID: commit: %w", err)
+	}
+
 	return &a, nil
 }
 
 // ListAppointments selects appointments for warehouse filtered by optional status.
 func (r *WMSRepo) ListAppointments(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, status *domain.AppointmentStatus) ([]domain.DockAppointment, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListAppointments: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListAppointments: set tenant: %w", err)
+	}
+
 	query := `
 	SELECT a.id, a.tenant_id, a.warehouse_id, w.name, a.dock_id, d.dock_code, d.dock_name,
 	       a.appointment_number, a.vendor_name, a.vehicle_plate, a.driver_name, a.driver_phone,
 	       a.po_reference, a.estimated_arrival, a.actual_arrival, a.start_unloading_at, a.completed_at,
 	       a.status, a.notes, a.created_by, u.name, a.created_at, a.updated_at
 	FROM dock_appointments a
-	JOIN warehouses w ON w.id = a.warehouse_id
-	LEFT JOIN inbound_docks d ON d.id = a.dock_id
-	LEFT JOIN users u ON u.id = a.created_by
+	JOIN warehouses w ON w.id = a.warehouse_id AND w.tenant_id = $1
+	LEFT JOIN inbound_docks d ON d.id = a.dock_id AND d.tenant_id = $1
+	LEFT JOIN users u ON u.id = a.created_by AND u.tenant_id = $1
 	WHERE a.tenant_id = $1`
 
 	args := []any{tenantID}
@@ -430,7 +486,7 @@ func (r *WMSRepo) ListAppointments(ctx context.Context, tenantID uuid.UUID, ware
 
 	query += " ORDER BY a.estimated_arrival ASC, a.created_at DESC"
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.ListAppointments: query: %w", err)
 	}
@@ -478,6 +534,10 @@ func (r *WMSRepo) ListAppointments(ctx context.Context, tenantID uuid.UUID, ware
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("WMSRepo.ListAppointments: rows err: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListAppointments: commit: %w", err)
 	}
 
 	return appointments, nil
@@ -532,7 +592,7 @@ func (r *WMSRepo) AssignDockToAppointment(ctx context.Context, tenantID, appoint
 	if dockWhID != appWhID {
 		return nil, domain.ErrInvalidInput
 	}
-	if domain.DockStatus(dockStatus) == domain.DockStatusMaintenance {
+	if domain.DockStatus(dockStatus) == domain.DockStatusMaintenance || domain.DockStatus(dockStatus) == domain.DockStatusOccupied {
 		return nil, domain.ErrDockOccupied
 	}
 
@@ -573,19 +633,27 @@ func (r *WMSRepo) AssignDockToAppointment(ctx context.Context, tenantID, appoint
 
 	// 6. If previous dock was assigned, free it if no active appointment remains
 	if oldDockID.Valid && oldDockID.String != req.DockID.String() {
-		oldUUID, _ := uuid.Parse(oldDockID.String)
-		var oldStillActive bool
-		_ = tx.QueryRowContext(ctx, `
-			SELECT EXISTS(
-				SELECT 1 FROM dock_appointments
-				WHERE tenant_id = $1 AND dock_id = $2 AND id != $3
-				  AND status IN ('ARRIVED', 'UNLOADING')
-			)`, tenantID, oldUUID, appointmentID).Scan(&oldStillActive)
-		if !oldStillActive {
-			_, _ = tx.ExecContext(ctx, `
-				UPDATE inbound_docks
-				SET status = 'AVAILABLE', updated_at = NOW()
-				WHERE id = $1 AND tenant_id = $2 AND status = 'OCCUPIED'`, oldUUID, tenantID)
+		oldUUID, parseErr := uuid.Parse(oldDockID.String)
+		if parseErr == nil {
+			var oldStillActive bool
+			err = tx.QueryRowContext(ctx, `
+				SELECT EXISTS(
+					SELECT 1 FROM dock_appointments
+					WHERE tenant_id = $1 AND dock_id = $2 AND id != $3
+					  AND status IN ('ARRIVED', 'UNLOADING')
+				)`, tenantID, oldUUID, appointmentID).Scan(&oldStillActive)
+			if err != nil {
+				return nil, fmt.Errorf("WMSRepo.AssignDockToAppointment: check old dock active: %w", err)
+			}
+			if !oldStillActive {
+				_, err = tx.ExecContext(ctx, `
+					UPDATE inbound_docks
+					SET status = 'AVAILABLE', updated_at = NOW()
+					WHERE id = $1 AND tenant_id = $2 AND status = 'OCCUPIED'`, oldUUID, tenantID)
+				if err != nil {
+					return nil, fmt.Errorf("WMSRepo.AssignDockToAppointment: release old dock: %w", err)
+				}
+			}
 		}
 	}
 
@@ -635,70 +703,80 @@ func (r *WMSRepo) UpdateAppointmentStatus(ctx context.Context, tenantID, appoint
 	compAt := completedAt
 
 	switch req.Status {
-	case domain.AppointmentStatusArrived:
-		if !actArr.Valid {
-			actArr = sql.NullTime{Time: now, Valid: true}
+	case domain.AppointmentStatusArrived, domain.AppointmentStatusUnloading:
+		if !dockID.Valid || strings.TrimSpace(dockID.String) == "" {
+			return nil, domain.ErrInvalidInput
 		}
-		if dockID.Valid && dockID.String != "" {
-			dUUID, _ := uuid.Parse(dockID.String)
-			_, _ = tx.ExecContext(ctx, `
-				UPDATE inbound_docks SET status = 'OCCUPIED', updated_at = NOW()
-				WHERE id = $1 AND tenant_id = $2`, dUUID, tenantID)
+		dUUID, err := uuid.Parse(dockID.String)
+		if err != nil || dUUID == uuid.Nil {
+			return nil, domain.ErrInvalidInput
 		}
 
-	case domain.AppointmentStatusUnloading:
+		var dockStatus string
+		err = tx.QueryRowContext(ctx, `
+			SELECT status FROM inbound_docks
+			WHERE id = $1 AND tenant_id = $2
+			FOR UPDATE`, dUUID, tenantID).Scan(&dockStatus)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, domain.ErrDockNotFound
+			}
+			return nil, fmt.Errorf("WMSRepo.UpdateAppointmentStatus: check dock status: %w", err)
+		}
+		if domain.DockStatus(dockStatus) == domain.DockStatusMaintenance {
+			return nil, domain.ErrDockOccupied
+		}
+
+		var collisionCount int
+		err = tx.QueryRowContext(ctx, `
+			SELECT COUNT(*) FROM dock_appointments
+			WHERE tenant_id = $1 AND dock_id = $2 AND id != $3
+			  AND status IN ('ARRIVED', 'UNLOADING')`,
+			tenantID, dUUID, appointmentID).Scan(&collisionCount)
+		if err != nil {
+			return nil, fmt.Errorf("WMSRepo.UpdateAppointmentStatus: check collision: %w", err)
+		}
+		if collisionCount > 0 {
+			return nil, domain.ErrDockOccupied
+		}
+
 		if !actArr.Valid {
 			actArr = sql.NullTime{Time: now, Valid: true}
 		}
-		if !startUnl.Valid {
+		if req.Status == domain.AppointmentStatusUnloading && !startUnl.Valid {
 			startUnl = sql.NullTime{Time: now, Valid: true}
 		}
-		if dockID.Valid && dockID.String != "" {
-			dUUID, _ := uuid.Parse(dockID.String)
-			var otherUnloading bool
-			_ = tx.QueryRowContext(ctx, `
-				SELECT EXISTS(
-					SELECT 1 FROM dock_appointments
-					WHERE tenant_id = $1 AND dock_id = $2 AND id != $3 AND status = 'UNLOADING'
-				)`, tenantID, dUUID, appointmentID).Scan(&otherUnloading)
-			if otherUnloading {
-				return nil, domain.ErrDockOccupied
-			}
-			_, _ = tx.ExecContext(ctx, `
-				UPDATE inbound_docks SET status = 'OCCUPIED', updated_at = NOW()
-				WHERE id = $1 AND tenant_id = $2`, dUUID, tenantID)
+
+		_, err = tx.ExecContext(ctx, `
+			UPDATE inbound_docks SET status = 'OCCUPIED', updated_at = NOW()
+			WHERE id = $1 AND tenant_id = $2`, dUUID, tenantID)
+		if err != nil {
+			return nil, fmt.Errorf("WMSRepo.UpdateAppointmentStatus: set dock occupied: %w", err)
 		}
 
-	case domain.AppointmentStatusCompleted:
-		if !compAt.Valid {
+	case domain.AppointmentStatusCompleted, domain.AppointmentStatusCancelled:
+		if req.Status == domain.AppointmentStatusCompleted && !compAt.Valid {
 			compAt = sql.NullTime{Time: now, Valid: true}
 		}
-		if dockID.Valid && dockID.String != "" {
-			dUUID, _ := uuid.Parse(dockID.String)
-			var activeCount int
-			_ = tx.QueryRowContext(ctx, `
-				SELECT COUNT(*) FROM dock_appointments
-				WHERE tenant_id = $1 AND dock_id = $2 AND id != $3 AND status IN ('ARRIVED', 'UNLOADING')`,
-				tenantID, dUUID, appointmentID).Scan(&activeCount)
-			if activeCount == 0 {
-				_, _ = tx.ExecContext(ctx, `
-					UPDATE inbound_docks SET status = 'AVAILABLE', updated_at = NOW()
-					WHERE id = $1 AND tenant_id = $2 AND status = 'OCCUPIED'`, dUUID, tenantID)
-			}
-		}
-
-	case domain.AppointmentStatusCancelled:
-		if dockID.Valid && dockID.String != "" {
-			dUUID, _ := uuid.Parse(dockID.String)
-			var activeCount int
-			_ = tx.QueryRowContext(ctx, `
-				SELECT COUNT(*) FROM dock_appointments
-				WHERE tenant_id = $1 AND dock_id = $2 AND id != $3 AND status IN ('ARRIVED', 'UNLOADING')`,
-				tenantID, dUUID, appointmentID).Scan(&activeCount)
-			if activeCount == 0 {
-				_, _ = tx.ExecContext(ctx, `
-					UPDATE inbound_docks SET status = 'AVAILABLE', updated_at = NOW()
-					WHERE id = $1 AND tenant_id = $2 AND status = 'OCCUPIED'`, dUUID, tenantID)
+		if dockID.Valid && strings.TrimSpace(dockID.String) != "" {
+			dUUID, err := uuid.Parse(dockID.String)
+			if err == nil && dUUID != uuid.Nil {
+				var activeCount int
+				err = tx.QueryRowContext(ctx, `
+					SELECT COUNT(*) FROM dock_appointments
+					WHERE tenant_id = $1 AND dock_id = $2 AND id != $3 AND status IN ('ARRIVED', 'UNLOADING')`,
+					tenantID, dUUID, appointmentID).Scan(&activeCount)
+				if err != nil {
+					return nil, fmt.Errorf("WMSRepo.UpdateAppointmentStatus: check active appointments: %w", err)
+				}
+				if activeCount == 0 {
+					_, err = tx.ExecContext(ctx, `
+						UPDATE inbound_docks SET status = 'AVAILABLE', updated_at = NOW()
+						WHERE id = $1 AND tenant_id = $2 AND status = 'OCCUPIED'`, dUUID, tenantID)
+					if err != nil {
+						return nil, fmt.Errorf("WMSRepo.UpdateAppointmentStatus: release dock: %w", err)
+					}
+				}
 			}
 		}
 	}
@@ -862,14 +940,24 @@ func (r *WMSRepo) CreateLPN(ctx context.Context, tenantID, userID uuid.UUID, req
 
 // GetLPNByID loads LPN and all contained product batch items.
 func (r *WMSRepo) GetLPNByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.StockLPNDetail, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetLPNByID: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetLPNByID: set tenant: %w", err)
+	}
+
 	queryHeader := `
 	SELECT l.id, l.tenant_id, l.warehouse_id, w.name, l.lpn_code, l.location_id,
 	       loc.code, loc.name, l.pallet_type, l.status, l.max_weight_kg, l.total_weight_kg,
 	       l.notes, l.created_by, u.name, l.created_at, l.updated_at
 	FROM stock_lpns l
-	JOIN warehouses w ON w.id = l.warehouse_id
-	JOIN warehouse_locations loc ON loc.id = l.location_id
-	LEFT JOIN users u ON u.id = l.created_by
+	JOIN warehouses w ON w.id = l.warehouse_id AND w.tenant_id = $2
+	JOIN warehouse_locations loc ON loc.id = l.location_id AND loc.tenant_id = $2
+	LEFT JOIN users u ON u.id = l.created_by AND u.tenant_id = $2
 	WHERE l.id = $1 AND l.tenant_id = $2`
 
 	var lpn domain.StockLPN
@@ -880,7 +968,7 @@ func (r *WMSRepo) GetLPNByID(ctx context.Context, tenantID, id uuid.UUID) (*doma
 	var createdBy sql.NullString
 	var createdByName sql.NullString
 
-	err := r.db.QueryRowContext(ctx, queryHeader, id, tenantID).Scan(
+	err = tx.QueryRowContext(ctx, queryHeader, id, tenantID).Scan(
 		&lpn.ID, &lpn.TenantID, &lpn.WarehouseID, &whName, &lpn.LPNCode, &lpn.LocationID,
 		&locCode, &locName, &lpn.PalletType, &lpn.Status, &lpn.MaxWeightKg, &lpn.TotalWeightKg,
 		&notes, &createdBy, &createdByName, &lpn.CreatedAt, &lpn.UpdatedAt,
@@ -903,12 +991,12 @@ func (r *WMSRepo) GetLPNByID(ctx context.Context, tenantID, id uuid.UUID) (*doma
 	SELECT i.id, i.tenant_id, i.lpn_id, i.product_id, p.name, p.sku,
 	       i.batch_id, b.batch_number, b.expiry_date, i.quantity, i.created_at, i.updated_at
 	FROM stock_lpn_items i
-	JOIN products p ON p.id = i.product_id
-	JOIN stock_batches b ON b.id = i.batch_id
+	JOIN products p ON p.id = i.product_id AND p.tenant_id = $2
+	JOIN stock_batches b ON b.id = i.batch_id AND b.tenant_id = $2
 	WHERE i.lpn_id = $1 AND i.tenant_id = $2
 	ORDER BY i.created_at ASC`
 
-	rows, err := r.db.QueryContext(ctx, queryItems, id, tenantID)
+	rows, err := tx.QueryContext(ctx, queryItems, id, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.GetLPNByID: query items: %w", err)
 	}
@@ -939,6 +1027,10 @@ func (r *WMSRepo) GetLPNByID(ctx context.Context, tenantID, id uuid.UUID) (*doma
 		return nil, fmt.Errorf("WMSRepo.GetLPNByID: items err: %w", err)
 	}
 
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetLPNByID: commit: %w", err)
+	}
+
 	return &domain.StockLPNDetail{
 		LPN:   lpn,
 		Items: items,
@@ -947,14 +1039,24 @@ func (r *WMSRepo) GetLPNByID(ctx context.Context, tenantID, id uuid.UUID) (*doma
 
 // ListLPNs selects LPNs for warehouse.
 func (r *WMSRepo) ListLPNs(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, locationID *uuid.UUID, status *domain.LPNStatus) ([]domain.StockLPN, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListLPNs: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListLPNs: set tenant: %w", err)
+	}
+
 	query := `
 	SELECT l.id, l.tenant_id, l.warehouse_id, w.name, l.lpn_code, l.location_id,
 	       loc.code, loc.name, l.pallet_type, l.status, l.max_weight_kg, l.total_weight_kg,
 	       l.notes, l.created_by, u.name, l.created_at, l.updated_at
 	FROM stock_lpns l
-	JOIN warehouses w ON w.id = l.warehouse_id
-	JOIN warehouse_locations loc ON loc.id = l.location_id
-	LEFT JOIN users u ON u.id = l.created_by
+	JOIN warehouses w ON w.id = l.warehouse_id AND w.tenant_id = $1
+	JOIN warehouse_locations loc ON loc.id = l.location_id AND loc.tenant_id = $1
+	LEFT JOIN users u ON u.id = l.created_by AND u.tenant_id = $1
 	WHERE l.tenant_id = $1`
 
 	args := []any{tenantID}
@@ -978,7 +1080,7 @@ func (r *WMSRepo) ListLPNs(ctx context.Context, tenantID uuid.UUID, warehouseID 
 
 	query += " ORDER BY l.created_at DESC"
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.ListLPNs: query: %w", err)
 	}
@@ -1012,6 +1114,10 @@ func (r *WMSRepo) ListLPNs(ctx context.Context, tenantID uuid.UUID, warehouseID 
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("WMSRepo.ListLPNs: rows err: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListLPNs: commit: %w", err)
 	}
 
 	return lpns, nil
@@ -1162,6 +1268,9 @@ func (r *WMSRepo) MoveLPN(ctx context.Context, tenantID, userID, lpnID uuid.UUID
 		}
 		return nil, fmt.Errorf("WMSRepo.MoveLPN: lock lpn: %w", err)
 	}
+	if lpn.Status == domain.LPNStatusShipped || lpn.Status == domain.LPNStatusDecommissioned {
+		return nil, domain.ErrInvalidInput
+	}
 	lpn.TenantID = tenantID
 	lpn.Notes = nullStringToPtr(notes)
 	lpn.CreatedBy = nullUUIDToPtr(createdBy)
@@ -1211,6 +1320,9 @@ func (r *WMSRepo) MoveLPN(ctx context.Context, tenantID, userID, lpnID uuid.UUID
 			return nil, fmt.Errorf("WMSRepo.MoveLPN: scan item: %w", err)
 		}
 		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("WMSRepo.MoveLPN: rows err: %w", err)
 	}
 	_ = rows.Close()
 
