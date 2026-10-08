@@ -21,6 +21,7 @@ import {
   Barcode,
   PackageCheck,
   RefreshCw,
+  History,
 } from "lucide-react"
 import {
   useWarehouses,
@@ -32,6 +33,7 @@ import {
 import { useWMSMovements, useWMSStock } from "@/hooks/useWMSLedger"
 import { Warehouse, WarehouseLocation, LocationType, StockSummary } from "@/lib/api"
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
+import { ActivityTimelineDrawer } from "@/components/wms/ActivityTimelineDrawer"
 
 export default function WMSDashboardPage() {
   const { data: warehouses = [], isLoading: loadingWarehouses, refetch: refetchWarehouses } = useWarehouses()
@@ -61,6 +63,7 @@ export default function WMSDashboardPage() {
   // Modals state
   const [showCreateWhModal, setShowCreateWhModal] = useState(false)
   const [showCreateLocModal, setShowCreateLocModal] = useState(false)
+  const [selectedMovementForAudit, setSelectedMovementForAudit] = useState<any | null>(null)
 
   // Filters & Tabs
   const [activeTab, setActiveTab] = useState<"locations" | "movements">("locations")
@@ -599,19 +602,20 @@ export default function WMSDashboardPage() {
                       <th className="px-4 py-3">Lokasi Tujuan</th>
                       <th className="px-4 py-3 text-right">Kuantitas</th>
                       <th className="px-4 py-3 text-center">Status</th>
-                      <th className="px-4 py-3">Operator</th>
+                      <th className="px-4 py-3">Dibuat / Disetujui / Operator</th>
+                      <th className="px-4 py-3 text-right">Riwayat</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {loadingMovements ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-slate-500 text-sm">
+                        <td colSpan={8} className="px-4 py-8 text-center text-slate-500 text-sm">
                           Memuat riwayat mutasi stok...
                         </td>
                       </tr>
                     ) : movements.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-12 text-center text-slate-500 text-sm">
+                        <td colSpan={8} className="px-4 py-12 text-center text-slate-500 text-sm">
                           Belum ada riwayat pergerakan stok barang.
                         </td>
                       </tr>
@@ -651,7 +655,23 @@ export default function WMSDashboardPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-600">
-                            {mov.executed_by_name || (mov.executed_by ? `Petugas (${mov.executed_by.slice(0, 8)})` : "Sistem / Otomatis")}
+                            <div className="font-medium text-slate-800">
+                              {mov.executed_by_name || (mov.executed_by ? `Petugas (${mov.executed_by.slice(0, 8)})` : "Sistem / Otomatis")}
+                            </div>
+                            <div className="text-[11px] text-slate-400">
+                              Ref: <span className="font-mono font-medium text-slate-600">{mov.reference_type || "INTERNAL"}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMovementForAudit(mov)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition text-xs font-medium shadow-2xs"
+                              title="Lihat Riwayat Aktivitas & Jejak Audit"
+                            >
+                              <History className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Riwayat</span>
+                            </button>
                           </td>
                         </tr>
                       ))
@@ -663,6 +683,35 @@ export default function WMSDashboardPage() {
           )}
         </div>
       </div>
+
+      {/* ── DRAWER: Activity Timeline & Audit Trail (CR-05b) ── */}
+      {selectedMovementForAudit && (
+        <ActivityTimelineDrawer
+          isOpen={!!selectedMovementForAudit}
+          onClose={() => setSelectedMovementForAudit(null)}
+          title={selectedMovementForAudit.movement_number}
+          subtitle={`Mutasi Stok (${selectedMovementForAudit.reference_type || "WMS Ledger"})`}
+          entityType="stock_movement"
+          entityId={selectedMovementForAudit.id}
+          actors={{
+            executed_by_name: selectedMovementForAudit.executed_by_name || "Operator Gudang",
+            executed_at: selectedMovementForAudit.created_at,
+            created_at: selectedMovementForAudit.created_at,
+            created_by_name: selectedMovementForAudit.executed_by_name || "Sistem WMS",
+          }}
+          metadata={{
+            status: selectedMovementForAudit.status,
+            reference_type: selectedMovementForAudit.reference_type,
+            reference_number: selectedMovementForAudit.reference_id,
+            product_name: selectedMovementForAudit.product_name,
+            sku: selectedMovementForAudit.sku,
+            source_location: selectedMovementForAudit.source_location_code || selectedMovementForAudit.source_location_id,
+            dest_location: selectedMovementForAudit.dest_location_code || selectedMovementForAudit.dest_location_id,
+            quantity: selectedMovementForAudit.quantity,
+            batch_number: selectedMovementForAudit.batch_number,
+          }}
+        />
+      )}
 
       {/* ── MODAL 1: Create Warehouse ── */}
       {showCreateWhModal && (

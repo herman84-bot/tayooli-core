@@ -6,6 +6,7 @@ import { PrintThermalAWB } from '@/components/wms/PrintThermalAWB'
 import { WaveReleaseModal } from '@/components/wms/WaveReleaseModal'
 import { WavePickingSubView } from '@/components/wms/WavePickingSubView'
 import { PackingStationSubView } from '@/components/wms/PackingStationSubView'
+import { ActivityTimelineDrawer } from '@/components/wms/ActivityTimelineDrawer'
 import DeliveryOrdersPanel from '@/components/wms/DeliveryOrdersPanel'
 import { PickingTaskDetail, DeliveryOrder, DeliveryOrderItem } from '@/lib/api'
 
@@ -32,6 +33,10 @@ jest.mock('@/hooks/useWMS', () => ({
   useDispatchDeliveryOrder: () => ({
     mutateAsync: jest.fn().mockResolvedValue({}),
     isPending: false,
+  }),
+  useAuditTrail: () => ({
+    data: [],
+    isLoading: false,
   }),
 }))
 
@@ -120,6 +125,20 @@ jest.mock('@/lib/api', () => ({
           data: { item_id: 'doi-1', packed_qty: '1', product_name: 'Beras 5kg', product_sku: 'BRS-01', item_completed: false },
         }),
         completePack: jest.fn().mockResolvedValue({ data: { id: 'do-123', status: 'PACKED' } }),
+      },
+      trace: {
+        auditTrail: jest.fn().mockResolvedValue({
+          data: [
+            {
+              id: 'log-1',
+              entity_type: 'delivery_order',
+              entity_id: 'do-123',
+              action: 'ORDER_CONFIRMED',
+              user_name: 'Bpk. Supervisor',
+              created_at: '2026-10-08T09:00:00Z',
+            },
+          ],
+        }),
       },
     },
     customers: {
@@ -410,6 +429,47 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
       expect(api.customers.create).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'Toko Berkah Baru' })
       )
+    })
+  })
+
+  describe('CR-05b: ActivityTimelineDrawer & Actor Audit', () => {
+    it('renders ActivityTimelineDrawer with actors, metadata, and close action', async () => {
+      const onClose = jest.fn()
+      render(
+        <ActivityTimelineDrawer
+          isOpen={true}
+          onClose={onClose}
+          title="DO-20261008-0001"
+          subtitle="Surat Jalan Keluar"
+          entityType="delivery_order"
+          entityId="do-123"
+          actors={{
+            created_by_name: 'Staf Inbound/Outbound',
+            created_at: '2026-10-08T08:00:00Z',
+            confirmed_by_name: 'Bpk. Supervisor',
+            confirmed_at: '2026-10-08T08:30:00Z',
+            packed_by_name: 'Petugas Meja Kemas',
+            dispatched_by_name: 'Sopir Ekspedisi',
+          }}
+          metadata={{
+            status: 'CONFIRMED',
+            reference_type: 'DIRECT_DO',
+            product_name: 'Beras Ramos 5kg',
+            quantity: 10,
+          }}
+        />
+      )
+
+      expect(screen.getByText(/Riwayat Aktivitas & Jejak Audit \(CR-05b\)/i)).toBeInTheDocument()
+      expect(screen.getByText('DO-20261008-0001')).toBeInTheDocument()
+      expect(screen.getAllByText('Staf Inbound/Outbound').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Bpk. Supervisor').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Petugas Meja Kemas').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Sopir Ekspedisi').length).toBeGreaterThanOrEqual(1)
+
+      const closeBtn = screen.getByRole('button', { name: /Tutup panel/i })
+      fireEvent.click(closeBtn)
+      expect(onClose).toHaveBeenCalled()
     })
   })
 })

@@ -24,6 +24,7 @@ import {
   Gift,
   UserCheck,
   UserPlus,
+  History,
 } from "lucide-react"
 import {
   useDeliveryOrders,
@@ -46,6 +47,7 @@ import { PrintPickingList } from "@/components/wms/PrintPickingList"
 import { PrintThermalAWB } from "@/components/wms/PrintThermalAWB"
 import { PackStationModal } from "@/components/wms/PackStationModal"
 import { WaveReleaseModal } from "@/components/wms/WaveReleaseModal"
+import { ActivityTimelineDrawer } from "@/components/wms/ActivityTimelineDrawer"
 import { ExportModal, ExportButton, type ExportFilter } from "@/components/ui/ExportModal"
 import type { ExportColumn } from "@/lib/export"
 
@@ -115,6 +117,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
   } | null>(null)
   const [isWaveModalOpen, setIsWaveModalOpen] = useState(false)
   const [loadingThermal, setLoadingThermal] = useState(false)
+  const [selectedDoForAudit, setSelectedDoForAudit] = useState<DeliveryOrder | null>(null)
 
   // Quick Add Customer Modal State (CR-02b)
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -673,7 +676,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                     <th className="py-3.5 px-4">Pelanggan / Penerima</th>
                     <th className="py-3.5 px-4">Tipe & Ref</th>
                     <th className="py-3.5 px-4">Ekspedisi & Driver</th>
-                    <th className="py-3.5 px-4">Pelaku (Dibuat / Dikemas)</th>
+                    <th className="py-3.5 px-4">Pelaku (Dibuat / Disetujui / Dikemas / Dikirim)</th>
                     <th className="py-3.5 px-4">Status</th>
                     <th className="py-3.5 px-4 text-right">Aksi Outbound</th>
                   </tr>
@@ -723,6 +726,9 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                         </td>
                         <td className="py-3.5 px-4 text-[11px] text-slate-600">
                           <div>Buat: <span className="font-medium text-slate-800">{order.created_by_name || "Admin"}</span></div>
+                          {order.confirmed_by_name && (
+                            <div className="text-indigo-700">Setuju: <span className="font-medium">{order.confirmed_by_name}</span></div>
+                          )}
                           {order.packed_by_name && (
                             <div className="text-emerald-700">Kemas: <span className="font-medium">{order.packed_by_name}</span></div>
                           )}
@@ -741,6 +747,14 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1 flex-wrap">
+                            <button
+                              onClick={() => setSelectedDoForAudit(order)}
+                              title="Lihat Riwayat Aktivitas & Jejak Audit (CR-05b)"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-[11px] font-medium shadow-2xs"
+                            >
+                              <History className="h-3 w-3 text-indigo-600" />
+                              Riwayat
+                            </button>
                             <button
                               onClick={() => handleOpenPrint(order)}
                               title="Cetak Surat Jalan A4"
@@ -799,6 +813,31 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
           )}
         </div>
       </div>
+
+      {/* ── Activity Timeline & Audit Drawer (CR-05b) ── */}
+      {selectedDoForAudit && (
+        <ActivityTimelineDrawer
+          isOpen={!!selectedDoForAudit}
+          onClose={() => setSelectedDoForAudit(null)}
+          title={selectedDoForAudit.do_number}
+          subtitle={`Surat Jalan Keluar (${selectedDoForAudit.order_type || "DIRECT_DO"})`}
+          entityType="delivery_order"
+          entityId={selectedDoForAudit.id}
+          actors={{
+            created_by_name: selectedDoForAudit.created_by_name || "Admin Pembuat",
+            created_at: selectedDoForAudit.created_at,
+            confirmed_by_name: selectedDoForAudit.confirmed_by_name,
+            packed_by_name: selectedDoForAudit.packed_by_name,
+            dispatched_by_name: selectedDoForAudit.dispatched_by_name,
+          }}
+          metadata={{
+            status: selectedDoForAudit.status,
+            reference_type: selectedDoForAudit.order_type,
+            reference_number: selectedDoForAudit.sales_order_id || selectedDoForAudit.tracking_number,
+            product_name: selectedDoForAudit.customer_name || selectedDoForAudit.recipient_name,
+          }}
+        />
+      )}
 
       {/* ── In-App Confirmation Modal for Dispatch (replaces confirm/alert) ── */}
       {orderToDispatch && (
