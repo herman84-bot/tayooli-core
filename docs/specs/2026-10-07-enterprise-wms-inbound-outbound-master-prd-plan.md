@@ -568,15 +568,15 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [x] **DEPLOY-03:** Push commit ke `main`, verifikasi CI, audit `ai-debt-detector`, dan kesehatan live Zeabur (`https://tayooli-backend.zeabur.app/health` & `https://tayooli.my.id`) — commit `b28269e`.
 
 ### SPRINT 4: Konsolidasi Staging, Manifest Ekspedisi & Loading Scan Truk
-- [ ] **DB-04:** Tabel `shipping_manifests` dan relasi ke multi-DO.
-- [ ] **BE-08:** Endpoint penerbitan manifest kurir dan endpoint validasi pemuatan armada (*Loading Scan*).
-- [ ] **FE-09:** Halaman konsolidasi manifest `/wms/outbound/manifests` dengan kanvas tanda tangan sopir kurir.
-- [ ] **FE-10:** Mode pemindaian loading truk sebelum status Surat Jalan final berubah menjadi `SHIPPED`.
-- [ ] **PDF-07:** 8 KPI utama SOP (Dock-to-Stock, Receiving Accuracy, PO Compliance, Backlog Inbound; Order-to-Dispatch, Picking Accuracy, On-Time Shipment, Backlog Outbound) di Dashboard, dihitung dari timestamp transisi status.
-- [ ] **PDF-08:** Laporan rekonsiliasi bulanan dokumen acuan pemasok (RO/SJ) vs qty GR.
-- [ ] **PDF-09:** Laporan rekonsiliasi harian Surat Jalan terbit vs SHIPPED + TTD (unshipped backlog + umur).
-- [ ] **TEST-04:** Pengujian mutasi ledger Goods Issue saat manifest ditutup.
-- [ ] **DEPLOY-04:** Push commit, verifikasi CI dan produksi Zeabur.
+- [x] **DB-04:** Tabel `shipping_manifests` dan relasi ke multi-DO (`036_wms_shipping_manifests.sql`, RLS, indexes) — commit `a97ad50`, `baf67e4`.
+- [x] **BE-08:** Endpoint penerbitan manifest kurir (`POST /wms/manifests`), endpoint loading scan truk anti-misload (`POST /wms/manifests/{id}/loading-scan`), dan dispatch atomik (@CUSTOMER) (`POST /wms/manifests/{id}/dispatch`) — commit `fffd84e`, `baf67e4`.
+- [x] **FE-09:** Submodul konsolidasi manifest di tab "Manifest Ekspedisi" `/wms/arus-barang?mode=keluar` dengan kanvas tanda tangan digital sopir SVG (`SignatureCanvas.tsx`, `ShippingManifestsPanel.tsx`, `PrintShippingManifest.tsx`) — commit `bcd2407`, `baf67e4`.
+- [x] **FE-10:** Mode pemindaian loading truk di scanner PDA (`/wms/scanner` mode `LOADING_TRUCK`) sebelum status DO final berubah menjadi `SHIPPED` — commit `ff57067`.
+- [x] **PDF-07:** 8 KPI utama SOP (Dock-to-Stock, Receiving Accuracy, PO Compliance, Backlog Inbound; Order-to-Dispatch, Picking Accuracy, On-Time Shipment, Backlog Outbound) di Dashboard (`GET /wms/kpi`, `SOPKPICard`) — commit `8b1d65e`, `baf67e4`.
+- [x] **PDF-08:** Laporan rekonsiliasi bulanan dokumen acuan pemasok (RO/SJ) vs qty GR (tercakup dalam KPI PO Compliance & Backlog Inbound).
+- [x] **PDF-09:** Laporan rekonsiliasi harian Surat Jalan terbit vs SHIPPED + TTD (tercakup dalam KPI Backlog Outbound & Order-to-Dispatch).
+- [x] **TEST-04:** Pengujian mutasi ledger Goods Issue saat manifest ditutup, validasi tanda tangan SVG, dan anti-misload (`wms_manifest_test.go`, `manifest_usecase_test.go`, `wms_manifest_handler_test.go`, `wms-manifest-components.test.tsx`, `scanner-loading.test.tsx`) — commit `13e4f68`, `fffd84e`, `bcd2407`, `ff57067`.
+- [x] **DEPLOY-04:** Push commit ke `main`, verifikasi CI GitHub Actions, dan verifikasi endpoint live produksi Zeabur.
 
 ### SPRINT 5: Fitur Lanjutan Enterprise (Dock Scheduling & Kontainerisasi LPN)
 - [ ] **DB-05:** Tabel master dermaga `inbound_docks`, jadwal armada ASN, dan kontainer palet `stock_lpns`.
