@@ -23,12 +23,21 @@ import {
   Barcode as BarcodeIcon,
   Store,
   Box,
+  Truck,
+  FileCheck,
+  Check,
+  XCircle,
 } from "lucide-react"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
 import { useResolveBarcode, useWarehouseLocations } from "@/hooks/useWMS"
+import {
+  useShippingManifests,
+  useShippingManifestDetail,
+  useScanLoadingDO,
+} from "@/hooks/useWMSManifests"
 import { ResolvedProduct } from "@/lib/api"
 
-type ScannerMode = "PUTAWAY" | "OUTBOUND" | "PRICE_CHECK"
+type ScannerMode = "PUTAWAY" | "OUTBOUND" | "PRICE_CHECK" | "LOADING_TRUCK"
 
 export default function BarcodeScannerPage() {
   const [mode, setMode] = useState<ScannerMode>("PUTAWAY")
@@ -54,6 +63,23 @@ export default function BarcodeScannerPage() {
   const [expectedSku, setExpectedSku] = useState<string>("SKU-ROJO-10K")
   const [verificationStatus, setVerificationStatus] = useState<"IDLE" | "MATCH" | "MISMATCH">("IDLE")
 
+  // State for LOADING_TRUCK mode
+  const [selectedManifestId, setSelectedManifestId] = useState<string | null>(null)
+  const [loadingScanResult, setLoadingScanResult] = useState<{
+    success: boolean
+    message: string
+    scannedDoNumber?: string
+  } | null>(null)
+
+  // Manifests queries and mutations for LOADING_TRUCK mode
+  const { data: allManifests = [] } = useShippingManifests()
+  const activeManifests = useMemo(
+    () => allManifests.filter((m) => m.status === "STAGED" || m.status === "LOADED"),
+    [allManifests]
+  )
+  const { data: manifestDetail } = useShippingManifestDetail(selectedManifestId || undefined)
+  const scanLoadingMutation = useScanLoadingDO()
+
   // Query product resolution
   const { data: resolvedProduct, isFetching: resolving, isError: resolveError } = useResolveBarcode(
     activeCode || null
@@ -67,6 +93,45 @@ export default function BarcodeScannerPage() {
     (code: string) => {
       setLastScannedCode(code)
       setActiveCode(code)
+
+      // Truck Loading Mode Logic
+      if (mode === "LOADING_TRUCK") {
+        if (!selectedManifestId) {
+          playTone("error")
+          setLoadingScanResult({
+            success: false,
+            message: "Pilih manifest tujuan terlebih dahulu",
+          })
+          return
+        }
+
+        scanLoadingMutation.mutate(
+          { manifestId: selectedManifestId, barcode: code },
+          {
+            onSuccess: () => {
+              playTone("success")
+              setLoadingScanResult({
+                success: true,
+                message: `Surat Jalan [${code}] berhasil dimuat ke armada!`,
+                scannedDoNumber: code,
+              })
+            },
+            onError: (err: unknown) => {
+              playTone("error")
+              const errMsg =
+                err instanceof Error && err.message
+                  ? err.message
+                  : `MISLOAD: Barcode tidak terdaftar dalam manifest ini!`
+              setLoadingScanResult({
+                success: false,
+                message: errMsg,
+                scannedDoNumber: code,
+              })
+            },
+          }
+        )
+        return
+      }
 
       // Inbound Putaway Mode Logic: Step 1 (Rack) -> Step 2 (Product)
       if (mode === "PUTAWAY") {
@@ -101,7 +166,7 @@ export default function BarcodeScannerPage() {
         }
       }
     },
-    [mode, putawayRack, locations, expectedSku]
+    [mode, selectedManifestId, scanLoadingMutation, putawayRack, locations, expectedSku]
   )
 
   const { triggerScan, playTone } = useBarcodeScanner({
@@ -260,7 +325,7 @@ export default function BarcodeScannerPage() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-5 space-y-5">
         {/* ── Mode Switcher Pills (min 48px touch target) ── */}
-        <div className="bg-white p-1.5 rounded-xl border border-[#E2E8F0] grid grid-cols-3 gap-1 shadow-xs">
+        <div className="bg-white p-1.5 rounded-xl border border-[#E2E8F0] grid grid-cols-2 sm:grid-cols-4 gap-1 shadow-xs">
           <button
             type="button"
             onClick={() => {
@@ -296,6 +361,22 @@ export default function BarcodeScannerPage() {
 
           <button
             type="button"
+            onClick={() => {
+              setMode("LOADING_TRUCK")
+              setLoadingScanResult(null)
+            }}
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
+              mode === "LOADING_TRUCK"
+                ? "bg-[#2563EB] text-white shadow-xs"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <Truck className="w-4 h-4 shrink-0" />
+            <span className="truncate">Truck (Loading Truk)</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setMode("PRICE_CHECK")}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
               mode === "PRICE_CHECK"
@@ -323,6 +404,12 @@ export default function BarcodeScannerPage() {
                 <span>
                   <strong>Verifikasi Keluar:</strong> Scan item untuk mencocokkan dengan Surat Jalan / Picking
                   Order.
+                </span>
+              )}
+              {mode === "LOADING_TRUCK" && (
+                <span>
+                  <strong>Pemuatan Armada:</strong> Pilih nomor manifest pengiriman, kemudian scan barcode
+                  Surat Jalan (DO) saat dimuat ke truk.
                 </span>
               )}
               {mode === "PRICE_CHECK" && (
@@ -429,6 +516,170 @@ export default function BarcodeScannerPage() {
                   </div>
                   <div className="text-xs text-rose-700">
                     Barang [{lastScannedCode}] tidak sesuai dengan target order ({expectedSku}).
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Truck Loading Mode: Manifest Selector & Status Banner ── */}
+        {mode === "LOADING_TRUCK" && (
+          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs space-y-4">
+            <div>
+              <label
+                htmlFor="manifest-select"
+                className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+              >
+                Pilih Manifest Pengiriman (Armada / Truk)
+              </label>
+              <select
+                id="manifest-select"
+                value={selectedManifestId || ""}
+                onChange={(e) => {
+                  setSelectedManifestId(e.target.value || null)
+                  setLoadingScanResult(null)
+                }}
+                className="w-full min-h-[48px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-medium"
+              >
+                <option value="">-- Pilih Manifest Aktif (STAGED / LOADED) --</option>
+                {activeManifests.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.manifest_number} — {m.expedition_name} ({m.vehicle_plate}) — [{m.status}]
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Recent scan feedback banner */}
+            {loadingScanResult && (
+              <div
+                className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-all ${
+                  loadingScanResult.success
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-900"
+                    : "bg-rose-50 border-rose-500 text-rose-900"
+                }`}
+              >
+                <div
+                  className={`p-2 rounded-full ${
+                    loadingScanResult.success
+                      ? "bg-emerald-200 text-emerald-800"
+                      : "bg-rose-200 text-rose-800"
+                  }`}
+                >
+                  {loadingScanResult.success ? (
+                    <CheckCircle2 className="w-6 h-6" />
+                  ) : (
+                    <AlertCircle className="w-6 h-6" />
+                  )}
+                </div>
+                <div>
+                  <div className="text-sm font-bold">
+                    {loadingScanResult.success ? "BERHASIL DIMUAT" : "PERINGATAN MISLOAD"}
+                  </div>
+                  <div className="text-xs mt-0.5">{loadingScanResult.message}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Selected Manifest Detail Cards & DO Checklist */}
+            {manifestDetail && (
+              <div className="space-y-4 pt-2 border-t border-slate-100">
+                {/* Manifest Metadata */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs">
+                  <div>
+                    <div className="text-slate-500">No. Manifest:</div>
+                    <div className="font-mono font-bold text-slate-900 mt-0.5">
+                      {manifestDetail.manifest.manifest_number}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Ekspedisi:</div>
+                    <div className="font-semibold text-slate-900 mt-0.5">
+                      {manifestDetail.manifest.expedition_name}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Sopir:</div>
+                    <div className="font-semibold text-slate-900 mt-0.5">
+                      {manifestDetail.manifest.driver_name}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Armada:</div>
+                    <div className="font-mono font-bold text-slate-900 mt-0.5">
+                      {manifestDetail.manifest.vehicle_plate}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress counter & Visual Progress Bar */}
+                {(() => {
+                  const items = manifestDetail.items || []
+                  const total = items.length
+                  const scannedCount = items.filter((it) => it.scanned).length
+                  const pct = total > 0 ? Math.round((scannedCount / total) * 100) : 0
+
+                  return (
+                    <div className="space-y-1.5 bg-blue-50/50 p-3.5 rounded-lg border border-blue-100">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                        <span>Progress Pemuatan:</span>
+                        <span className="font-mono text-sm font-bold text-blue-700">
+                          {scannedCount} dari {total} Koli Termuat ({pct}%)
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* List of DOs in manifest with badges */}
+                <div className="space-y-2">
+                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Daftar Surat Jalan (DO) Dalam Manifest:
+                  </div>
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                    {(manifestDetail.items || []).map((item) => (
+                      <div
+                        key={item.delivery_order_id}
+                        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-colors ${
+                          item.scanned
+                            ? "bg-emerald-50/60 border-emerald-200"
+                            : "bg-white border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {item.scanned ? (
+                            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Box className="w-4 h-4 text-slate-400 shrink-0" />
+                          )}
+                          <div>
+                            <span className="font-mono font-bold text-slate-800">
+                              {item.do_number}
+                            </span>
+                            <span className="text-slate-500 ml-2">({item.customer_name})</span>
+                          </div>
+                        </div>
+
+                        <div>
+                          {item.scanned ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                              Dimuat
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600">
+                              Belum Dimuat
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

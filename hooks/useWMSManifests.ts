@@ -64,10 +64,13 @@ export function useCreateShippingManifest() {
 export function useScanLoadingDO() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, barcode }: { id: string; barcode: string }) =>
-      api.wms.manifests.scanLoading(id, barcode),
+    mutationFn: (variables: { manifestId: string; barcode: string } | { id: string; barcode: string }) => {
+      const manifestId = "manifestId" in variables ? variables.manifestId : variables.id
+      return api.wms.manifests.scanLoading(manifestId, variables.barcode)
+    },
     onSuccess: (_data, variables) => {
-      qc.invalidateQueries({ queryKey: ["shipping-manifest", variables.id] })
+      const manifestId = "manifestId" in variables ? variables.manifestId : variables.id
+      qc.invalidateQueries({ queryKey: ["shipping-manifest", manifestId] })
       qc.invalidateQueries({ queryKey: ["shipping-manifests"] })
     },
   })
