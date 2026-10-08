@@ -357,6 +357,18 @@ func (m *mockWMSUsecase) ScanPackStationItem(ctx context.Context, tenantID, user
 func (m *mockWMSUsecase) CompletePackStation(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackCompleteRequest) (*domain.DeliveryOrder, error) {
 	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusPacked}, nil
 }
+func (m *mockWMSUsecase) CreatePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreatePickWaveRequest) (*domain.PickWave, error) {
+	return &domain.PickWave{ID: uuid.New(), WarehouseID: req.WarehouseID, OrderType: req.OrderType, Status: domain.PickWaveStatusOpen}, nil
+}
+func (m *mockWMSUsecase) ListPickWaves(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, orderType, expeditionName *string, status *domain.PickWaveStatus) ([]domain.PickWave, error) {
+	return []domain.PickWave{}, nil
+}
+func (m *mockWMSUsecase) GetPickWaveByID(ctx context.Context, tenantID, userID uuid.UUID, role string, waveID uuid.UUID) (*domain.PickWaveDetail, error) {
+	return &domain.PickWaveDetail{Wave: domain.PickWave{ID: waveID}}, nil
+}
+func (m *mockWMSUsecase) ReleasePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, waveID uuid.UUID, pickerID *uuid.UUID) (*domain.PickWave, error) {
+	return &domain.PickWave{ID: waveID, Status: domain.PickWaveStatusReleased}, nil
+}
 
 func withWMSAuth(r *http.Request, tenantID, userID uuid.UUID, role string) *http.Request {
 	ctx := context.WithValue(r.Context(), appMiddleware.TenantIDKey, tenantID)

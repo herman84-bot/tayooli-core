@@ -76,6 +76,22 @@ func (m *mockWMSRepo) CompleteDOPacking(ctx context.Context, tenantID, doID, use
 	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusPacked}, nil
 }
 
+func (m *mockWMSRepo) CreatePickWave(ctx context.Context, tenantID uuid.UUID, createdBy *uuid.UUID, req domain.CreatePickWaveRequest) (*domain.PickWave, error) {
+	return &domain.PickWave{ID: uuid.New(), WarehouseID: req.WarehouseID, OrderType: req.OrderType, Status: domain.PickWaveStatusOpen}, nil
+}
+
+func (m *mockWMSRepo) ListPickWaves(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, orderType, expeditionName *string, status *domain.PickWaveStatus) ([]domain.PickWave, error) {
+	return []domain.PickWave{}, nil
+}
+
+func (m *mockWMSRepo) GetPickWaveByID(ctx context.Context, tenantID, waveID uuid.UUID) (*domain.PickWaveDetail, error) {
+	return &domain.PickWaveDetail{Wave: domain.PickWave{ID: waveID}}, nil
+}
+
+func (m *mockWMSRepo) ReleasePickWave(ctx context.Context, tenantID, waveID uuid.UUID, pickerID *uuid.UUID) (*domain.PickWave, error) {
+	return &domain.PickWave{ID: waveID, Status: domain.PickWaveStatusReleased}, nil
+}
+
 func TestQCUsecase(t *testing.T) {
 	ctx := context.Background()
 	tenantID, adminID, outsiderID := uuid.New(), uuid.New(), uuid.New()

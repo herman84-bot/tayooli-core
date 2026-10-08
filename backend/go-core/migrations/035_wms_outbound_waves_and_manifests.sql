@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS pick_waves (
     wave_number        VARCHAR(100) NOT NULL,
     order_type         VARCHAR(50) NOT NULL DEFAULT 'DIRECT_DO'
                        CHECK (order_type IN ('DIRECT_DO', 'SALES_ORDER', 'MARKETPLACE', 'TRANSFER')),
+    expedition_name    VARCHAR(100) NULL,
+    route_zone         VARCHAR(100) NULL,
     status             VARCHAR(50) NOT NULL DEFAULT 'OPEN'
                        CHECK (status IN ('OPEN', 'RELEASED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
     picker_id          UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -48,6 +50,10 @@ CREATE TABLE IF NOT EXISTS pick_waves (
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (tenant_id, wave_number)
 );
+
+ALTER TABLE pick_waves ADD COLUMN IF NOT EXISTS expedition_name VARCHAR(100);
+ALTER TABLE pick_waves ADD COLUMN IF NOT EXISTS route_zone VARCHAR(100);
+CREATE INDEX IF NOT EXISTS idx_pick_waves_route ON pick_waves(tenant_id, order_type, expedition_name);
 
 ALTER TABLE pick_waves ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pick_waves FORCE ROW LEVEL SECURITY;

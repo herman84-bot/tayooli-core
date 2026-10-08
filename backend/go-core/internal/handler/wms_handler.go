@@ -102,6 +102,10 @@ type WMSUsecase interface {
 	ReportPickingShortage(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.ShortageReportRequest) (*domain.ShortageTicket, error)
 	ScanPackStationItem(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackScanRequest) (*domain.PackScanResult, error)
 	CompletePackStation(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackCompleteRequest) (*domain.DeliveryOrder, error)
+	CreatePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreatePickWaveRequest) (*domain.PickWave, error)
+	ListPickWaves(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, orderType, expeditionName *string, status *domain.PickWaveStatus) ([]domain.PickWave, error)
+	GetPickWaveByID(ctx context.Context, tenantID, userID uuid.UUID, role string, waveID uuid.UUID) (*domain.PickWaveDetail, error)
+	ReleasePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, waveID uuid.UUID, pickerID *uuid.UUID) (*domain.PickWave, error)
 	ReleaseStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, error)
 	GetWMSSettings(ctx context.Context, tenantID, userID uuid.UUID, role string) (*domain.WMSSettings, error)
 	UpdateWMSSettings(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.UpdateWMSSettingsRequest) (*domain.WMSSettings, error)
@@ -150,6 +154,12 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Post("/delivery-orders/{id}/picking/shortage", h.ReportPickingShortage)
 		r.Post("/delivery-orders/{id}/pack/scan", h.ScanPackStationItem)
 		r.Post("/delivery-orders/{id}/pack/complete", h.CompletePackStation)
+
+		// Pick Waves (PDF-05, OCA §1.3)
+		r.Get("/pick-waves", h.ListPickWaves)
+		r.Post("/pick-waves", h.CreatePickWave)
+		r.Get("/pick-waves/{id}", h.GetPickWave)
+		r.Post("/pick-waves/{id}/release", h.ReleasePickWave)
 
 		// Stock Opnames
 		r.Get("/opnames", h.ListStockOpnames)

@@ -18,6 +18,8 @@ var (
 	ErrPackQtyExceeded       = errors.New("jumlah pemindaian melebihi sisa yang harus dikemas")
 	ErrPickingTaskNotFound   = errors.New("dokumen picking task tidak ditemukan")
 	ErrPickingItemNotFound   = errors.New("item picking tidak ditemukan")
+	ErrPickWaveNotFound      = errors.New("gelombang pengambilan (pick wave) tidak ditemukan")
+	ErrNoOrdersForWave       = errors.New("tidak ada pesanan yang cocok untuk dibuatkan pick wave")
 )
 
 type PickingTaskStatus string
@@ -148,6 +150,56 @@ type ShortageReportRequest struct {
 	Reason     string          `json:"reason"`
 }
 
+// PickWaveStatus represents the lifecycle of a wave picking batch.
+type PickWaveStatus string
+
+const (
+	PickWaveStatusOpen       PickWaveStatus = "OPEN"
+	PickWaveStatusReleased   PickWaveStatus = "RELEASED"
+	PickWaveStatusInProgress PickWaveStatus = "IN_PROGRESS"
+	PickWaveStatusCompleted  PickWaveStatus = "COMPLETED"
+	PickWaveStatusCancelled  PickWaveStatus = "CANCELLED"
+)
+
+// PickWave represents a wave release grouping multiple orders by route/courier and type (PDF-05, OCA §1.3).
+type PickWave struct {
+	ID             uuid.UUID      `json:"id"`
+	TenantID       uuid.UUID      `json:"tenant_id"`
+	WarehouseID    uuid.UUID      `json:"warehouse_id"`
+	WarehouseName  *string        `json:"warehouse_name,omitempty"`
+	WaveNumber     string         `json:"wave_number"`
+	OrderType      string         `json:"order_type"` // DIRECT_DO, SALES_ORDER, MARKETPLACE, TRANSFER
+	ExpeditionName *string        `json:"expedition_name,omitempty"`
+	RouteZone      *string        `json:"route_zone,omitempty"`
+	Status         PickWaveStatus `json:"status"`
+	PickerID       *uuid.UUID     `json:"picker_id,omitempty"`
+	PickerName     *string        `json:"picker_name,omitempty"`
+	CreatedBy      *uuid.UUID     `json:"created_by,omitempty"`
+	CreatedByName  *string        `json:"created_by_name,omitempty"`
+	StartedAt      *time.Time     `json:"started_at,omitempty"`
+	CompletedAt    *time.Time     `json:"completed_at,omitempty"`
+	Notes          *string        `json:"notes,omitempty"`
+	TotalOrders    int            `json:"total_orders"`
+	TotalLines     int            `json:"total_lines"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+type CreatePickWaveRequest struct {
+	WarehouseID      uuid.UUID   `json:"warehouse_id"`
+	OrderType        string      `json:"order_type"` // DIRECT_DO, SALES_ORDER, MARKETPLACE, TRANSFER
+	ExpeditionName   *string     `json:"expedition_name,omitempty"`
+	RouteZone        *string     `json:"route_zone,omitempty"`
+	PickerID         *uuid.UUID  `json:"picker_id,omitempty"`
+	Notes            *string     `json:"notes,omitempty"`
+	DeliveryOrderIDs []uuid.UUID `json:"delivery_order_ids,omitempty"`
+}
+
+type PickWaveDetail struct {
+	Wave         PickWave            `json:"wave"`
+	PickingTasks []PickingTaskDetail `json:"picking_tasks"`
+}
+
 // WMSOutboundRepository defines the persistence port for Sprint 3 outbound operations.
 type WMSOutboundRepository interface {
 	GetOrCreatePickingTask(ctx context.Context, tenantID uuid.UUID, doID uuid.UUID) (*PickingTaskDetail, error)
@@ -156,4 +208,8 @@ type WMSOutboundRepository interface {
 	RecordPickingItemProgress(ctx context.Context, tenantID, taskItemID uuid.UUID, pickedQty decimal.Decimal) error
 	UpdateDOPackScan(ctx context.Context, tenantID, doID, itemID uuid.UUID, addPackedQty decimal.Decimal) (*DeliveryOrderItem, error)
 	CompleteDOPacking(ctx context.Context, tenantID, doID, userID uuid.UUID, req PackCompleteRequest) (*DeliveryOrder, error)
+	CreatePickWave(ctx context.Context, tenantID uuid.UUID, createdBy *uuid.UUID, req CreatePickWaveRequest) (*PickWave, error)
+	ListPickWaves(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, orderType, expeditionName *string, status *PickWaveStatus) ([]PickWave, error)
+	GetPickWaveByID(ctx context.Context, tenantID, waveID uuid.UUID) (*PickWaveDetail, error)
+	ReleasePickWave(ctx context.Context, tenantID, waveID uuid.UUID, pickerID *uuid.UUID) (*PickWave, error)
 }

@@ -286,3 +286,33 @@ func (u *Usecase) CompletePackStation(ctx context.Context, tenantID, userID uuid
 	}
 	return packedDO, nil
 }
+
+// CreatePickWave groups multiple DOs into a single pick wave by order type and route/courier (PDF-05, OCA §1.3).
+func (u *Usecase) CreatePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreatePickWaveRequest) (*domain.PickWave, error) {
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.WarehouseID); err != nil {
+		return nil, err
+	}
+	return u.repo.CreatePickWave(ctx, tenantID, &userID, req)
+}
+
+// ListPickWaves retrieves waves matching filters.
+func (u *Usecase) ListPickWaves(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, orderType, expeditionName *string, status *domain.PickWaveStatus) ([]domain.PickWave, error) {
+	return u.repo.ListPickWaves(ctx, tenantID, warehouseID, orderType, expeditionName, status)
+}
+
+// GetPickWaveByID retrieves detailed wave information including all picking tasks.
+func (u *Usecase) GetPickWaveByID(ctx context.Context, tenantID, userID uuid.UUID, role string, waveID uuid.UUID) (*domain.PickWaveDetail, error) {
+	return u.repo.GetPickWaveByID(ctx, tenantID, waveID)
+}
+
+// ReleasePickWave releases a wave and transitions its picking tasks to IN_PROGRESS.
+func (u *Usecase) ReleasePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, waveID uuid.UUID, pickerID *uuid.UUID) (*domain.PickWave, error) {
+	detail, err := u.repo.GetPickWaveByID(ctx, tenantID, waveID)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, detail.Wave.WarehouseID); err != nil {
+		return nil, err
+	}
+	return u.repo.ReleasePickWave(ctx, tenantID, waveID, pickerID)
+}

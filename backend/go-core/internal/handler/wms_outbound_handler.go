@@ -211,3 +211,119 @@ func (h *WMSHandler) CompletePackStation(w http.ResponseWriter, r *http.Request)
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"data": res})
 }
+
+func (h *WMSHandler) CreatePickWave(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	var req domain.CreatePickWaveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	wave, err := h.uc.CreatePickWave(r.Context(), tenantID, userID, role, req)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusCreated, map[string]any{"data": wave})
+}
+
+func (h *WMSHandler) ListPickWaves(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	var warehouseID *uuid.UUID
+	if whStr := r.URL.Query().Get("warehouse_id"); whStr != "" {
+		if id, err := uuid.Parse(whStr); err == nil {
+			warehouseID = &id
+		}
+	}
+	var orderType *string
+	if ot := r.URL.Query().Get("order_type"); ot != "" {
+		orderType = &ot
+	}
+	var expName *string
+	if exp := r.URL.Query().Get("expedition_name"); exp != "" {
+		expName = &exp
+	}
+	var status *domain.PickWaveStatus
+	if st := r.URL.Query().Get("status"); st != "" {
+		s := domain.PickWaveStatus(st)
+		status = &s
+	}
+
+	waves, err := h.uc.ListPickWaves(r.Context(), tenantID, userID, role, warehouseID, orderType, expName, status)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"data": waves})
+}
+
+func (h *WMSHandler) GetPickWave(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	waveID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid wave id")
+		return
+	}
+
+	detail, err := h.uc.GetPickWaveByID(r.Context(), tenantID, userID, role, waveID)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"data": detail})
+}
+
+func (h *WMSHandler) ReleasePickWave(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	waveID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid wave id")
+		return
+	}
+
+	var req struct {
+		PickerID *uuid.UUID `json:"picker_id"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	pickerID := req.PickerID
+	if pickerID == nil {
+		pickerID = &userID
+	}
+
+	wave, err := h.uc.ReleasePickWave(r.Context(), tenantID, userID, role, waveID, pickerID)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"data": wave})
+}

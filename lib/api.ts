@@ -517,6 +517,43 @@ export interface PickingTaskDetail {
   delivery_order: DeliveryOrder
 }
 
+export interface PickWave {
+  id: string
+  warehouse_id: string
+  warehouse_name?: string
+  wave_number: string
+  order_type: "DIRECT_DO" | "SALES_ORDER" | "MARKETPLACE" | "TRANSFER"
+  expedition_name?: string | null
+  route_zone?: string | null
+  status: "OPEN" | "RELEASED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
+  picker_id?: string | null
+  picker_name?: string | null
+  created_by?: string | null
+  created_by_name?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  notes?: string | null
+  total_orders: number
+  total_lines: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CreatePickWaveInput {
+  warehouse_id: string
+  order_type: string
+  expedition_name?: string
+  route_zone?: string
+  picker_id?: string
+  notes?: string
+  delivery_order_ids?: string[]
+}
+
+export interface PickWaveDetail {
+  wave: PickWave
+  picking_tasks: PickingTaskDetail[]
+}
+
 export interface Customer {
   id: string
   tenant_id?: string
@@ -1385,6 +1422,29 @@ export const api = {
         request<{ data: DeliveryOrder }>(`/wms/delivery-orders/${id}/pack/complete`, {
           method: "POST",
           body: JSON.stringify(payload),
+        }),
+    },
+    pickWaves: {
+      list: (params?: { warehouse_id?: string; order_type?: string; expedition_name?: string; status?: string }) => {
+        const q = new URLSearchParams()
+        if (params?.warehouse_id) q.set("warehouse_id", params.warehouse_id)
+        if (params?.order_type) q.set("order_type", params.order_type)
+        if (params?.expedition_name) q.set("expedition_name", params.expedition_name)
+        if (params?.status) q.set("status", params.status)
+        const qs = q.toString() ? `?${q.toString()}` : ""
+        return request<{ data: PickWave[] }>(`/wms/pick-waves${qs}`)
+      },
+      create: (payload: CreatePickWaveInput) =>
+        request<{ data: PickWave }>("/wms/pick-waves", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      get: (id: string) =>
+        request<{ data: PickWaveDetail }>(`/wms/pick-waves/${id}`),
+      release: (id: string, pickerId?: string) =>
+        request<{ data: PickWave }>(`/wms/pick-waves/${id}/release`, {
+          method: "POST",
+          body: JSON.stringify({ picker_id: pickerId }),
         }),
     },
     opnames: {

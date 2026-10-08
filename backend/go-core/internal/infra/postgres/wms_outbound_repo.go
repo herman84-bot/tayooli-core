@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -418,4 +419,308 @@ func (r *WMSRepo) CompleteDOPacking(ctx context.Context, tenantID, doID, userID 
 
 	do, _, err := r.GetDeliveryOrderByID(ctx, tenantID, doID)
 	return do, err
+}
+
+func (r *WMSRepo) CreatePickWave(ctx context.Context, tenantID uuid.UUID, createdBy *uuid.UUID, req domain.CreatePickWaveRequest) (*domain.PickWave, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.CreatePickWave: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.CreatePickWave: set tenant: %w", err)
+	}
+
+	orderType := strings.TrimSpace(req.OrderType)
+	if orderType == "" {
+		orderType = "DIRECT_DO"
+	}
+
+	doIDs := req.DeliveryOrderIDs
+	if len(doIDs) == 0 {
+		query := `
+			SELECT d.id
+			FROM delivery_orders d
+			WHERE d.tenant_id = $1
+			  AND d.warehouse_id = $2
+			  AND d.order_type = $3
+			  AND ($4::varchar IS NULL OR d.expedition_name = $4)
+			  AND d.status IN ('DRAFT', 'CONFIRMED')
+			  AND NOT EXISTS (
+			      SELECT 1 FROM picking_tasks pt
+			      WHERE pt.delivery_order_id = d.id AND pt.tenant_id = d.tenant_id AND pt.wave_id IS NOT NULL
+			  )
+			ORDER BY d.created_at ASC
+			LIMIT 50`
+		rows, err := tx.QueryContext(ctx, query, tenantID, req.WarehouseID, orderType, req.ExpeditionName)
+		if err != nil {
+			return nil, fmt.Errorf("WMSRepo.CreatePickWave: find eligible DOs: %w", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var id uuid.UUID
+			if err := rows.Scan(&id); err != nil {
+				return nil, err
+			}
+			doIDs = append(doIDs, id)
+		}
+		rows.Close()
+	}
+
+	if len(doIDs) == 0 {
+		return nil, domain.ErrNoOrdersForWave
+	}
+
+	waveID := uuid.New()
+	waveNum := fmt.Sprintf("WAVE-%s-%04d", time.Now().Format("20060102"), time.Now().UnixNano()%10000)
+
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO pick_waves
+			(id, tenant_id, warehouse_id, wave_number, order_type, expedition_name, route_zone, status, picker_id, created_by, notes, created_at, updated_at)
+		VALUES
+			($1, $2, $3, $4, $5, $6, $7, 'OPEN', $8, $9, $10, NOW(), NOW())`,
+		waveID, tenantID, req.WarehouseID, waveNum, orderType, req.ExpeditionName, req.RouteZone,
+		ptrToNullUUID(req.PickerID), ptrToNullUUID(createdBy), req.Notes)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.CreatePickWave: insert wave: %w", err)
+	}
+
+	for _, dID := range doIDs {
+		var ptID uuid.UUID
+		err := tx.QueryRowContext(ctx, `SELECT id FROM picking_tasks WHERE delivery_order_id = $1 AND tenant_id = $2`, dID, tenantID).Scan(&ptID)
+		if errors.Is(err, sql.ErrNoRows) {
+			var doNum string
+			if sErr := tx.QueryRowContext(ctx, `SELECT do_number FROM delivery_orders WHERE id = $1 AND tenant_id = $2`, dID, tenantID).Scan(&doNum); sErr == nil {
+				ptID = uuid.New()
+				taskNum := fmt.Sprintf("PICK-%s", doNum)
+				_, _ = tx.ExecContext(ctx, `
+					INSERT INTO picking_tasks (id, tenant_id, delivery_order_id, wave_id, task_number, status, created_at, updated_at)
+					VALUES ($1, $2, $3, $4, $5, 'PENDING', NOW(), NOW())`,
+					ptID, tenantID, dID, waveID, taskNum)
+			}
+		} else if err == nil {
+			_, _ = tx.ExecContext(ctx, `
+				UPDATE picking_tasks SET wave_id = $1, updated_at = NOW()
+				WHERE id = $2 AND tenant_id = $3`, waveID, ptID, tenantID)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return r.getPickWaveSummary(ctx, tenantID, waveID)
+}
+
+func (r *WMSRepo) getPickWaveSummary(ctx context.Context, tenantID, waveID uuid.UUID) (*domain.PickWave, error) {
+	var w domain.PickWave
+	var whName, expName, rZone, pName, cName, notes sql.NullString
+	var pID, cID sql.NullString
+	var startedAt, completedAt sql.NullTime
+
+	err := r.db.QueryRowContext(ctx, `
+		SELECT pw.id, pw.tenant_id, pw.warehouse_id, COALESCE(wh.name, ''),
+		       pw.wave_number, pw.order_type, pw.expedition_name, pw.route_zone,
+		       pw.status, pw.picker_id, COALESCE(u_pk.full_name, u_pk.email, ''),
+		       pw.created_by, COALESCE(u_cr.full_name, u_cr.email, ''),
+		       pw.started_at, pw.completed_at, pw.notes,
+		       (SELECT COUNT(DISTINCT pt.id) FROM picking_tasks pt WHERE pt.wave_id = pw.id AND pt.tenant_id = pw.tenant_id),
+		       (SELECT COUNT(pti.id) FROM picking_task_items pti JOIN picking_tasks pt ON pt.id = pti.task_id WHERE pt.wave_id = pw.id AND pt.tenant_id = pw.tenant_id),
+		       pw.created_at, pw.updated_at
+		FROM pick_waves pw
+		LEFT JOIN warehouses wh ON wh.id = pw.warehouse_id AND wh.tenant_id = pw.tenant_id
+		LEFT JOIN users u_pk ON u_pk.id = pw.picker_id AND u_pk.tenant_id = pw.tenant_id
+		LEFT JOIN users u_cr ON u_cr.id = pw.created_by AND u_cr.tenant_id = pw.tenant_id
+		WHERE pw.id = $1 AND pw.tenant_id = $2`, waveID, tenantID).Scan(
+		&w.ID, &w.TenantID, &w.WarehouseID, &whName,
+		&w.WaveNumber, &w.OrderType, &expName, &rZone,
+		&w.Status, &pID, &pName,
+		&cID, &cName,
+		&startedAt, &completedAt, &notes,
+		&w.TotalOrders, &w.TotalLines,
+		&w.CreatedAt, &w.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrPickWaveNotFound
+		}
+		return nil, fmt.Errorf("WMSRepo.getPickWaveSummary: %w", err)
+	}
+
+	w.WarehouseName = nullStringToPtr(whName)
+	w.ExpeditionName = nullStringToPtr(expName)
+	w.RouteZone = nullStringToPtr(rZone)
+	w.PickerID = nullUUIDToPtr(pID)
+	w.PickerName = nullStringToPtr(pName)
+	w.CreatedBy = nullUUIDToPtr(cID)
+	w.CreatedByName = nullStringToPtr(cName)
+	w.StartedAt = nullTimeToPtr(startedAt)
+	w.CompletedAt = nullTimeToPtr(completedAt)
+	w.Notes = nullStringToPtr(notes)
+
+	return &w, nil
+}
+
+func (r *WMSRepo) ListPickWaves(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, orderType, expeditionName *string, status *domain.PickWaveStatus) ([]domain.PickWave, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListPickWaves: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListPickWaves: set tenant: %w", err)
+	}
+
+	query := `
+		SELECT pw.id, pw.tenant_id, pw.warehouse_id, COALESCE(wh.name, ''),
+		       pw.wave_number, pw.order_type, pw.expedition_name, pw.route_zone,
+		       pw.status, pw.picker_id, COALESCE(u_pk.full_name, u_pk.email, ''),
+		       pw.created_by, COALESCE(u_cr.full_name, u_cr.email, ''),
+		       pw.started_at, pw.completed_at, pw.notes,
+		       (SELECT COUNT(DISTINCT pt.id) FROM picking_tasks pt WHERE pt.wave_id = pw.id AND pt.tenant_id = pw.tenant_id),
+		       (SELECT COUNT(pti.id) FROM picking_task_items pti JOIN picking_tasks pt ON pt.id = pti.task_id WHERE pt.wave_id = pw.id AND pt.tenant_id = pw.tenant_id),
+		       pw.created_at, pw.updated_at
+		FROM pick_waves pw
+		LEFT JOIN warehouses wh ON wh.id = pw.warehouse_id AND wh.tenant_id = pw.tenant_id
+		LEFT JOIN users u_pk ON u_pk.id = pw.picker_id AND u_pk.tenant_id = pw.tenant_id
+		LEFT JOIN users u_cr ON u_cr.id = pw.created_by AND u_cr.tenant_id = pw.tenant_id
+		WHERE pw.tenant_id = $1
+		  AND ($2::uuid IS NULL OR pw.warehouse_id = $2)
+		  AND ($3::varchar IS NULL OR pw.order_type = $3)
+		  AND ($4::varchar IS NULL OR pw.expedition_name = $4)
+		  AND ($5::varchar IS NULL OR pw.status = $5)
+		ORDER BY pw.created_at DESC`
+
+	var statStr *string
+	if status != nil {
+		s := string(*status)
+		statStr = &s
+	}
+
+	rows, err := tx.QueryContext(ctx, query, tenantID, ptrToNullUUID(warehouseID), orderType, expeditionName, statStr)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListPickWaves: query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.PickWave
+	for rows.Next() {
+		var w domain.PickWave
+		var whName, expName, rZone, pName, cName, notes sql.NullString
+		var pID, cID sql.NullString
+		var startedAt, completedAt sql.NullTime
+
+		if err := rows.Scan(
+			&w.ID, &w.TenantID, &w.WarehouseID, &whName,
+			&w.WaveNumber, &w.OrderType, &expName, &rZone,
+			&w.Status, &pID, &pName,
+			&cID, &cName,
+			&startedAt, &completedAt, &notes,
+			&w.TotalOrders, &w.TotalLines,
+			&w.CreatedAt, &w.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("WMSRepo.ListPickWaves: scan: %w", err)
+		}
+
+		w.WarehouseName = nullStringToPtr(whName)
+		w.ExpeditionName = nullStringToPtr(expName)
+		w.RouteZone = nullStringToPtr(rZone)
+		w.PickerID = nullUUIDToPtr(pID)
+		w.PickerName = nullStringToPtr(pName)
+		w.CreatedBy = nullUUIDToPtr(cID)
+		w.CreatedByName = nullStringToPtr(cName)
+		w.StartedAt = nullTimeToPtr(startedAt)
+		w.CompletedAt = nullTimeToPtr(completedAt)
+		w.Notes = nullStringToPtr(notes)
+
+		result = append(result, w)
+	}
+
+	return result, tx.Commit()
+}
+
+func (r *WMSRepo) GetPickWaveByID(ctx context.Context, tenantID, waveID uuid.UUID) (*domain.PickWaveDetail, error) {
+	wave, err := r.getPickWaveSummary(ctx, tenantID, waveID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT pt.delivery_order_id
+		FROM picking_tasks pt
+		WHERE pt.wave_id = $1 AND pt.tenant_id = $2
+		ORDER BY pt.task_number ASC`, waveID, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetPickWaveByID: find tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var doIDs []uuid.UUID
+	for rows.Next() {
+		var dID uuid.UUID
+		if err := rows.Scan(&dID); err != nil {
+			return nil, err
+		}
+		doIDs = append(doIDs, dID)
+	}
+	rows.Close()
+
+	var tasks []domain.PickingTaskDetail
+	for _, dID := range doIDs {
+		detail, err := r.GetPickingTaskByDO(ctx, tenantID, dID)
+		if err == nil && detail != nil {
+			tasks = append(tasks, *detail)
+		}
+	}
+
+	return &domain.PickWaveDetail{
+		Wave:         *wave,
+		PickingTasks: tasks,
+	}, nil
+}
+
+func (r *WMSRepo) ReleasePickWave(ctx context.Context, tenantID, waveID uuid.UUID, pickerID *uuid.UUID) (*domain.PickWave, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ReleasePickWave: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ReleasePickWave: set tenant: %w", err)
+	}
+
+	now := time.Now().UTC()
+	_, err = tx.ExecContext(ctx, `
+		UPDATE pick_waves
+		SET status = 'RELEASED',
+		    picker_id = COALESCE($3, picker_id),
+		    started_at = COALESCE(started_at, $4),
+		    updated_at = NOW()
+		WHERE id = $1 AND tenant_id = $2`,
+		waveID, tenantID, ptrToNullUUID(pickerID), now)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ReleasePickWave: update wave: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
+		UPDATE picking_tasks
+		SET status = 'IN_PROGRESS',
+		    picker_id = COALESCE($3, picker_id),
+		    started_at = COALESCE(started_at, $4),
+		    updated_at = NOW()
+		WHERE wave_id = $1 AND tenant_id = $2 AND status = 'PENDING'`,
+		waveID, tenantID, ptrToNullUUID(pickerID), now)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ReleasePickWave: update tasks: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return r.getPickWaveSummary(ctx, tenantID, waveID)
 }

@@ -197,3 +197,140 @@ func TestOutboundRealPostgres(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, remStock.Equal(dec(18)), "Initial was 30, dispatched 12, remaining must be 18")
 }
+
+func TestPickWaveGroupingRealPostgres(t *testing.T) {
+	adminDSN := os.Getenv("TAYOOLI_PG_INTEGRATION_DSN")
+	if adminDSN == "" {
+		t.Skip("set TAYOOLI_PG_INTEGRATION_DSN to run real PostgreSQL integration test")
+	}
+	ctx := context.Background()
+	admin, err := sql.Open("postgres", adminDSN)
+	require.NoError(t, err)
+	defer admin.Close()
+
+	repo := postgres.NewWMSRepo(admin)
+	uc := wmsuc.New(repo)
+
+	tenantID := uuid.New()
+	userID := uuid.New()
+	whID := uuid.New()
+
+	_, err = admin.ExecContext(ctx, `
+		INSERT INTO tenants (id, name, created_at, updated_at) VALUES ($1, 'Tenant Wave', NOW(), NOW())
+		ON CONFLICT (id) DO NOTHING`, tenantID)
+	require.NoError(t, err)
+
+	userEmail := fmt.Sprintf("wave-%s@tayooli.test", userID.String()[:8])
+	_, err = admin.ExecContext(ctx, `
+		INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at)
+		VALUES ($1, $2, $3, 'x', 'admin', NOW(), NOW())
+		ON CONFLICT (id) DO NOTHING`, userID, tenantID, userEmail)
+	require.NoError(t, err)
+
+	_, err = admin.ExecContext(ctx, `
+		INSERT INTO warehouses (id, tenant_id, code, name, created_at, updated_at)
+		VALUES ($1, $2, 'WH-WAVE', 'Gudang Wave Release', NOW(), NOW())
+		ON CONFLICT (id) DO NOTHING`, whID, tenantID)
+	require.NoError(t, err)
+
+	p1 := uuid.New()
+	p2 := uuid.New()
+	_, err = admin.ExecContext(ctx, `
+		INSERT INTO products (id, tenant_id, sku, name, price, created_at, updated_at)
+		VALUES ($1, $3, 'SKU-WAVE-1', 'Wave Product 1', 10000, NOW(), NOW()),
+		       ($2, $3, 'SKU-WAVE-2', 'Wave Product 2', 20000, NOW(), NOW())`, p1, p2, tenantID)
+	require.NoError(t, err)
+
+	rackLocID := uuid.New()
+	_, err = admin.ExecContext(ctx, `
+		INSERT INTO warehouse_locations (id, tenant_id, warehouse_id, code, name, type, created_at, updated_at)
+		VALUES ($1, $2, $3, 'BIN-WV-01', 'Bin Wave 1', 'INTERNAL', NOW(), NOW())`,
+		rackLocID, tenantID, whID)
+	require.NoError(t, err)
+
+	expJNE := "JNE"
+	expSiCepat := "SICEPAT"
+	routeJkt := "JABODETABEK"
+	otMarketplace := "MARKETPLACE"
+	otDirect := "DIRECT_DO"
+
+	do1, err := uc.CreateDeliveryOrder(ctx, tenantID, userID, "admin", wmsuc.CreateDeliveryOrderRequest{
+		WarehouseID:    whID,
+		OrderType:      &otMarketplace,
+		ExpeditionName: &expJNE,
+		DONumber:       "DO-WAVE-01",
+		Items: []wmsuc.CreateDeliveryOrderItemRequest{
+			{ProductID: p1, Quantity: decimal.NewFromInt(2), LocationID: rackLocID},
+		},
+	})
+	require.NoError(t, err)
+
+	do2, err := uc.CreateDeliveryOrder(ctx, tenantID, userID, "admin", wmsuc.CreateDeliveryOrderRequest{
+		WarehouseID:    whID,
+		OrderType:      &otMarketplace,
+		ExpeditionName: &expJNE,
+		DONumber:       "DO-WAVE-02",
+		Items: []wmsuc.CreateDeliveryOrderItemRequest{
+			{ProductID: p2, Quantity: decimal.NewFromInt(3), LocationID: rackLocID},
+		},
+	})
+	require.NoError(t, err)
+
+	do3, err := uc.CreateDeliveryOrder(ctx, tenantID, userID, "admin", wmsuc.CreateDeliveryOrderRequest{
+		WarehouseID:    whID,
+		OrderType:      &otDirect,
+		ExpeditionName: &expSiCepat,
+		DONumber:       "DO-WAVE-03",
+		Items: []wmsuc.CreateDeliveryOrderItemRequest{
+			{ProductID: p1, Quantity: decimal.NewFromInt(1), LocationID: rackLocID},
+		},
+	})
+	require.NoError(t, err)
+
+	// 1. Generate Wave grouped by MARKETPLACE and JNE (PDF-05)
+	wave, err := uc.CreatePickWave(ctx, tenantID, userID, "admin", domain.CreatePickWaveRequest{
+		WarehouseID:    whID,
+		OrderType:      "MARKETPLACE",
+		ExpeditionName: &expJNE,
+		RouteZone:      &routeJkt,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domain.PickWaveStatusOpen, wave.Status)
+	require.Equal(t, 2, wave.TotalOrders, "Should group DO 1 and DO 2, excluding DO 3")
+	require.Equal(t, "MARKETPLACE", wave.OrderType)
+	require.Equal(t, &expJNE, wave.ExpeditionName)
+
+	// 2. Fetch Wave Detail
+	detail, err := uc.GetPickWaveByID(ctx, tenantID, userID, "admin", wave.ID)
+	require.NoError(t, err)
+	require.Len(t, detail.PickingTasks, 2)
+	assertDOIDs := []uuid.UUID{detail.PickingTasks[0].DeliveryOrder.ID, detail.PickingTasks[1].DeliveryOrder.ID}
+	require.Contains(t, assertDOIDs, do1.ID)
+	require.Contains(t, assertDOIDs, do2.ID)
+	require.NotContains(t, assertDOIDs, do3.ID)
+
+	// 3. Release Wave
+	releasedWave, err := uc.ReleasePickWave(ctx, tenantID, userID, "admin", wave.ID, &userID)
+	require.NoError(t, err)
+	require.Equal(t, domain.PickWaveStatusReleased, releasedWave.Status)
+	require.Equal(t, &userID, releasedWave.PickerID)
+
+	// Verify linked picking tasks are now IN_PROGRESS
+	task1, err := uc.GetPickingTask(ctx, tenantID, userID, "admin", do1.ID)
+	require.NoError(t, err)
+	require.Equal(t, domain.PickingTaskStatusInProgress, task1.Task.Status)
+
+	// 4. Multi-tenancy isolation: Tenant B cannot list or access wave of Tenant A
+	tenantB := uuid.New()
+	_, err = admin.ExecContext(ctx, `
+		INSERT INTO tenants (id, name, created_at, updated_at) VALUES ($1, 'Tenant B Wave', NOW(), NOW())
+		ON CONFLICT (id) DO NOTHING`, tenantB)
+	require.NoError(t, err)
+
+	wavesB, err := uc.ListPickWaves(ctx, tenantB, userID, "admin", nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.Empty(t, wavesB)
+
+	_, err = uc.GetPickWaveByID(ctx, tenantB, userID, "admin", wave.ID)
+	require.ErrorIs(t, err, domain.ErrPickWaveNotFound)
+}

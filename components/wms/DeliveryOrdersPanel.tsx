@@ -45,6 +45,7 @@ import { PrintDeliveryOrder } from "@/components/wms/PrintDeliveryOrder"
 import { PrintPickingList } from "@/components/wms/PrintPickingList"
 import { PrintThermalAWB } from "@/components/wms/PrintThermalAWB"
 import { PackStationModal } from "@/components/wms/PackStationModal"
+import { WaveReleaseModal } from "@/components/wms/WaveReleaseModal"
 import { ExportModal, ExportButton, type ExportFilter } from "@/components/ui/ExportModal"
 import type { ExportColumn } from "@/lib/export"
 
@@ -112,6 +113,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
     order: DeliveryOrder
     items: DeliveryOrderItem[]
   } | null>(null)
+  const [isWaveModalOpen, setIsWaveModalOpen] = useState(false)
   const [loadingThermal, setLoadingThermal] = useState(false)
 
   // Quick Add Customer Modal State (CR-02b)
@@ -529,6 +531,15 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
               <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
             </button>
             <ExportButton onClick={() => setExporting(true)} disabled={deliveryOrders.length === 0} />
+
+            <button
+              onClick={() => setIsWaveModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-lg font-semibold text-xs border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95 transition-all shadow-xs"
+              title="Kelompokkan DO menjadi batch picking (Wave Release - PDF-05)"
+            >
+              <Layers className="h-4 w-4 text-indigo-600" />
+              <span>Wave Release (PDF-05)</span>
+            </button>
 
             <button
               onClick={handleOpenCreateModal}
@@ -1194,6 +1205,15 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
           onClose={() => setSelectedDoForThermal(null)}
         />
       )}
+
+      {/* ── Modal Wave Release Grouping (PDF-05) ── */}
+      <WaveReleaseModal
+        isOpen={isWaveModalOpen}
+        onClose={() => setIsWaveModalOpen(false)}
+        warehouses={warehouses}
+        defaultWarehouseId={selectedWarehouseFilter === "ALL" ? undefined : selectedWarehouseFilter}
+        onWaveUpdated={refetch}
+      />
 
       {/* ── Modal Cepat Tambah Pelanggan Baru (CR-02b) ── */}
       {showQuickCustomerModal && (
