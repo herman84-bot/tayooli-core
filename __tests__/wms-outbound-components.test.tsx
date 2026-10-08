@@ -6,12 +6,39 @@ import { PrintThermalAWB } from '@/components/wms/PrintThermalAWB'
 import { WaveReleaseModal } from '@/components/wms/WaveReleaseModal'
 import { WavePickingSubView } from '@/components/wms/WavePickingSubView'
 import { PackingStationSubView } from '@/components/wms/PackingStationSubView'
+import DeliveryOrdersPanel from '@/components/wms/DeliveryOrdersPanel'
 import { PickingTaskDetail, DeliveryOrder, DeliveryOrderItem } from '@/lib/api'
 
-// Mock useWarehouses
+// Mock useWarehouses and useWarehouseLocations
 jest.mock('@/hooks/useWMS', () => ({
   useWarehouses: () => ({
     data: [{ id: 'wh-1', code: 'WH-MAIN', name: 'Gudang Utama', is_active: true }],
+    isLoading: false,
+  }),
+  useWarehouseLocations: () => ({
+    data: [{ id: 'loc-1', code: 'RCK-A-01', name: 'Rak A1', type: 'INTERNAL' }],
+    isLoading: false,
+  }),
+  useDeliveryOrders: () => ({
+    data: [],
+    isLoading: false,
+    refetch: jest.fn(),
+    isFetching: false,
+  }),
+  useCreateDeliveryOrder: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({}),
+    isPending: false,
+  }),
+  useDispatchDeliveryOrder: () => ({
+    mutateAsync: jest.fn().mockResolvedValue({}),
+    isPending: false,
+  }),
+}))
+
+// Mock useProducts
+jest.mock('@/hooks/useProducts', () => ({
+  useProducts: () => ({
+    data: [{ id: 'prod-1', name: 'Beras Ramos 5kg', sku: 'BRS-RAMOS-5K' }],
     isLoading: false,
   }),
 }))
@@ -94,6 +121,17 @@ jest.mock('@/lib/api', () => ({
         }),
         completePack: jest.fn().mockResolvedValue({ data: { id: 'do-123', status: 'PACKED' } }),
       },
+    },
+    customers: {
+      list: jest.fn().mockResolvedValue({
+        data: [{ id: 'cust-1', name: 'PT Maju Bersama', phone: '08123456789' }],
+      }),
+      create: jest.fn().mockResolvedValue({
+        id: 'cust-new',
+        name: 'Toko Berkah Baru',
+        phone: '08999999999',
+        address: 'Jl. Merdeka No. 1',
+      }),
     },
   },
 }))
@@ -330,6 +368,48 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
       expect(screen.getByText(/Pindai Barcode \/ SKU Barang/i)).toBeInTheDocument()
       expect(screen.getByText(/Kemajuan Pemeriksaan Kemasan/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Audio Aktif/i })).toBeInTheDocument()
+    })
+  })
+
+  describe('CR-02b: Customer Selection & Quick Add Modal', () => {
+    it('opens Quick Customer modal and registers new customer on submit', async () => {
+      await React.act(async () => {
+        render(<DeliveryOrdersPanel />)
+      })
+
+      // Click "Buat Surat Jalan Baru"
+      const createDOBtn = screen.getByRole('button', { name: /Buat Surat Jalan Baru/i })
+      await React.act(async () => {
+        fireEvent.click(createDOBtn)
+      })
+
+      expect(screen.getByText(/Pilih Pelanggan \(Customer\)/i)).toBeInTheDocument()
+
+      // Click "+ Cepat"
+      const quickAddBtn = screen.getByRole('button', { name: /\+ Cepat/i })
+      await React.act(async () => {
+        fireEvent.click(quickAddBtn)
+      })
+
+      expect(screen.getByText(/Tambah Pelanggan Cepat/i)).toBeInTheDocument()
+
+      // Fill form
+      const nameInput = screen.getByPlaceholderText(/e\.g\. Toko Berkah Abadi/i)
+      await React.act(async () => {
+        fireEvent.change(nameInput, { target: { value: 'Toko Berkah Baru' } })
+      })
+
+      // Submit quick customer form
+      const saveBtn = screen.getByRole('button', { name: /Simpan & Pilih/i })
+      await React.act(async () => {
+        fireEvent.click(saveBtn)
+      })
+
+      // Verify customer API called
+      const { api } = require('@/lib/api')
+      expect(api.customers.create).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Toko Berkah Baru' })
+      )
     })
   })
 })
