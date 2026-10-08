@@ -549,23 +549,23 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [ ] **DEPLOY-02:** Push commit, verifikasi CI dan produksi Zeabur.
 
 ### SPRINT 3: Alur Outbound Inti (Picking FEFO, Meja Kemas QC 100% Scan & Resi Termal AWB)
-- [x] **DB-03:** Buat migrasi SQL `035_wms_outbound_waves_and_manifests.sql` (tabel `picking_tasks`, `picking_task_items`, penambahan kolom kemasan, customer_id, dan actor tracking di `delivery_orders` & `delivery_order_items`, FORCE RLS).
-- [x] **BE-06:** Logic alokasi rak FEFO: Surat Jalan otomatis memilih batch dengan masa kedaluwarsa terdekat (`AllocateFEFO` pada pembuatan DO dari rak INTERNAL).
-- [x] **BE-07:** Endpoint verifikasi meja kemas (*packing station*): memvalidasi barcode SKU pesanan secara interaktif (`POST /wms/pack/scan`, `POST /wms/pack/complete`).
-- [x] **FE-06:** Format cetak dokumen *Picking List* terurut lokasi rak untuk petugas gudang (`PrintPickingList.tsx`).
-- [x] **FE-07:** Halaman/modal stasiun meja kemas dengan antarmuka pencocokan scan 100% & Web Audio beeper (`PackStationModal.tsx`).
-- [x] **FE-08:** Generator cetak label stiker resi termal pengiriman AWB ukuran 100x150 mm (`PrintThermalAWB.tsx`).
-- [x] **CR-02a (DB/BE):** `delivery_orders.customer_id` (nullable, FK `customers`) + kolom pelaku `created_by, confirmed_by, packed_by, dispatched_by`.
-- [x] **CR-02b (FE):** Pilih customer di form Surat Jalan + quick-add customer baru via modal (`POST /api/v1/customers`).
-- [x] **CR-04a (BE):** Tambah `outbound_qty_today/month`, `top_outbound_products[10]`, `top_customers[10]` di `GET /dashboard/summary` dengan filter periode 7/30/90 hari.
-- [x] **CR-04c (FE):** Hapus blok P2P di Dashboard ("Pembelian Vendor (Procure-to-Pay)", "Faktur Vendor", "Vendor Teratas") untuk menjaga kepatuhan modul.
-- [x] **CR-04b (FE):** Kartu "Barang Keluar Hari Ini", tabel Top 10 Produk Keluar, dan Top 10 Pelanggan Teraktif di Dashboard.
-- [x] **CR-05b (FE):** Kolom "Dibuat oleh / Disetujui oleh / Dikemas oleh / Dikirim oleh" di tabel Surat Jalan & tabel Mutasi Stok + panel drawer "Riwayat Aktivitas & Jejak Audit" (`ActivityTimelineDrawer.tsx` timeline siapa, apa, kapan).
-- [x] **PDF-01:** Free item / bonus di baris Surat Jalan (`is_free_item`, harga 0, tetap potong stok per batch, tercetak "BONUS").
-- [x] **PDF-03/04:** Rusak saat pick/QC → Quarantine + Laporan Item Rusak + re-pick otomatis (`POST /wms/picking/damaged`).
-- [x] **PDF-05:** Wave dikelompokkan per jenis order (`DIRECT_DO`, `SALES_ORDER`, `MARKETPLACE`, `TRANSFER`).
-- [x] **TEST-03:** Pengujian otomatis alokasi FEFO dan pencegahan salah kirim barang di meja kemas (`wms_outbound_integration_test.go` di PG15 + suite unit usecase/handler).
-- [ ] **DEPLOY-03:** Push commit, verifikasi CI dan produksi Zeabur.
+- [x] **DB-03:** Buat migrasi SQL `035_wms_outbound_waves_and_manifests.sql` (tabel `picking_tasks`, `picking_task_items`, `pick_waves`, penambahan kolom kemasan, customer_id, dan actor tracking di `delivery_orders` & `delivery_order_items`, FORCE RLS) — commit `2e92ac2`, `e085623`.
+- [x] **BE-06:** Logic alokasi rak FEFO: Surat Jalan otomatis memilih batch dengan masa kedaluwarsa terdekat (`AllocateFEFO` pada pembuatan DO dari rak INTERNAL) — commit `2e92ac2`, `fe3bd92`.
+- [x] **BE-07:** Endpoint verifikasi meja kemas (*packing station*): memvalidasi barcode SKU pesanan secara interaktif (`POST /wms/pack/scan`, `POST /wms/pack/complete`) — commit `2e92ac2`.
+- [x] **FE-06:** Format cetak dokumen *Picking List* terurut lokasi rak untuk petugas gudang (`PrintPickingList.tsx`) — commit `2e92ac2`, `d8d8e94`.
+- [x] **FE-07:** Antarmuka stasiun meja kemas dengan pencocokan scan 100% & Web Audio beeper (`PackingStationSubView.tsx`, `PackStationModal.tsx`) — commit `dcfc7a3`, `b28269e`.
+- [x] **FE-08:** Generator cetak label stiker resi termal pengiriman AWB ukuran 100x150 mm (`PrintThermalAWB.tsx`) — commit `2e92ac2`, `d8d8e94`.
+- [x] **CR-02a (DB/BE):** `delivery_orders.customer_id` (nullable, FK `customers`) + kolom pelaku `created_by, confirmed_by, packed_by, dispatched_by` — commit `2e92ac2`.
+- [x] **CR-02b (FE):** Pilih customer di form Surat Jalan + quick-add customer baru via modal (`POST /api/v1/customers`) — commit `d8d8e94`, `8f02b13`.
+- [x] **CR-04a (BE):** Tambah `outbound_qty_today/month`, `top_outbound_products[10]`, `top_customers[10]` di `GET /dashboard/summary` dengan filter periode 7/30/90 hari — commit `76f2c65`.
+- [x] **CR-04c (FE):** Hapus blok P2P di Dashboard ("Pembelian Vendor (Procure-to-Pay)", "Faktur Vendor", "Vendor Teratas") untuk menjaga kepatuhan 12 modul — commit `76f2c65`, `93b9211`.
+- [x] **CR-04b (FE):** Kartu "Barang Keluar Hari Ini", tabel Top 10 Produk Keluar, dan Top 10 Toko/Pelanggan Teraktif di Dashboard — commit `76f2c65`, `93b9211`.
+- [x] **CR-05b (FE):** Kolom "Dibuat oleh / Disetujui oleh / Dikemas oleh / Dikirim oleh" di tabel Surat Jalan & tabel Mutasi Stok + panel drawer "Riwayat Aktivitas & Jejak Audit" (`ActivityTimelineDrawer.tsx`) — commit `dedfaed`.
+- [x] **PDF-01:** Free item / bonus di baris Surat Jalan (`is_free_item`, harga 0, tetap potong stok per batch, tercetak "BONUS") — commit `d635cfc`.
+- [x] **PDF-03/04:** Rusak saat pick/QC → Quarantine + Laporan Item Rusak + re-pick otomatis (`POST /wms/picking/damaged`) — commit `3e934ad`.
+- [x] **PDF-05:** Wave dikelompokkan per jenis order (`DIRECT_DO`, `SALES_ORDER`, `MARKETPLACE`, `TRANSFER`), kurir, dan rute zona (`WavePickingSubView.tsx`, `WaveReleaseModal.tsx`) — commit `47bb890`, `dcfc7a3`.
+- [x] **TEST-03:** Pengujian otomatis alokasi FEFO dan pencegahan salah kirim barang di meja kemas (`wms_outbound_integration_test.go` di PG15 + suite unit usecase/handler Go + Jest frontend 31 suites) — commit `2e92ac2`, `47bb890`, `d8d8e94`, `8f02b13`, `dedfaed`.
+- [x] **DEPLOY-03:** Push commit ke `main`, verifikasi CI, audit `ai-debt-detector`, dan kesehatan live Zeabur (`https://tayooli-backend.zeabur.app/health` & `https://tayooli.my.id`) — commit `b28269e`.
 
 ### SPRINT 4: Konsolidasi Staging, Manifest Ekspedisi & Loading Scan Truk
 - [ ] **DB-04:** Tabel `shipping_manifests` dan relasi ke multi-DO.
