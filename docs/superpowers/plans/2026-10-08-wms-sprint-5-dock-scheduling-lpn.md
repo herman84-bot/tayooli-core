@@ -35,7 +35,7 @@
 - Consumes: `tenants`, `warehouses`, `warehouse_locations`, `products`, `stock_batches`, `users`
 - Produces: Tables `inbound_docks`, `dock_appointments`, `stock_lpns`, `stock_lpn_items` with RLS policies and indexes.
 
-- [ ] **Step 1: Tulis berkas migrasi SQL `037_wms_docks_and_lpns.sql`**
+- [x] **Step 1: Tulis berkas migrasi SQL `037_wms_docks_and_lpns.sql`**
 Skema lengkap:
 - `inbound_docks`: `id`, `tenant_id`, `warehouse_id`, `dock_code`, `dock_name`, `dock_type`, `max_tonnage`, `status`, `notes`, timestamps, UNIQUE(tenant_id, warehouse_id, dock_code).
 - `dock_appointments`: `id`, `tenant_id`, `warehouse_id`, `dock_id`, `appointment_number`, `vendor_name`, `vehicle_plate`, `driver_name`, `driver_phone`, `po_reference`, `estimated_arrival`, `actual_arrival`, `start_unloading_at`, `completed_at`, `status`, `notes`, `created_by`, timestamps, UNIQUE(tenant_id, appointment_number).
@@ -43,11 +43,11 @@ Skema lengkap:
 - `stock_lpn_items`: `id`, `tenant_id`, `lpn_id`, `product_id`, `batch_id`, `quantity`, timestamps, UNIQUE(tenant_id, lpn_id, batch_id).
 - RLS enabled & forced pada semua 4 tabel dengan policy isolasi tenant `tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid`.
 
-- [ ] **Step 2: Uji sintaks & kompilasi backend Go**
+- [x] **Step 2: Uji sintaks & kompilasi backend Go**
 Run: `go build ./...` di `backend/go-core`
 Expected: exit 0
 
-- [ ] **Step 3: Commit migrasi database**
+- [x] **Step 3: Commit migrasi database**
 ```bash
 git add backend/go-core/migrations/037_wms_docks_and_lpns.sql
 git commit -m "feat(wms): add migration 037 for inbound docks, appointments, and pallet LPNs"
@@ -68,25 +68,25 @@ git commit -m "feat(wms): add migration 037 for inbound docks, appointments, and
 - Consumes: `domain.WarehouseLocation`, `domain.StockMovement`
 - Produces: `domain.InboundDock`, `domain.DockAppointment`, `domain.StockLPN`, `domain.StockLPNItem`, `domain.StockLPNDetail`, `domain.WMSDockLPNRepository` methods
 
-- [ ] **Step 1: Definisikan domain models di `internal/domain/wms_dock_lpn.go`**
+- [x] **Step 1: Definisikan domain models di `internal/domain/wms_dock_lpn.go`**
 - Enums: `DockStatus`, `AppointmentStatus`, `LPNStatus`, `PalletType`.
 - Structs: `InboundDock`, `DockAppointment`, `StockLPN`, `StockLPNItem`, `StockLPNDetail`.
 - Request DTOs: `CreateDockRequest`, `UpdateDockStatusRequest`, `CreateAppointmentRequest`, `AssignDockRequest`, `UpdateAppointmentStatusRequest`, `CreateLPNRequest`, `AddLPNItemRequest`, `MoveLPNRequest`.
 - Sentinel errors: `ErrDockNotFound`, `ErrDockOccupied`, `ErrAppointmentNotFound`, `ErrLPNNotFound`, `ErrLPNEmpty`, `ErrInvalidLocationType`.
 - Interface `WMSDockLPNRepository`.
 
-- [ ] **Step 2: Implementasikan repository PostgreSQL di `internal/infra/postgres/wms_dock_lpn_repo.go`**
+- [x] **Step 2: Implementasikan repository PostgreSQL di `internal/infra/postgres/wms_dock_lpn_repo.go`**
 Metode pada `*WMSRepo`:
 - `CreateDock`, `ListDocks`, `UpdateDockStatus`
 - `CreateAppointment`, `ListAppointments`, `AssignDockToAppointment` (dengan dock collision guard), `UpdateAppointmentStatus`
 - `CreateLPN`, `GetLPNByID`, `ListLPNs`, `AddLPNItem`
 - `MoveLPN`: Transaksi atomik mengunci LPN, memindahkan setiap item batch ke lokasi tujuan rak (`DeductLocationStock` / mutasi rak internal), memperbarui `stock_lpns.location_id` dan status `STORED`, serta mencatat audit trail.
 
-- [ ] **Step 3: Tulis unit test untuk domain & repository docks/lpns**
+- [x] **Step 3: Tulis unit test untuk domain & repository docks/lpns**
 Run: `go test -v ./internal/domain -run "TestDockLPN"`
 Expected: PASS
 
-- [ ] **Step 4: Commit domain & repository**
+- [x] **Step 4: Commit domain & repository**
 ```bash
 git add backend/go-core/internal/domain/wms_dock_lpn.go backend/go-core/internal/infra/postgres/wms_dock_lpn_repo.go backend/go-core/internal/domain/wms.go
 git commit -m "feat(wms): implement domain models and postgres repository for docks and pallet LPNs"
@@ -107,24 +107,24 @@ git commit -m "feat(wms): implement domain models and postgres repository for do
 - Consumes: `domain.WMSDockLPNRepository`, `domain.WMSRepository`
 - Produces: REST Endpoints `/api/v1/wms/docks/*`, `/api/v1/wms/dock-appointments/*`, `/api/v1/wms/lpns/*`
 
-- [ ] **Step 1: Implementasikan usecase di `internal/usecase/wms/dock_lpn_usecase.go`**
+- [x] **Step 1: Implementasikan usecase di `internal/usecase/wms/dock_lpn_usecase.go`**
 Logika bisnis:
 - Validasi warehouse access & write access untuk seluruh operasi dermaga dan LPN.
 - Validasi anti-collision sebelum mengalokasikan dock ke appointment.
 - Validasi lokasi rak tujuan pada pemindahan LPN (`MoveLPN`).
 
-- [ ] **Step 2: Implementasikan REST handler di `internal/handler/wms_dock_lpn_handler.go` & rute di `wms_handler.go`**
+- [x] **Step 2: Implementasikan REST handler di `internal/handler/wms_dock_lpn_handler.go` & rute di `wms_handler.go`**
 Handler lengkap dengan `http.MaxBytesReader`, ekstraksi tenant/user context, error mapper HTTP:
 - `ErrDockOccupied` -> 409
 - `ErrDockNotFound`, `ErrAppointmentNotFound`, `ErrLPNNotFound` -> 404
 - `ErrLPNEmpty`, `ErrInvalidLocationType` -> 422 / 400
 
-- [ ] **Step 3: Tulis pengujian usecase & HTTP handler**
+- [x] **Step 3: Tulis pengujian usecase & HTTP handler**
 Run: `go test -v ./internal/usecase/wms -run "TestDockLPNUsecase"`
 Run: `go test -v ./internal/handler -run "TestDockLPNHandlers"`
 Expected: PASS
 
-- [ ] **Step 4: Commit usecase & handlers**
+- [x] **Step 4: Commit usecase & handlers**
 ```bash
 git add backend/go-core/internal/usecase/wms/dock_lpn_usecase.go backend/go-core/internal/handler/wms_dock_lpn_handler.go backend/go-core/internal/handler/wms_handler.go
 git commit -m "feat(wms): implement usecases and REST handlers for dock scheduling and LPN management"

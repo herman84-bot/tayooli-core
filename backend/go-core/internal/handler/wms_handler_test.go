@@ -83,6 +83,22 @@ type mockWMSUsecase struct {
 	scanDOLoadingFn            func(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.LoadingScanRequest) (*domain.ShippingManifestDetail, error)
 	dispatchShippingManifestFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.DispatchShippingManifestRequest) (*domain.ShippingManifest, error)
 	getWMSOutboundKPIsFn       func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) (*domain.WMSOutboundKPISummary, error)
+
+	// Sprint 5 Docks & LPNs
+	createDockFn              func(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateDockRequest) (*domain.InboundDock, error)
+	getDockFn                 func(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.InboundDock, error)
+	listDocksFn               func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID, status *domain.DockStatus) ([]domain.InboundDock, error)
+	updateDockStatusFn        func(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID, req domain.UpdateDockStatusRequest) (*domain.InboundDock, error)
+	createAppointmentFn       func(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateAppointmentRequest) (*domain.DockAppointment, error)
+	getAppointmentFn          func(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.DockAppointment, error)
+	listAppointmentsFn        func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID, status *domain.AppointmentStatus) ([]domain.DockAppointment, error)
+	assignDockToAppointmentFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, id, dockID uuid.UUID) (*domain.DockAppointment, error)
+	updateAppointmentStatusFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID, req domain.UpdateAppointmentStatusRequest) (*domain.DockAppointment, error)
+	createLPNFn               func(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateLPNRequest) (*domain.StockLPN, error)
+	getLPNFn                  func(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.StockLPNDetail, error)
+	listLPNsFn                func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID, status *domain.LPNStatus) ([]domain.StockLPN, error)
+	addLPNItemFn              func(ctx context.Context, tenantID, userID uuid.UUID, role string, lpnID uuid.UUID, req domain.AddLPNItemRequest) (*domain.StockLPNDetail, error)
+	moveLPNFn                 func(ctx context.Context, tenantID, userID uuid.UUID, role string, lpnID uuid.UUID, req domain.MoveLPNRequest) (*domain.StockLPNDetail, error)
 }
 
 func (m *mockWMSUsecase) CreateWarehouse(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateWarehouseRequest) (*domain.Warehouse, error) {
@@ -425,6 +441,104 @@ func (m *mockWMSUsecase) GetWMSOutboundKPIs(ctx context.Context, tenantID, userI
 		return m.getWMSOutboundKPIsFn(ctx, tenantID, userID, role, warehouseID)
 	}
 	return &domain.WMSOutboundKPISummary{DockToStockAvgMinutes: 30.0, PickingAccuracyPct: 99.0}, nil
+}
+
+func (m *mockWMSUsecase) CreateDock(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateDockRequest) (*domain.InboundDock, error) {
+	if m.createDockFn != nil {
+		return m.createDockFn(ctx, tenantID, userID, role, req)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) GetDock(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.InboundDock, error) {
+	if m.getDockFn != nil {
+		return m.getDockFn(ctx, tenantID, userID, role, id)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) ListDocks(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID, status *domain.DockStatus) ([]domain.InboundDock, error) {
+	if m.listDocksFn != nil {
+		return m.listDocksFn(ctx, tenantID, userID, role, warehouseID, status)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) UpdateDockStatus(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID, req domain.UpdateDockStatusRequest) (*domain.InboundDock, error) {
+	if m.updateDockStatusFn != nil {
+		return m.updateDockStatusFn(ctx, tenantID, userID, role, id, req)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) CreateAppointment(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateAppointmentRequest) (*domain.DockAppointment, error) {
+	if m.createAppointmentFn != nil {
+		return m.createAppointmentFn(ctx, tenantID, userID, role, req)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) GetAppointment(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.DockAppointment, error) {
+	if m.getAppointmentFn != nil {
+		return m.getAppointmentFn(ctx, tenantID, userID, role, id)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) ListAppointments(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID, status *domain.AppointmentStatus) ([]domain.DockAppointment, error) {
+	if m.listAppointmentsFn != nil {
+		return m.listAppointmentsFn(ctx, tenantID, userID, role, warehouseID, status)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) AssignDockToAppointment(ctx context.Context, tenantID, userID uuid.UUID, role string, id, dockID uuid.UUID) (*domain.DockAppointment, error) {
+	if m.assignDockToAppointmentFn != nil {
+		return m.assignDockToAppointmentFn(ctx, tenantID, userID, role, id, dockID)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) UpdateAppointmentStatus(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID, req domain.UpdateAppointmentStatusRequest) (*domain.DockAppointment, error) {
+	if m.updateAppointmentStatusFn != nil {
+		return m.updateAppointmentStatusFn(ctx, tenantID, userID, role, id, req)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) CreateLPN(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateLPNRequest) (*domain.StockLPN, error) {
+	if m.createLPNFn != nil {
+		return m.createLPNFn(ctx, tenantID, userID, role, req)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) GetLPN(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.StockLPNDetail, error) {
+	if m.getLPNFn != nil {
+		return m.getLPNFn(ctx, tenantID, userID, role, id)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) ListLPNs(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID, status *domain.LPNStatus) ([]domain.StockLPN, error) {
+	if m.listLPNsFn != nil {
+		return m.listLPNsFn(ctx, tenantID, userID, role, warehouseID, status)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) AddLPNItem(ctx context.Context, tenantID, userID uuid.UUID, role string, lpnID uuid.UUID, req domain.AddLPNItemRequest) (*domain.StockLPNDetail, error) {
+	if m.addLPNItemFn != nil {
+		return m.addLPNItemFn(ctx, tenantID, userID, role, lpnID, req)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) MoveLPN(ctx context.Context, tenantID, userID uuid.UUID, role string, lpnID uuid.UUID, req domain.MoveLPNRequest) (*domain.StockLPNDetail, error) {
+	if m.moveLPNFn != nil {
+		return m.moveLPNFn(ctx, tenantID, userID, role, lpnID, req)
+	}
+	return nil, nil
 }
 
 func withWMSAuth(r *http.Request, tenantID, userID uuid.UUID, role string) *http.Request {

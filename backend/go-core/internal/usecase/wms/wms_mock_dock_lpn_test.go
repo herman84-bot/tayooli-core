@@ -11,6 +11,16 @@ import (
 
 // Mock methods for WMSDockLPNRepository on mockWMSRepo
 
+var (
+	testDockWarehouseID        uuid.UUID
+	testAppointmentWarehouseID uuid.UUID
+	testLPNWarehouseID         uuid.UUID
+
+	mockGetDockByIDFn        func(ctx context.Context, tenantID, id uuid.UUID) (*domain.InboundDock, error)
+	mockGetAppointmentByIDFn func(ctx context.Context, tenantID, id uuid.UUID) (*domain.DockAppointment, error)
+	mockGetLPNByIDFn         func(ctx context.Context, tenantID, id uuid.UUID) (*domain.StockLPNDetail, error)
+)
+
 func (m *mockWMSRepo) CreateDock(ctx context.Context, tenantID uuid.UUID, req domain.CreateDockRequest) (*domain.InboundDock, error) {
 	now := time.Now().UTC()
 	whName := "Mock Warehouse"
@@ -31,12 +41,19 @@ func (m *mockWMSRepo) CreateDock(ctx context.Context, tenantID uuid.UUID, req do
 }
 
 func (m *mockWMSRepo) GetDockByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.InboundDock, error) {
+	if mockGetDockByIDFn != nil {
+		return mockGetDockByIDFn(ctx, tenantID, id)
+	}
 	now := time.Now().UTC()
 	whName := "Mock Warehouse"
+	whID := testDockWarehouseID
+	if whID == uuid.Nil {
+		whID = uuid.New()
+	}
 	return &domain.InboundDock{
 		ID:            id,
 		TenantID:      tenantID,
-		WarehouseID:   uuid.New(),
+		WarehouseID:   whID,
 		WarehouseName: &whName,
 		DockCode:      "DOCK-01",
 		DockName:      "Mock Dock",
@@ -85,11 +102,18 @@ func (m *mockWMSRepo) CreateAppointment(ctx context.Context, tenantID, userID uu
 }
 
 func (m *mockWMSRepo) GetAppointmentByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.DockAppointment, error) {
+	if mockGetAppointmentByIDFn != nil {
+		return mockGetAppointmentByIDFn(ctx, tenantID, id)
+	}
 	now := time.Now().UTC()
+	whID := testAppointmentWarehouseID
+	if whID == uuid.Nil {
+		whID = uuid.New()
+	}
 	return &domain.DockAppointment{
 		ID:                id,
 		TenantID:          tenantID,
-		WarehouseID:       uuid.New(),
+		WarehouseID:       whID,
 		AppointmentNumber: "APP-MOCK-001",
 		VendorName:        "Mock Vendor",
 		VehiclePlate:      "B 1234 CD",
@@ -144,12 +168,19 @@ func (m *mockWMSRepo) CreateLPN(ctx context.Context, tenantID, userID uuid.UUID,
 }
 
 func (m *mockWMSRepo) GetLPNByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.StockLPNDetail, error) {
+	if mockGetLPNByIDFn != nil {
+		return mockGetLPNByIDFn(ctx, tenantID, id)
+	}
 	now := time.Now().UTC()
+	whID := testLPNWarehouseID
+	if whID == uuid.Nil {
+		whID = uuid.New()
+	}
 	return &domain.StockLPNDetail{
 		LPN: domain.StockLPN{
 			ID:            id,
 			TenantID:      tenantID,
-			WarehouseID:   uuid.New(),
+			WarehouseID:   whID,
 			LPNCode:       "LPN-MOCK-001",
 			LocationID:    uuid.New(),
 			PalletType:    domain.PalletTypeWooden,

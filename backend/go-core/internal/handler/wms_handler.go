@@ -124,6 +124,22 @@ type WMSUsecase interface {
 	ScanDOLoading(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.LoadingScanRequest) (*domain.ShippingManifestDetail, error)
 	DispatchShippingManifest(ctx context.Context, tenantID, userID uuid.UUID, role string, manifestID uuid.UUID, req domain.DispatchShippingManifestRequest) (*domain.ShippingManifest, error)
 	GetWMSOutboundKPIs(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) (*domain.WMSOutboundKPISummary, error)
+
+	// Inbound Docks, Appointments & Stock LPNs (Sprint 5)
+	CreateDock(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateDockRequest) (*domain.InboundDock, error)
+	GetDock(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.InboundDock, error)
+	ListDocks(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID, status *domain.DockStatus) ([]domain.InboundDock, error)
+	UpdateDockStatus(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID, req domain.UpdateDockStatusRequest) (*domain.InboundDock, error)
+	CreateAppointment(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateAppointmentRequest) (*domain.DockAppointment, error)
+	GetAppointment(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.DockAppointment, error)
+	ListAppointments(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID, status *domain.AppointmentStatus) ([]domain.DockAppointment, error)
+	AssignDockToAppointment(ctx context.Context, tenantID, userID uuid.UUID, role string, id, dockID uuid.UUID) (*domain.DockAppointment, error)
+	UpdateAppointmentStatus(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID, req domain.UpdateAppointmentStatusRequest) (*domain.DockAppointment, error)
+	CreateLPN(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateLPNRequest) (*domain.StockLPN, error)
+	GetLPN(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.StockLPNDetail, error)
+	ListLPNs(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID uuid.UUID, status *domain.LPNStatus) ([]domain.StockLPN, error)
+	AddLPNItem(ctx context.Context, tenantID, userID uuid.UUID, role string, lpnID uuid.UUID, req domain.AddLPNItemRequest) (*domain.StockLPNDetail, error)
+	MoveLPN(ctx context.Context, tenantID, userID uuid.UUID, role string, lpnID uuid.UUID, req domain.MoveLPNRequest) (*domain.StockLPNDetail, error)
 }
 
 type WMSHandler struct {
@@ -251,6 +267,24 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 			r.Post("/sku-mappings", h.CreateSKUMapping)
 			r.Get("/sku-mappings", h.ListSKUMappings)
 		})
+
+		// Inbound Docks & Appointments (Sprint 5)
+		r.Get("/docks", h.ListDocks)
+		r.Post("/docks", h.CreateDock)
+		r.Get("/docks/{id}", h.GetDock)
+		r.Patch("/docks/{id}/status", h.UpdateDockStatus)
+		r.Get("/dock-appointments", h.ListAppointments)
+		r.Post("/dock-appointments", h.CreateAppointment)
+		r.Get("/dock-appointments/{id}", h.GetAppointment)
+		r.Post("/dock-appointments/{id}/assign", h.AssignDock)
+		r.Patch("/dock-appointments/{id}/status", h.UpdateAppointmentStatus)
+
+		// Stock LPNs (Pallet Containers) (Sprint 5)
+		r.Get("/lpns", h.ListLPNs)
+		r.Post("/lpns", h.CreateLPN)
+		r.Get("/lpns/{id}", h.GetLPN)
+		r.Post("/lpns/{id}/items", h.AddLPNItem)
+		r.Post("/lpns/{id}/move", h.MoveLPN)
 	})
 }
 
@@ -319,6 +353,18 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusBadRequest, "Batch ID wajib dicantumkan pada setiap mutasi barang")
 	case errors.Is(err, domain.ErrConflict):
 		RespondError(w, r, http.StatusConflict, "conflict")
+	case errors.Is(err, domain.ErrDockNotFound):
+		RespondError(w, r, http.StatusNotFound, "inbound dock not found")
+	case errors.Is(err, domain.ErrDockOccupied):
+		RespondError(w, r, http.StatusConflict, "dock is currently occupied or undergoing unloading")
+	case errors.Is(err, domain.ErrAppointmentNotFound):
+		RespondError(w, r, http.StatusNotFound, "dock appointment not found")
+	case errors.Is(err, domain.ErrLPNNotFound):
+		RespondError(w, r, http.StatusNotFound, "stock lpn not found")
+	case errors.Is(err, domain.ErrLPNEmpty):
+		RespondError(w, r, http.StatusUnprocessableEntity, "cannot move empty lpn with no stock items")
+	case errors.Is(err, domain.ErrInvalidLocationType):
+		RespondError(w, r, http.StatusUnprocessableEntity, "target location must be an internal rack location")
 	case errors.Is(err, domain.ErrWarehouseNotFound):
 		RespondError(w, r, http.StatusNotFound, "warehouse not found")
 	case errors.Is(err, domain.ErrSourceLocationRequired):
