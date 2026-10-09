@@ -734,6 +734,9 @@ type WMSRepository interface {
 	ListMarketplaceOrders(ctx context.Context, tenantID uuid.UUID, warehouseID, batchID *uuid.UUID, status *MarketplaceOrderStatus) ([]MarketplaceOrder, error)
 	GetMarketplaceOrderByID(ctx context.Context, tenantID, id uuid.UUID) (*MarketplaceOrder, error)
 	UpdateMarketplaceOrderStatus(ctx context.Context, tenantID, id uuid.UUID, status MarketplaceOrderStatus) error
+	// ClaimMarketplaceOrder atomically moves an order from -> to. It returns
+	// false when the order is no longer in `from` (another request won).
+	ClaimMarketplaceOrder(ctx context.Context, tenantID, id uuid.UUID, from, to MarketplaceOrderStatus) (bool, error)
 	GetSKUMapping(ctx context.Context, tenantID uuid.UUID, channelName, externalSKU string) (*ProductSKUMapping, error)
 	ListSKUMappings(ctx context.Context, tenantID uuid.UUID, channelName string) ([]ProductSKUMapping, error)
 	UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UUID, channel MarketplaceChannel, externalSKU string, productID uuid.UUID) error

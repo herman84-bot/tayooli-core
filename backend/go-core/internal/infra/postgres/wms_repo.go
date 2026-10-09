@@ -2939,6 +2939,34 @@ func (r *WMSRepo) UpdateMarketplaceOrderStatus(ctx context.Context, tenantID, id
 	return tx.Commit()
 }
 
+// ClaimMarketplaceOrder is a compare-and-set on status (M4): only one
+// concurrent caller can move an order out of `from`, so stock is deducted once.
+func (r *WMSRepo) ClaimMarketplaceOrder(ctx context.Context, tenantID, id uuid.UUID, from, to domain.MarketplaceOrderStatus) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceOrder: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceOrder: set tenant: %w", err)
+	}
+	res, err := tx.ExecContext(ctx,
+		`UPDATE marketplace_orders SET status = $1 WHERE tenant_id = $2 AND id = $3 AND status = $4`,
+		string(to), tenantID, id, string(from))
+	if err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceOrder: exec: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceOrder: rows affected: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceOrder: commit: %w", err)
+	}
+	return n == 1, nil
+}
+
 const getSKUMappingSQL = `
 SELECT id, tenant_id, product_id, mapping_type, channel_name, external_sku, external_name, multiplier, created_at, updated_at
 FROM product_sku_mappings

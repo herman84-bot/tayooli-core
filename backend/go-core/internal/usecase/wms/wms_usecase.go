@@ -2071,6 +2071,15 @@ func (u *Usecase) ResolveSKUMapping(ctx context.Context, tenantID, userID uuid.U
 		}
 
 		if allMapped {
+			// M4: claim the order first; a concurrent resolve that loses the
+			// claim must not deduct a second time.
+			claimed, errClaim := u.repo.ClaimMarketplaceOrder(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusUnmappedSKU, domain.MarketplaceOrderStatusProcessing)
+			if errClaim != nil {
+				return nil, fmt.Errorf("ResolveSKUMapping: claim order: %w", errClaim)
+			}
+			if !claimed {
+				continue
+			}
 			errStock := u.deductOrderStock(ctx, tenantID, userID, &order, channel, nil)
 			if errStock == nil {
 				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusCompleted); errUpd != nil {

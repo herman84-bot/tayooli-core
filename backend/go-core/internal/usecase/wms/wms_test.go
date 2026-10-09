@@ -38,6 +38,7 @@ type mockWMSRepo struct {
 	stockScraps     map[uuid.UUID]*domain.StockScrap
 	marketplaceBatches map[uuid.UUID]*domain.MarketplaceImportBatch
 	marketplaceOrders  map[uuid.UUID]*domain.MarketplaceOrder
+	stalePendingOrders []domain.MarketplaceOrder
 	// Stock receipts (lazily initialised in wms_receipt_test.go)
 	stockReceipts    map[uuid.UUID]*domain.StockReceipt
 	receiptItems     map[uuid.UUID][]domain.StockReceiptItem
@@ -641,6 +642,15 @@ func (m *mockWMSRepo) UpdateMarketplaceOrderStatus(ctx context.Context, tenantID
 	return nil
 }
 
+func (m *mockWMSRepo) ClaimMarketplaceOrder(ctx context.Context, tenantID, id uuid.UUID, from, to domain.MarketplaceOrderStatus) (bool, error) {
+	o, ok := m.marketplaceOrders[id]
+	if !ok || o.TenantID != tenantID || o.Status != from {
+		return false, nil
+	}
+	o.Status = to
+	return true, nil
+}
+
 func (m *mockWMSRepo) UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UUID, channel domain.MarketplaceChannel, externalSKU string, productID uuid.UUID) error {
 	for _, o := range m.marketplaceOrders {
 		if o.TenantID == tenantID && o.Channel == channel {
@@ -656,6 +666,11 @@ func (m *mockWMSRepo) UpdateUnmappedOrderItems(ctx context.Context, tenantID uui
 }
 
 func (m *mockWMSRepo) GetPendingUnmappedOrdersBySKU(ctx context.Context, tenantID uuid.UUID, channel domain.MarketplaceChannel, externalSKU string) ([]domain.MarketplaceOrder, error) {
+	if m.stalePendingOrders != nil {
+		// Simulates a concurrent request that read the pending list before
+		// another request finished processing it.
+		return m.stalePendingOrders, nil
+	}
 	var list []domain.MarketplaceOrder
 	for _, o := range m.marketplaceOrders {
 		if o.TenantID == tenantID && o.Channel == channel && o.Status == domain.MarketplaceOrderStatusUnmappedSKU {
@@ -2655,6 +2670,53 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		}
 		_, err = usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", big)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	})
+
+	t.Run("M4: resolve deducts an unmapped order only once", func(t *testing.T) {
+		imp := uc.ImportMarketplaceOrdersRequest{WarehouseID: whID, Channel: domain.MarketplaceChannelLazada,
+			Orders: []uc.ImportOrderRequest{{ExternalOrderID: "LZ-RACE-1", Items: []uc.ImportOrderItemRequest{
+				{ExternalSKU: "LZ-RACE-SKU", ItemName: "race", Quantity: decimal.NewFromInt(3)},
+			}}}}
+		resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", imp)
+		require.NoError(t, err)
+		require.Equal(t, domain.MarketplaceOrderStatusUnmappedSKU, resp.Orders[0].Status)
+
+		movesBefore := 0
+		for _, mv := range repo.stockMovements {
+			if mv.ReferenceID == resp.Orders[0].ID {
+				movesBefore++
+			}
+		}
+		require.Zero(t, movesBefore)
+
+		one := decimal.NewFromInt(1)
+		mreq := uc.CreateSKUMappingRequest{ProductID: prod1ID, MappingType: domain.SKUMappingTypeMarketplace, ChannelName: "LAZADA", ExternalSKU: "LZ-RACE-SKU", Multiplier: &one}
+		// Both requests read the pending list before either deducts.
+		stale, err := repo.GetPendingUnmappedOrdersBySKU(ctx, tenantID, domain.MarketplaceChannelLazada, "LZ-RACE-SKU")
+		require.NoError(t, err)
+		require.Len(t, stale, 1)
+		for i := range stale[0].Items {
+			stale[0].Items[i].ProductID = &prod1ID
+			stale[0].Items[i].IsMapped = true
+		}
+		_, err = usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", mreq)
+		require.NoError(t, err)
+		repo.stalePendingOrders = stale // second request still holds the old snapshot
+		_, err = usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", mreq)
+		repo.stalePendingOrders = nil
+		require.NoError(t, err)
+
+		moves := 0
+		for _, mv := range repo.stockMovements {
+			if mv.ReferenceID == resp.Orders[0].ID {
+				moves++
+			}
+		}
+		assert.Equal(t, 1, moves, "order must be deducted exactly once")
+
+		claimed, err := repo.ClaimMarketplaceOrder(ctx, tenantID, resp.Orders[0].ID, domain.MarketplaceOrderStatusUnmappedSKU, domain.MarketplaceOrderStatusProcessing)
+		require.NoError(t, err)
+		assert.False(t, claimed, "claim from a stale status must fail")
 	})
 
 	t.Run("M2: multiplier ceiling and role gate", func(t *testing.T) {
