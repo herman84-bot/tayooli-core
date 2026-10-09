@@ -339,6 +339,14 @@ func (m *mockWMSUsecase) ResolveSKUMapping(ctx context.Context, tenantID, userID
 	return nil, nil
 }
 
+func (m *mockWMSUsecase) ApproveMarketplaceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.MarketplaceImportBatch, error) {
+	return nil, domain.ErrNotFound
+}
+
+func (m *mockWMSUsecase) RejectMarketplaceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.MarketplaceImportBatch, error) {
+	return nil, domain.ErrNotFound
+}
+
 func (m *mockWMSUsecase) ListMarketplaceBatches(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.MarketplaceImportBatch, error) {
 	if m.listMarketplaceBatchesFn != nil {
 		return m.listMarketplaceBatchesFn(ctx, tenantID, userID, role, warehouseID)

@@ -1993,6 +1993,7 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 				return nil, fmt.Errorf("ImportMarketplaceOrders: create order: %w", err)
 			}
 		} else {
+			// M7: mapped orders wait for batch approval; no stock moves here.
 			order.Status = domain.MarketplaceOrderStatusPending
 			if err := u.repo.CreateMarketplaceOrder(ctx, &order); err != nil {
 				if errors.Is(err, domain.ErrDuplicateMarketplaceOrder) {
@@ -2000,18 +2001,6 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 					continue
 				}
 				return nil, fmt.Errorf("ImportMarketplaceOrders: create order: %w", err)
-			}
-
-			if err := u.deductOrderStock(ctx, tenantID, userID, &order); err != nil {
-				order.Status = domain.MarketplaceOrderStatusStockInsufficient
-				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusStockInsufficient); errUpd != nil {
-					return nil, fmt.Errorf("ImportMarketplaceOrders: update order stock insufficient: %w", errUpd)
-				}
-			} else {
-				order.Status = domain.MarketplaceOrderStatusCompleted
-				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusCompleted); errUpd != nil {
-					return nil, fmt.Errorf("ImportMarketplaceOrders: update order completed: %w", errUpd)
-				}
 			}
 		}
 
@@ -2022,7 +2011,7 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 	if batch.ProcessedOrders == 0 && batch.FailedOrders > 0 {
 		batch.Status = domain.MarketplaceBatchStatusFailed
 	} else {
-		batch.Status = domain.MarketplaceBatchStatusCompleted
+		batch.Status = domain.MarketplaceBatchStatusPendingApproval
 	}
 
 	if err := u.repo.UpdateMarketplaceBatch(ctx, batch); err != nil {
@@ -2087,27 +2076,110 @@ func (u *Usecase) ResolveSKUMapping(ctx context.Context, tenantID, userID uuid.U
 		if allMapped {
 			// M4: claim the order first; a concurrent resolve that loses the
 			// claim must not deduct a second time.
-			claimed, errClaim := u.repo.ClaimMarketplaceOrder(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusUnmappedSKU, domain.MarketplaceOrderStatusProcessing)
+			// M7: the resolved order joins the approval queue instead of
+			// deducting immediately.
+			claimed, errClaim := u.repo.ClaimMarketplaceOrder(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusUnmappedSKU, domain.MarketplaceOrderStatusPending)
 			if errClaim != nil {
 				return nil, fmt.Errorf("ResolveSKUMapping: claim order: %w", errClaim)
 			}
-			if !claimed {
+			if !claimed || order.BatchID == nil {
 				continue
 			}
-			errStock := u.deductOrderStock(ctx, tenantID, userID, &order)
-			if errStock == nil {
-				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusCompleted); errUpd != nil {
-					return nil, fmt.Errorf("ResolveSKUMapping: update order status completed: %w", errUpd)
-				}
-			} else {
-				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusStockInsufficient); errUpd != nil {
-					return nil, fmt.Errorf("ResolveSKUMapping: update order status stock insufficient: %w", errUpd)
-				}
+			// A batch that was already approved must be approved again for
+			// this newly deductible order.
+			if _, errReopen := u.repo.ClaimMarketplaceBatch(ctx, tenantID, *order.BatchID, domain.MarketplaceBatchStatusDeducted, domain.MarketplaceBatchStatusPendingApproval, nil); errReopen != nil {
+				return nil, fmt.Errorf("ResolveSKUMapping: reopen batch: %w", errReopen)
 			}
 		}
 	}
 
 	return mapping, nil
+}
+
+// ApproveMarketplaceBatch deducts stock for every PENDING order of a batch
+// (M7). Only owner/admin may approve and never the uploader (segregation of
+// duties). The PENDING_APPROVAL->APPROVED claim makes concurrent approvals
+// deduct once.
+func (u *Usecase) ApproveMarketplaceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.MarketplaceImportBatch, error) {
+	batch, err := u.authorizeMarketplaceBatchDecision(ctx, tenantID, userID, role, batchID)
+	if err != nil {
+		return nil, err
+	}
+	claimed, err := u.repo.ClaimMarketplaceBatch(ctx, tenantID, batchID, domain.MarketplaceBatchStatusPendingApproval, domain.MarketplaceBatchStatusApproved, &userID)
+	if err != nil {
+		return nil, fmt.Errorf("ApproveMarketplaceBatch: claim: %w", err)
+	}
+	if !claimed {
+		return nil, &domain.StockReceiptValidationError{Msg: "Batch tidak menunggu persetujuan (sudah diproses atau ditolak)"}
+	}
+
+	pending := domain.MarketplaceOrderStatusPending
+	orders, err := u.repo.ListMarketplaceOrders(ctx, tenantID, nil, &batchID, &pending)
+	if err != nil {
+		return nil, fmt.Errorf("ApproveMarketplaceBatch: list orders: %w", err)
+	}
+	for i := range orders {
+		order := orders[i]
+		ok, errClaim := u.repo.ClaimMarketplaceOrder(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusPending, domain.MarketplaceOrderStatusProcessing)
+		if errClaim != nil {
+			return nil, fmt.Errorf("ApproveMarketplaceBatch: claim order: %w", errClaim)
+		}
+		if !ok {
+			continue
+		}
+		next := domain.MarketplaceOrderStatusCompleted
+		if errStock := u.deductOrderStock(ctx, tenantID, userID, &order); errStock != nil {
+			next = domain.MarketplaceOrderStatusStockInsufficient
+		}
+		if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, next); errUpd != nil {
+			return nil, fmt.Errorf("ApproveMarketplaceBatch: update order: %w", errUpd)
+		}
+	}
+
+	if _, err := u.repo.ClaimMarketplaceBatch(ctx, tenantID, batchID, domain.MarketplaceBatchStatusApproved, domain.MarketplaceBatchStatusDeducted, nil); err != nil {
+		return nil, fmt.Errorf("ApproveMarketplaceBatch: finish: %w", err)
+	}
+	return u.repo.GetMarketplaceBatchByID(ctx, tenantID, batch.ID)
+}
+
+// RejectMarketplaceBatch closes a batch without moving stock (M7).
+func (u *Usecase) RejectMarketplaceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.MarketplaceImportBatch, error) {
+	if _, err := u.authorizeMarketplaceBatchDecision(ctx, tenantID, userID, role, batchID); err != nil {
+		return nil, err
+	}
+	claimed, err := u.repo.ClaimMarketplaceBatch(ctx, tenantID, batchID, domain.MarketplaceBatchStatusPendingApproval, domain.MarketplaceBatchStatusRejected, &userID)
+	if err != nil {
+		return nil, fmt.Errorf("RejectMarketplaceBatch: claim: %w", err)
+	}
+	if !claimed {
+		return nil, &domain.StockReceiptValidationError{Msg: "Batch tidak menunggu persetujuan (sudah diproses atau ditolak)"}
+	}
+	pending := domain.MarketplaceOrderStatusPending
+	orders, err := u.repo.ListMarketplaceOrders(ctx, tenantID, nil, &batchID, &pending)
+	if err != nil {
+		return nil, fmt.Errorf("RejectMarketplaceBatch: list orders: %w", err)
+	}
+	for _, o := range orders {
+		if _, err := u.repo.ClaimMarketplaceOrder(ctx, tenantID, o.ID, domain.MarketplaceOrderStatusPending, domain.MarketplaceOrderStatusFailed); err != nil {
+			return nil, fmt.Errorf("RejectMarketplaceBatch: fail order: %w", err)
+		}
+	}
+	return u.repo.GetMarketplaceBatchByID(ctx, tenantID, batchID)
+}
+
+func (u *Usecase) authorizeMarketplaceBatchDecision(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.MarketplaceImportBatch, error) {
+	r := strings.ToLower(strings.TrimSpace(role))
+	if r != "admin" && r != "owner" {
+		return nil, domain.ErrForbidden
+	}
+	batch, err := u.repo.GetMarketplaceBatchByID(ctx, tenantID, batchID)
+	if err != nil {
+		return nil, err
+	}
+	if batch.UploadedBy == userID {
+		return nil, domain.ErrMarketplaceSelfApproval
+	}
+	return batch, nil
 }
 
 func (u *Usecase) ListMarketplaceBatches(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.MarketplaceImportBatch, error) {

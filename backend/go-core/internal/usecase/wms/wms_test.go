@@ -564,6 +564,20 @@ func (m *mockWMSRepo) ListMarketplaceBatches(ctx context.Context, tenantID uuid.
 	return list, nil
 }
 
+func (m *mockWMSRepo) ClaimMarketplaceBatch(ctx context.Context, tenantID, id uuid.UUID, from, to domain.MarketplaceBatchStatus, approvedBy *uuid.UUID) (bool, error) {
+	b, ok := m.marketplaceBatches[id]
+	if !ok || b.TenantID != tenantID || b.Status != from {
+		return false, nil
+	}
+	b.Status = to
+	if approvedBy != nil {
+		ab := *approvedBy
+		now := time.Now().UTC()
+		b.ApprovedBy, b.ApprovedAt = &ab, &now
+	}
+	return true, nil
+}
+
 func (m *mockWMSRepo) UpdateMarketplaceBatch(ctx context.Context, batch *domain.MarketplaceImportBatch) error {
 	b, ok := m.marketplaceBatches[batch.ID]
 	if !ok || b.TenantID != batch.TenantID {
@@ -2379,6 +2393,19 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 	repo.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, srcLocID, prod1ID)] = decimal.NewFromInt(100)
 	repo.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, srcLocID, prod2ID)] = decimal.NewFromInt(5)
 
+	// M7: imports wait for approval by an owner/admin who is not the uploader.
+	approve := func(t *testing.T, batchID uuid.UUID) {
+		t.Helper()
+		_, err := usecase.ApproveMarketplaceBatch(ctx, tenantID, adminID, "admin", batchID)
+		require.NoError(t, err)
+	}
+	orderStatus := func(t *testing.T, id uuid.UUID) domain.MarketplaceOrderStatus {
+		t.Helper()
+		o, err := repo.GetMarketplaceOrderByID(ctx, tenantID, id)
+		require.NoError(t, err)
+		return o.Status
+	}
+
 	t.Run("AC-1: Idempotent import ignores duplicate orders", func(t *testing.T) {
 		req := uc.ImportMarketplaceOrdersRequest{
 			WarehouseID: whID, SourceLocationID: srcLocID,
@@ -2407,7 +2434,10 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		assert.Equal(t, 1, resp1.Batch.TotalOrders)
 		assert.Equal(t, 1, resp1.Batch.ProcessedOrders)
 		assert.Equal(t, 0, resp1.Batch.FailedOrders)
-		assert.Equal(t, domain.MarketplaceOrderStatusCompleted, resp1.Orders[0].Status)
+		assert.Equal(t, domain.MarketplaceBatchStatusPendingApproval, resp1.Batch.Status)
+		assert.Equal(t, domain.MarketplaceOrderStatusPending, resp1.Orders[0].Status)
+		approve(t, resp1.Batch.ID)
+		assert.Equal(t, domain.MarketplaceOrderStatusCompleted, orderStatus(t, resp1.Orders[0].ID))
 
 		// Second upload of the exact same order in the same channel
 		resp2, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", req)
@@ -2461,8 +2491,14 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", req)
 		require.NoError(t, err)
 		assert.Equal(t, 1, resp.Batch.ProcessedOrders)
-		assert.Equal(t, domain.MarketplaceOrderStatusCompleted, resp.Orders[0].Status)
+		assert.Equal(t, domain.MarketplaceOrderStatusPending, resp.Orders[0].Status)
 		ac2OrderID = resp.Orders[0].ID
+
+		pre, err := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod1ID)
+		require.NoError(t, err)
+		assert.True(t, pre.Equal(decimal.NewFromInt(100)), "import alone must not move stock")
+		approve(t, resp.Batch.ID)
+		assert.Equal(t, domain.MarketplaceOrderStatusCompleted, orderStatus(t, ac2OrderID))
 
 		// Initial stock was 100. Deduct 2 * 24 = 48. Expected remaining = 52.
 		stock, err := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod1ID)
@@ -2517,10 +2553,10 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, mapping)
 
-		// Verify order was reprocessed and marked COMPLETED
-		reprocessedOrder, err := repo.GetMarketplaceOrderByID(ctx, tenantID, resp.Orders[0].ID)
-		require.NoError(t, err)
-		assert.Equal(t, domain.MarketplaceOrderStatusCompleted, reprocessedOrder.Status)
+		// Resolved order joins the approval queue; approval deducts.
+		assert.Equal(t, domain.MarketplaceOrderStatusPending, orderStatus(t, resp.Orders[0].ID))
+		approve(t, resp.Batch.ID)
+		assert.Equal(t, domain.MarketplaceOrderStatusCompleted, orderStatus(t, resp.Orders[0].ID))
 
 		// Stock should now be deducted: 52 - 2 = 50
 		stockAfter, err := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod1ID)
@@ -2575,9 +2611,13 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 
 		resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", req)
 		require.NoError(t, err)
-		assert.Equal(t, domain.MarketplaceBatchStatusCompleted, resp.Batch.Status)
+		assert.Equal(t, domain.MarketplaceBatchStatusPendingApproval, resp.Batch.Status)
 		assert.Equal(t, 1, resp.Batch.ProcessedOrders)
-		assert.Equal(t, domain.MarketplaceOrderStatusStockInsufficient, resp.Orders[0].Status)
+		approve(t, resp.Batch.ID)
+		assert.Equal(t, domain.MarketplaceOrderStatusStockInsufficient, orderStatus(t, resp.Orders[0].ID))
+		b, err := repo.GetMarketplaceBatchByID(ctx, tenantID, resp.Batch.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.MarketplaceBatchStatusDeducted, b.Status, "batch finishes even when an order lacks stock")
 
 		// Stock remains 4 (not deducted / no negative stock)
 		stock, err := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod2ID)
@@ -2717,6 +2757,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		_, err = usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", mreq)
 		repo.stalePendingOrders = nil
 		require.NoError(t, err)
+		approve(t, resp.Batch.ID)
 
 		moves := 0
 		for _, mv := range repo.stockMovements {
@@ -2746,7 +2787,8 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		before, _ := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod2ID)
 		resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", base(srcLocID))
 		require.NoError(t, err)
-		require.Equal(t, domain.MarketplaceOrderStatusCompleted, resp.Orders[0].Status)
+		approve(t, resp.Batch.ID)
+		require.Equal(t, domain.MarketplaceOrderStatusCompleted, orderStatus(t, resp.Orders[0].ID))
 		after, _ := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod2ID)
 		assert.True(t, before.Sub(after).Equal(decimal.NewFromInt(1)), "deducted from the chosen rack")
 	})
@@ -2772,6 +2814,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		// Resolving B completes the order and deducts.
 		_, err = usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", mreq("BL-SNAP-B", decimal.NewFromInt(1)))
 		require.NoError(t, err)
+		approve(t, resp.Batch.ID)
 
 		stored, err := repo.GetMarketplaceOrderByID(ctx, tenantID, orderID)
 		require.NoError(t, err)
@@ -2791,7 +2834,8 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 			WarehouseID: whID, SourceLocationID: srcLocID, Channel: domain.MarketplaceChannelBlibli,
 			Orders: []uc.ImportOrderRequest{{ExternalOrderID: "BL-COST-1", Items: []uc.ImportOrderItemRequest{{ExternalSKU: "MAS000123", ItemName: "x", Quantity: decimal.NewFromInt(2)}}}}})
 		require.NoError(t, err)
-		require.Equal(t, domain.MarketplaceOrderStatusCompleted, resp.Orders[0].Status)
+		approve(t, resp.Batch.ID)
+		require.Equal(t, domain.MarketplaceOrderStatusCompleted, orderStatus(t, resp.Orders[0].ID))
 		found := false
 		for _, mv := range repo.stockMovements {
 			if mv.ReferenceID == resp.Orders[0].ID {
@@ -2800,6 +2844,60 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 			}
 		}
 		require.True(t, found, "movement written")
+	})
+
+	t.Run("M7: approval gate, segregation of duties, single deduction, reject", func(t *testing.T) {
+		secondAdmin := uuid.New()
+		imp := func(id string, user uuid.UUID, role string) *uc.ImportMarketplaceOrdersResponse {
+			r, err := usecase.ImportMarketplaceOrders(ctx, tenantID, user, role, uc.ImportMarketplaceOrdersRequest{
+				WarehouseID: whID, SourceLocationID: srcLocID, Channel: domain.MarketplaceChannelOther,
+				Orders: []uc.ImportOrderRequest{{ExternalOrderID: id, Items: []uc.ImportOrderItemRequest{{ExternalSKU: "MAS000123", ItemName: "x", Quantity: decimal.NewFromInt(4)}}}}})
+			require.NoError(t, err)
+			return r
+		}
+		stock := func() decimal.Decimal {
+			v, err := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod1ID)
+			require.NoError(t, err)
+			return v
+		}
+
+		start := stock()
+		r := imp("M7-1", adminID, "admin")
+		assert.True(t, stock().Equal(start), "import must not deduct before approval")
+
+		_, err := usecase.ApproveMarketplaceBatch(ctx, tenantID, adminID, "admin", r.Batch.ID)
+		assert.ErrorIs(t, err, domain.ErrSelfApprovalForbidden, "uploader cannot approve own batch")
+		_, err = usecase.ApproveMarketplaceBatch(ctx, tenantID, staffID, "warehouse", r.Batch.ID)
+		assert.ErrorIs(t, err, domain.ErrForbidden, "warehouse role cannot approve")
+		_, err = usecase.ApproveMarketplaceBatch(ctx, tenantID, secondAdmin, "auditor", r.Batch.ID)
+		assert.ErrorIs(t, err, domain.ErrForbidden, "auditor cannot approve")
+		_, err = usecase.ApproveMarketplaceBatch(ctx, uuid.New(), secondAdmin, "admin", r.Batch.ID)
+		assert.ErrorIs(t, err, domain.ErrBatchNotFound, "other tenant cannot approve")
+		assert.True(t, stock().Equal(start), "rejected approvals must not move stock")
+
+		b, err := usecase.ApproveMarketplaceBatch(ctx, tenantID, secondAdmin, "admin", r.Batch.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.MarketplaceBatchStatusDeducted, b.Status)
+		require.NotNil(t, b.ApprovedBy)
+		assert.Equal(t, secondAdmin, *b.ApprovedBy)
+		assert.True(t, start.Sub(stock()).Equal(decimal.NewFromInt(4)))
+
+		_, err = usecase.ApproveMarketplaceBatch(ctx, tenantID, secondAdmin, "admin", r.Batch.ID)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "second approval refused")
+		assert.True(t, start.Sub(stock()).Equal(decimal.NewFromInt(4)), "no double deduction")
+
+		// Reject: no stock moves, orders FAILED, approval afterwards refused.
+		mid := stock()
+		r2 := imp("M7-2", staffID, "warehouse")
+		_, err = usecase.RejectMarketplaceBatch(ctx, tenantID, staffID, "warehouse", r2.Batch.ID)
+		assert.ErrorIs(t, err, domain.ErrForbidden)
+		rb, err := usecase.RejectMarketplaceBatch(ctx, tenantID, adminID, "admin", r2.Batch.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.MarketplaceBatchStatusRejected, rb.Status)
+		assert.Equal(t, domain.MarketplaceOrderStatusFailed, orderStatus(t, r2.Orders[0].ID))
+		_, err = usecase.ApproveMarketplaceBatch(ctx, tenantID, adminID, "admin", r2.Batch.ID)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "rejected batch cannot be approved")
+		assert.True(t, stock().Equal(mid), "rejected batch moves no stock")
 	})
 
 	t.Run("M2: multiplier ceiling and role gate", func(t *testing.T) {

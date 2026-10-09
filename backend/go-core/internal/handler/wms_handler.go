@@ -82,6 +82,8 @@ type WMSUsecase interface {
 	ImportMarketplaceOrders(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.ImportMarketplaceOrdersRequest) (*uc.ImportMarketplaceOrdersResponse, error)
 	ResolveSKUMapping(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateSKUMappingRequest) (*domain.ProductSKUMapping, error)
 	ListMarketplaceBatches(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.MarketplaceImportBatch, error)
+	ApproveMarketplaceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.MarketplaceImportBatch, error)
+	RejectMarketplaceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.MarketplaceImportBatch, error)
 	ListMarketplaceOrders(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID, batchID *uuid.UUID, status *domain.MarketplaceOrderStatus) ([]domain.MarketplaceOrder, error)
 	GetMarketplaceOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, orderID uuid.UUID) (*domain.MarketplaceOrder, error)
 	ListSKUMappings(ctx context.Context, tenantID uuid.UUID, channelName string) ([]domain.ProductSKUMapping, error)
@@ -262,6 +264,8 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Route("/marketplace", func(r chi.Router) {
 			r.Post("/import", h.ImportMarketplaceOrders)
 			r.Get("/batches", h.ListMarketplaceBatches)
+			r.Post("/batches/{id}/approve", h.ApproveMarketplaceBatch)
+			r.Post("/batches/{id}/reject", h.RejectMarketplaceBatch)
 			r.Get("/orders", h.ListMarketplaceOrders)
 			r.Get("/orders/{id}", h.GetMarketplaceOrder)
 			r.Post("/sku-mappings", h.CreateSKUMapping)
@@ -407,6 +411,8 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, domain.ErrInvalidTransferStatus):
 		RespondError(w, r, http.StatusBadRequest, "invalid transfer status transition")
+	case errors.Is(err, domain.ErrMarketplaceSelfApproval):
+		RespondError(w, r, http.StatusForbidden, "uploader cannot approve or reject their own marketplace batch")
 	case errors.Is(err, domain.ErrSelfApprovalForbidden):
 		RespondError(w, r, http.StatusForbidden, "requester cannot approve or reject their own transfer")
 	case errors.Is(err, domain.ErrRejectionReasonRequired):
@@ -1762,4 +1768,36 @@ func (h *WMSHandler) ListStockSummary(w http.ResponseWriter, r *http.Request) {
 		stock = []domain.StockSummary{}
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"data": stock})
+}
+
+// ApproveMarketplaceBatch handles POST /api/v1/wms/marketplace/batches/{id}/approve (M7).
+func (h *WMSHandler) ApproveMarketplaceBatch(w http.ResponseWriter, r *http.Request) {
+	h.decideMarketplaceBatch(w, r, h.uc.ApproveMarketplaceBatch)
+}
+
+// RejectMarketplaceBatch handles POST /api/v1/wms/marketplace/batches/{id}/reject (M7).
+func (h *WMSHandler) RejectMarketplaceBatch(w http.ResponseWriter, r *http.Request) {
+	h.decideMarketplaceBatch(w, r, h.uc.RejectMarketplaceBatch)
+}
+
+func (h *WMSHandler) decideMarketplaceBatch(w http.ResponseWriter, r *http.Request,
+	fn func(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.MarketplaceImportBatch, error)) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+	batchID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid batch id")
+		return
+	}
+	batch, err := fn(r.Context(), tenantID, userID, role, batchID)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"data": batch})
 }

@@ -2493,7 +2493,8 @@ func (r *WMSRepo) CreateMarketplaceBatch(ctx context.Context, batch *domain.Mark
 
 const getMarketplaceBatchByIDSQL = `
 SELECT id, tenant_id, batch_number, channel, warehouse_id, file_name,
-       total_orders, processed_orders, failed_orders, unmapped_skus, status, uploaded_by, created_at
+       total_orders, processed_orders, failed_orders, unmapped_skus, status, uploaded_by, created_at,
+       approved_by, approved_at
 FROM marketplace_import_batches
 WHERE tenant_id = $1 AND id = $2`
 
@@ -2510,11 +2511,17 @@ func (r *WMSRepo) GetMarketplaceBatchByID(ctx context.Context, tenantID, id uuid
 
 	var b domain.MarketplaceImportBatch
 	var channel, status string
+	var approvedBy sql.NullString
+	var approvedAt sql.NullTime
 	err = tx.QueryRowContext(ctx, getMarketplaceBatchByIDSQL, tenantID, id).Scan(
 		&b.ID, &b.TenantID, &b.BatchNumber, &channel, &b.WarehouseID, &b.FileName,
 		&b.TotalOrders, &b.ProcessedOrders, &b.FailedOrders, &b.UnmappedSKUs,
-		&status, &b.UploadedBy, &b.CreatedAt,
+		&status, &b.UploadedBy, &b.CreatedAt, &approvedBy, &approvedAt,
 	)
+	b.ApprovedBy = nullUUIDToPtr(approvedBy)
+	if approvedAt.Valid {
+		b.ApprovedAt = &approvedAt.Time
+	}
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrBatchNotFound
@@ -2532,14 +2539,16 @@ func (r *WMSRepo) GetMarketplaceBatchByID(ctx context.Context, tenantID, id uuid
 
 const listMarketplaceBatchesSQL = `
 SELECT id, tenant_id, batch_number, channel, warehouse_id, file_name,
-       total_orders, processed_orders, failed_orders, unmapped_skus, status, uploaded_by, created_at
+       total_orders, processed_orders, failed_orders, unmapped_skus, status, uploaded_by, created_at,
+       approved_by, approved_at
 FROM marketplace_import_batches
 WHERE tenant_id = $1
 ORDER BY created_at DESC`
 
 const listMarketplaceBatchesByWarehouseSQL = `
 SELECT id, tenant_id, batch_number, channel, warehouse_id, file_name,
-       total_orders, processed_orders, failed_orders, unmapped_skus, status, uploaded_by, created_at
+       total_orders, processed_orders, failed_orders, unmapped_skus, status, uploaded_by, created_at,
+       approved_by, approved_at
 FROM marketplace_import_batches
 WHERE tenant_id = $1 AND warehouse_id = $2
 ORDER BY created_at DESC`
@@ -2571,12 +2580,19 @@ func (r *WMSRepo) ListMarketplaceBatches(ctx context.Context, tenantID uuid.UUID
 	for rows.Next() {
 		var b domain.MarketplaceImportBatch
 		var channel, status string
+		var approvedBy sql.NullString
+		var approvedAt sql.NullTime
 		if err := rows.Scan(
 			&b.ID, &b.TenantID, &b.BatchNumber, &channel, &b.WarehouseID, &b.FileName,
 			&b.TotalOrders, &b.ProcessedOrders, &b.FailedOrders, &b.UnmappedSKUs,
-			&status, &b.UploadedBy, &b.CreatedAt,
+			&status, &b.UploadedBy, &b.CreatedAt, &approvedBy, &approvedAt,
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListMarketplaceBatches: scan: %w", err)
+		}
+		b.ApprovedBy = nullUUIDToPtr(approvedBy)
+		if approvedAt.Valid {
+			t := approvedAt.Time
+			b.ApprovedAt = &t
 		}
 		b.Channel = domain.MarketplaceChannel(channel)
 		b.Status = domain.MarketplaceBatchStatus(status)
@@ -2621,6 +2637,37 @@ func (r *WMSRepo) UpdateMarketplaceBatch(ctx context.Context, batch *domain.Mark
 	}
 
 	return tx.Commit()
+}
+
+func (r *WMSRepo) ClaimMarketplaceBatch(ctx context.Context, tenantID, id uuid.UUID, from, to domain.MarketplaceBatchStatus, approvedBy *uuid.UUID) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceBatch: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceBatch: set tenant: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx, `
+UPDATE marketplace_import_batches
+SET status = $1,
+    approved_by = COALESCE($5, approved_by),
+    approved_at = CASE WHEN $5::uuid IS NULL THEN approved_at ELSE NOW() END
+WHERE tenant_id = $2 AND id = $3 AND status = $4`,
+		string(to), tenantID, id, string(from), ptrToNullUUID(approvedBy))
+	if err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceBatch: exec: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceBatch: rows affected: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("WMSRepo.ClaimMarketplaceBatch: commit: %w", err)
+	}
+	return n == 1, nil
 }
 
 func scanMarketplaceOrderRow(scanner interface{ Scan(dest ...any) error }) (*domain.MarketplaceOrder, error) {

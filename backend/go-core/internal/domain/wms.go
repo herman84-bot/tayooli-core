@@ -22,6 +22,9 @@ var (
 	ErrUnauthorizedWarehouse = errors.New("user is not authorized to access this warehouse")
 	ErrInvalidTransferStatus = errors.New("invalid stock transfer status transition")
 	ErrSelfApprovalForbidden = errors.New("requester cannot approve or reject their own transfer")
+	// ErrMarketplaceSelfApproval: the uploader of a marketplace batch cannot
+	// approve/reject it (M7). Wraps ErrSelfApprovalForbidden for 403 mapping.
+	ErrMarketplaceSelfApproval = fmt.Errorf("%w: pengunggah batch marketplace tidak boleh menyetujui atau menolak batch sendiri", ErrSelfApprovalForbidden)
 	ErrRejectionReasonRequired = errors.New("rejection reason is required")
 	// ErrTransferNotDraft: cancel is only meaningful while the transfer is still
 	// a DRAFT. Once submitted/approved/dispatched it must go through reject or
@@ -239,6 +242,12 @@ const (
 	MarketplaceBatchStatusProcessing MarketplaceBatchStatus = "PROCESSING"
 	MarketplaceBatchStatusCompleted  MarketplaceBatchStatus = "COMPLETED"
 	MarketplaceBatchStatusFailed     MarketplaceBatchStatus = "FAILED"
+	// M7 approval lifecycle: PENDING_APPROVAL -> APPROVED (claimed, deducting)
+	// -> DEDUCTED, or PENDING_APPROVAL -> REJECTED.
+	MarketplaceBatchStatusPendingApproval MarketplaceBatchStatus = "PENDING_APPROVAL"
+	MarketplaceBatchStatusApproved        MarketplaceBatchStatus = "APPROVED"
+	MarketplaceBatchStatusDeducted        MarketplaceBatchStatus = "DEDUCTED"
+	MarketplaceBatchStatusRejected        MarketplaceBatchStatus = "REJECTED"
 )
 
 // MarketplaceOrderStatus represents normalized marketplace order state.
@@ -605,6 +614,8 @@ type MarketplaceImportBatch struct {
 	UnmappedSKUs    int                    `json:"unmapped_skus"`
 	Status          MarketplaceBatchStatus `json:"status"`
 	UploadedBy      uuid.UUID              `json:"uploaded_by"`
+	ApprovedBy      *uuid.UUID             `json:"approved_by,omitempty"`
+	ApprovedAt      *time.Time             `json:"approved_at,omitempty"`
 	CreatedAt       time.Time              `json:"created_at"`
 }
 
@@ -735,6 +746,10 @@ type WMSRepository interface {
 	GetMarketplaceBatchByID(ctx context.Context, tenantID, id uuid.UUID) (*MarketplaceImportBatch, error)
 	ListMarketplaceBatches(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID) ([]MarketplaceImportBatch, error)
 	UpdateMarketplaceBatch(ctx context.Context, batch *MarketplaceImportBatch) error
+	// ClaimMarketplaceBatch atomically moves a batch from -> to; false when the
+	// batch is not in `from` (already claimed by a concurrent request). When
+	// approvedBy is non-nil it also stamps approved_by/approved_at.
+	ClaimMarketplaceBatch(ctx context.Context, tenantID, id uuid.UUID, from, to MarketplaceBatchStatus, approvedBy *uuid.UUID) (bool, error)
 	CreateMarketplaceOrder(ctx context.Context, order *MarketplaceOrder) error
 	GetMarketplaceOrderByExternalID(ctx context.Context, tenantID uuid.UUID, channel MarketplaceChannel, externalID string) (*MarketplaceOrder, error)
 	ListMarketplaceOrders(ctx context.Context, tenantID uuid.UUID, warehouseID, batchID *uuid.UUID, status *MarketplaceOrderStatus) ([]MarketplaceOrder, error)
