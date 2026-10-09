@@ -37,6 +37,7 @@ import {
   useWarehouses,
   useWarehouseLocations,
   useMarketplaceBatches,
+  useDecideMarketplaceBatch,
   useMarketplaceOrders,
   useMarketplaceOrder,
   useMarketplaceSKUMappings,
@@ -161,6 +162,8 @@ export default function MarketplacePage() {
     isLoading: loadingBatches,
     refetch: refetchBatches,
   } = useMarketplaceBatches()
+  const decideBatch = useDecideMarketplaceBatch()
+  const pendingBatches = batches.filter((b) => b.status === "PENDING_APPROVAL")
   const {
     data: orders = [],
     isLoading: loadingOrders,
@@ -415,7 +418,7 @@ export default function MarketplacePage() {
       showNotification(
         "success",
         "Impor Pesanan Selesai",
-        `Berhasil memproses ${parsedPreview.validOrderCount} pesanan marketplace dan mutasi stok ke pelanggan.`
+        `${parsedPreview.validOrderCount} pesanan tersimpan dan menunggu persetujuan owner/admin lain sebelum stok dipotong.`
       )
       handleClearImport()
       refetchBatches()
@@ -1369,6 +1372,62 @@ export default function MarketplacePage() {
         {/* =================================================================== */}
         {activeTab === "orders" && (
           <div className="space-y-4">
+            {pendingBatches.length > 0 && (
+              <section aria-label="Batch menunggu persetujuan" className="bg-amber-50 rounded-xl border border-amber-200 p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-amber-900">
+                  Batch Menunggu Persetujuan ({pendingBatches.length})
+                </h3>
+                <p className="text-xs text-amber-800">
+                  Stok baru dipotong setelah batch disetujui owner/admin yang bukan pengunggah.
+                </p>
+                <ul className="divide-y divide-amber-200">
+                  {pendingBatches.map((b) => (
+                    <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                      <div className="text-xs">
+                        <div className="font-mono font-semibold text-slate-800">{b.batch_number}</div>
+                        <div className="text-slate-600">
+                          {b.channel} · {b.processed_orders} pesanan · {b.file_name}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={decideBatch.isPending}
+                          onClick={() =>
+                            decideBatch.mutate(
+                              { id: b.id, action: "approve" },
+                              {
+                                onSuccess: () => showNotification("success", "Batch Disetujui", `${b.batch_number}: stok telah dipotong.`),
+                                onError: (err) => showNotification("error", "Gagal Menyetujui", err instanceof Error ? err.message : "Gagal menyetujui batch"),
+                              }
+                            )
+                          }
+                          className="min-h-[40px] px-3 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:opacity-50"
+                        >
+                          Setujui & Potong Stok
+                        </button>
+                        <button
+                          type="button"
+                          disabled={decideBatch.isPending}
+                          onClick={() =>
+                            decideBatch.mutate(
+                              { id: b.id, action: "reject" },
+                              {
+                                onSuccess: () => showNotification("success", "Batch Ditolak", `${b.batch_number}: tidak ada stok yang dipotong.`),
+                                onError: (err) => showNotification("error", "Gagal Menolak", err instanceof Error ? err.message : "Gagal menolak batch"),
+                              }
+                            )
+                          }
+                          className="min-h-[40px] px-3 rounded-lg border border-rose-300 text-rose-700 text-xs font-semibold disabled:opacity-50"
+                        >
+                          Tolak
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             {/* Filter Controls Toolbar */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

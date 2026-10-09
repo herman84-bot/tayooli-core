@@ -1140,7 +1140,15 @@ export type MarketplaceChannel =
   | "BLIBLI"
   | "OTHER"
 
-export type MarketplaceBatchStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED"
+export type MarketplaceBatchStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED"
+  | "PENDING_APPROVAL"
+  | "APPROVED"
+  | "DEDUCTED"
+  | "REJECTED"
 
 export type MarketplaceOrderStatus =
   | "PENDING"
@@ -1164,6 +1172,8 @@ export interface MarketplaceImportBatch {
   unmapped_skus: number
   status: MarketplaceBatchStatus
   uploaded_by: string
+  approved_by?: string
+  approved_at?: string
   created_at: string
 }
 
@@ -1844,6 +1854,10 @@ export const api = {
         request<{ data: MarketplaceImportBatch[] }>(
           `/wms/marketplace/batches${warehouseId ? `?warehouse_id=${encodeURIComponent(warehouseId)}` : ""}`
         ),
+      approveBatch: (id: string) =>
+        request<{ data: MarketplaceImportBatch }>(`/wms/marketplace/batches/${id}/approve`, { method: "POST" }),
+      rejectBatch: (id: string) =>
+        request<{ data: MarketplaceImportBatch }>(`/wms/marketplace/batches/${id}/reject`, { method: "POST" }),
       listOrders: (params?: { warehouse_id?: string; batch_id?: string; status?: string }) => {
         const searchParams = new URLSearchParams()
         if (params?.warehouse_id) searchParams.set("warehouse_id", params.warehouse_id)

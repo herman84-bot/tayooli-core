@@ -554,6 +554,25 @@ export function useImportMarketplaceOrders() {
 }
 
 /**
+ * M7: approve (deducts stock) or reject a PENDING_APPROVAL marketplace batch.
+ * Backend enforces owner/admin role and that the approver is not the uploader.
+ */
+export function useDecideMarketplaceBatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "approve" | "reject" }) =>
+      action === "approve"
+        ? api.wms.marketplace.approveBatch(id)
+        : api.wms.marketplace.rejectBatch(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wms", "marketplace", "batches"] })
+      qc.invalidateQueries({ queryKey: ["wms", "marketplace", "orders"] })
+      qc.invalidateQueries({ queryKey: ["wms", "stock"] })
+    },
+  })
+}
+
+/**
  * Mutation to create or update channel SKU mapping and reprocess pending orders.
  */
 export function useCreateSKUMapping() {
