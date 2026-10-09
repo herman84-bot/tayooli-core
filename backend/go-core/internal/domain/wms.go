@@ -160,6 +160,15 @@ const (
 	SKUMappingTypeVendor      SKUMappingType = "VENDOR"
 )
 
+// SKUMappingStatus represents the approval lifecycle of an external SKU mapping (M2/M10).
+type SKUMappingStatus string
+
+const (
+	SKUMappingStatusPending  SKUMappingStatus = "PENDING"
+	SKUMappingStatusApproved SKUMappingStatus = "APPROVED"
+	SKUMappingStatusRejected SKUMappingStatus = "REJECTED"
+)
+
 // StockMovementStatus represents ledger movement finality.
 type StockMovementStatus string
 
@@ -340,16 +349,17 @@ type ProductBarcode struct {
 
 // ProductSKUMapping maps external channel or customer SKUs to internal product.
 type ProductSKUMapping struct {
-	ID           uuid.UUID       `json:"id"`
-	TenantID     uuid.UUID       `json:"tenant_id"`
-	ProductID    uuid.UUID       `json:"product_id"`
-	MappingType  SKUMappingType  `json:"mapping_type"`
-	ChannelName  string          `json:"channel_name"`
-	ExternalSKU  string          `json:"external_sku"`
-	ExternalName *string         `json:"external_name,omitempty"`
-	Multiplier   decimal.Decimal `json:"multiplier"`
-	CreatedAt    time.Time       `json:"created_at"`
-	UpdatedAt    time.Time       `json:"updated_at"`
+	ID           uuid.UUID        `json:"id"`
+	TenantID     uuid.UUID        `json:"tenant_id"`
+	ProductID    uuid.UUID        `json:"product_id"`
+	MappingType  SKUMappingType   `json:"mapping_type"`
+	ChannelName  string           `json:"channel_name"`
+	ExternalSKU  string           `json:"external_sku"`
+	ExternalName *string          `json:"external_name,omitempty"`
+	Multiplier   decimal.Decimal  `json:"multiplier"`
+	Status       SKUMappingStatus `json:"status"`
+	CreatedAt    time.Time        `json:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at"`
 }
 
 // StockMovement represents an immutable ledger entry of physical or virtual stock transfer.

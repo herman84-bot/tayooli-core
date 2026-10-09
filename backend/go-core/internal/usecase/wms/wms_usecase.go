@@ -439,6 +439,7 @@ func (u *Usecase) CreateSKUMapping(ctx context.Context, tenantID uuid.UUID, req 
 		ExternalSKU:  strings.TrimSpace(req.ExternalSKU),
 		ExternalName: req.ExternalName,
 		Multiplier:   mult,
+		Status:       domain.SKUMappingStatusApproved,
 		CreatedAt:    time.Now().UTC(),
 		UpdatedAt:    time.Now().UTC(),
 	}
@@ -1845,6 +1846,12 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 				return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf(
 					"Pesanan %s SKU %s: jumlah %s tidak valid (wajib 1-%d)",
 					strings.TrimSpace(o.ExternalOrderID), strings.TrimSpace(it.ExternalSKU), it.Quantity.String(), domain.MaxMarketplaceItemQty)}
+			}
+			// M10: marketplace products are tracked in piece units (PCS), quantity must be an integer.
+			if !it.Quantity.Equal(it.Quantity.Floor()) {
+				return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf(
+					"Pesanan %s SKU %s: kuantitas %s tidak valid (harus bilangan bulat untuk PCS)",
+					strings.TrimSpace(o.ExternalOrderID), strings.TrimSpace(it.ExternalSKU), it.Quantity.String())}
 			}
 			batchQty = batchQty.Add(it.Quantity)
 		}

@@ -206,10 +206,18 @@ func (m *mockWMSRepo) CreateBarcode(ctx context.Context, b *domain.ProductBarcod
 }
 
 func (m *mockWMSRepo) CreateSKUMapping(ctx context.Context, p *domain.ProductSKUMapping) error {
+	if p.Status == "" {
+		p.Status = domain.SKUMappingStatusApproved
+	}
 	key1 := fmt.Sprintf("%s:%s", p.TenantID, p.ExternalSKU)
 	key2 := fmt.Sprintf("%s:%s:%s", p.TenantID, p.ChannelName, p.ExternalSKU)
 	m.skuMappings[key1] = *p
 	m.skuMappings[key2] = *p
+	m.auditLogs = append(m.auditLogs, domain.AuditTrailEntry{
+		Action:     "mapping_approved",
+		EntityType: "sku_mapping",
+		EntityID:   p.ID,
+	})
 	return nil
 }
 
@@ -541,6 +549,11 @@ func (m *mockWMSRepo) ListStockScraps(ctx context.Context, tenantID uuid.UUID, w
 func (m *mockWMSRepo) CreateMarketplaceBatch(ctx context.Context, batch *domain.MarketplaceImportBatch) error {
 	cp := *batch
 	m.marketplaceBatches[batch.ID] = &cp
+	m.auditLogs = append(m.auditLogs, domain.AuditTrailEntry{
+		Action:     "marketplace_imported",
+		EntityType: "marketplace_batch",
+		EntityID:   batch.ID,
+	})
 	return nil
 }
 
@@ -2996,6 +3009,65 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 			require.NoError(t, err, fmt.Sprintf("channel %s must be accepted", goodCh))
 			assert.Equal(t, goodCh, resp.Batch.Channel)
 		}
+	})
+
+	t.Run("M10: integer qty for PCS, mapping status, audit logging", func(t *testing.T) {
+		// 1. Non-integer quantity rejected for PCS
+		badQtyReq := uc.ImportMarketplaceOrdersRequest{
+			WarehouseID:      whID,
+			SourceLocationID: srcLocID,
+			Channel:          domain.MarketplaceChannelShopee,
+			Orders: []uc.ImportOrderRequest{
+				{
+					ExternalOrderID: "M10-DECIMAL-QTY",
+					Items: []uc.ImportOrderItemRequest{
+						{ExternalSKU: "DIRECT-SKU-001", ItemName: "x", Quantity: decimal.NewFromFloat(2.5)},
+					},
+				},
+			},
+		}
+		_, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", badQtyReq)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "non-integer decimal quantity must be rejected")
+
+		// 2. Integer quantity accepted and writes marketplace_imported audit log
+		beforeLogs := len(repo.auditLogs)
+		goodReq := uc.ImportMarketplaceOrdersRequest{
+			WarehouseID:      whID,
+			SourceLocationID: srcLocID,
+			Channel:          domain.MarketplaceChannelShopee,
+			Orders: []uc.ImportOrderRequest{
+				{
+					ExternalOrderID: "M10-INT-QTY",
+					Items: []uc.ImportOrderItemRequest{
+						{ExternalSKU: "DIRECT-SKU-001", ItemName: "x", Quantity: decimal.NewFromInt(3)},
+					},
+				},
+			},
+		}
+		resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", goodReq)
+		require.NoError(t, err)
+		assert.Equal(t, domain.MarketplaceBatchStatusPendingApproval, resp.Batch.Status)
+		assert.True(t, len(repo.auditLogs) > beforeLogs, "marketplace_imported audit log must be written")
+		lastLog := repo.auditLogs[len(repo.auditLogs)-1]
+		assert.Equal(t, "marketplace_imported", lastLog.Action)
+		assert.Equal(t, "marketplace_batch", lastLog.EntityType)
+
+		// 3. SKU mapping creation sets status APPROVED and writes mapping_approved audit log
+		beforeLogs = len(repo.auditLogs)
+		m1 := decimal.NewFromInt(1)
+		mapResp, err := usecase.ResolveSKUMapping(ctx, tenantID, staffID, "warehouse", uc.CreateSKUMappingRequest{
+			ProductID:   prod1ID,
+			MappingType: domain.SKUMappingTypeMarketplace,
+			ChannelName: "SHOPEE",
+			ExternalSKU: "M10-NEW-MAPPING",
+			Multiplier:  &m1,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, domain.SKUMappingStatusApproved, mapResp.Status)
+		assert.True(t, len(repo.auditLogs) > beforeLogs, "mapping_approved audit log must be written")
+		lastMapLog := repo.auditLogs[len(repo.auditLogs)-1]
+		assert.Equal(t, "mapping_approved", lastMapLog.Action)
+		assert.Equal(t, "sku_mapping", lastMapLog.EntityType)
 	})
 
 	t.Run("M2: multiplier ceiling and role gate", func(t *testing.T) {

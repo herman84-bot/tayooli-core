@@ -742,13 +742,14 @@ func (r *WMSRepo) CreateBarcode(ctx context.Context, b *domain.ProductBarcode) e
 }
 
 const createSKUMappingSQL = `
-INSERT INTO product_sku_mappings (id, tenant_id, product_id, mapping_type, channel_name, external_sku, external_name, multiplier, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO product_sku_mappings (id, tenant_id, product_id, mapping_type, channel_name, external_sku, external_name, multiplier, status, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (tenant_id, channel_name, external_sku)
 DO UPDATE SET product_id = EXCLUDED.product_id,
               mapping_type = EXCLUDED.mapping_type,
               external_name = EXCLUDED.external_name,
               multiplier = EXCLUDED.multiplier,
+              status = EXCLUDED.status,
               updated_at = EXCLUDED.updated_at`
 
 func (r *WMSRepo) CreateSKUMapping(ctx context.Context, m *domain.ProductSKUMapping) error {
@@ -775,13 +776,28 @@ func (r *WMSRepo) CreateSKUMapping(ctx context.Context, m *domain.ProductSKUMapp
 	if m.Multiplier.IsZero() {
 		m.Multiplier = decimal.NewFromInt(1)
 	}
+	if m.Status == "" {
+		m.Status = domain.SKUMappingStatusApproved
+	}
 
 	_, err = tx.ExecContext(ctx, createSKUMappingSQL,
 		m.ID, m.TenantID, m.ProductID, m.MappingType, m.ChannelName,
 		m.ExternalSKU, ptrToNullString(m.ExternalName), m.Multiplier,
-		m.CreatedAt, m.UpdatedAt)
+		string(m.Status), m.CreatedAt, m.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("WMSRepo.CreateSKUMapping: exec: %w", err)
+	}
+
+	// M10: audit log for mapping approval/creation
+	details, _ := json.Marshal(map[string]any{
+		"channel_name": m.ChannelName,
+		"external_sku": m.ExternalSKU,
+		"product_id":   m.ProductID,
+		"multiplier":   m.Multiplier,
+		"status":       m.Status,
+	})
+	if err := r.WriteAuditTx(ctx, tx, m.TenantID, nil, "sku_mapping", m.ID, "mapping_approved", details); err != nil {
+		return fmt.Errorf("WMSRepo.CreateSKUMapping: audit: %w", err)
 	}
 
 	return tx.Commit()
@@ -2488,6 +2504,17 @@ func (r *WMSRepo) CreateMarketplaceBatch(ctx context.Context, batch *domain.Mark
 		return fmt.Errorf("WMSRepo.CreateMarketplaceBatch: exec: %w", err)
 	}
 
+	// M10: audit log for marketplace import
+	batchDetails, _ := json.Marshal(map[string]any{
+		"batch_number": batch.BatchNumber,
+		"channel":      batch.Channel,
+		"total_orders": batch.TotalOrders,
+		"file_name":    batch.FileName,
+	})
+	if err := r.WriteAuditTx(ctx, tx, batch.TenantID, &batch.UploadedBy, "marketplace_batch", batch.ID, "marketplace_imported", batchDetails); err != nil {
+		return fmt.Errorf("WMSRepo.CreateMarketplaceBatch: audit: %w", err)
+	}
+
 	return tx.Commit()
 }
 
@@ -3021,7 +3048,7 @@ func (r *WMSRepo) ClaimMarketplaceOrder(ctx context.Context, tenantID, id uuid.U
 }
 
 const getSKUMappingSQL = `
-SELECT id, tenant_id, product_id, mapping_type, channel_name, external_sku, external_name, multiplier, created_at, updated_at
+SELECT id, tenant_id, product_id, mapping_type, channel_name, external_sku, external_name, multiplier, status, created_at, updated_at
 FROM product_sku_mappings
 WHERE tenant_id = $1 AND channel_name = $2 AND external_sku = $3
 LIMIT 1`
@@ -3039,10 +3066,10 @@ func (r *WMSRepo) GetSKUMapping(ctx context.Context, tenantID uuid.UUID, channel
 
 	var m domain.ProductSKUMapping
 	var extName sql.NullString
-	var mappingType string
+	var mappingType, status string
 	err = tx.QueryRowContext(ctx, getSKUMappingSQL, tenantID, channelName, externalSKU).Scan(
 		&m.ID, &m.TenantID, &m.ProductID, &mappingType, &m.ChannelName,
-		&m.ExternalSKU, &extName, &m.Multiplier, &m.CreatedAt, &m.UpdatedAt,
+		&m.ExternalSKU, &extName, &m.Multiplier, &status, &m.CreatedAt, &m.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -3052,6 +3079,7 @@ func (r *WMSRepo) GetSKUMapping(ctx context.Context, tenantID uuid.UUID, channel
 	}
 	m.MappingType = domain.SKUMappingType(mappingType)
 	m.ExternalName = nullStringToPtr(extName)
+	m.Status = domain.SKUMappingStatus(status)
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("WMSRepo.GetSKUMapping: commit: %w", err)
@@ -3060,13 +3088,13 @@ func (r *WMSRepo) GetSKUMapping(ctx context.Context, tenantID uuid.UUID, channel
 }
 
 const listSKUMappingsSQL = `
-SELECT id, tenant_id, product_id, mapping_type, channel_name, external_sku, external_name, multiplier, created_at, updated_at
+SELECT id, tenant_id, product_id, mapping_type, channel_name, external_sku, external_name, multiplier, status, created_at, updated_at
 FROM product_sku_mappings
 WHERE tenant_id = $1
 ORDER BY created_at DESC`
 
 const listSKUMappingsByChannelSQL = `
-SELECT id, tenant_id, product_id, mapping_type, channel_name, external_sku, external_name, multiplier, created_at, updated_at
+SELECT id, tenant_id, product_id, mapping_type, channel_name, external_sku, external_name, multiplier, status, created_at, updated_at
 FROM product_sku_mappings
 WHERE tenant_id = $1 AND channel_name = $2
 ORDER BY created_at DESC`
@@ -3098,15 +3126,16 @@ func (r *WMSRepo) ListSKUMappings(ctx context.Context, tenantID uuid.UUID, chann
 	for rows.Next() {
 		var m domain.ProductSKUMapping
 		var extName sql.NullString
-		var mappingType string
+		var mappingType, status string
 		if err := rows.Scan(
 			&m.ID, &m.TenantID, &m.ProductID, &mappingType, &m.ChannelName,
-			&m.ExternalSKU, &extName, &m.Multiplier, &m.CreatedAt, &m.UpdatedAt,
+			&m.ExternalSKU, &extName, &m.Multiplier, &status, &m.CreatedAt, &m.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListSKUMappings: scan: %w", err)
 		}
 		m.MappingType = domain.SKUMappingType(mappingType)
 		m.ExternalName = nullStringToPtr(extName)
+		m.Status = domain.SKUMappingStatus(status)
 		res = append(res, m)
 	}
 	if err := rows.Err(); err != nil {

@@ -1268,6 +1268,7 @@ export interface MarketplaceSKUMapping {
   external_sku: string
   external_name?: string | null
   multiplier: number | string
+  status?: "PENDING" | "APPROVED" | "REJECTED"
   created_at: string
   updated_at?: string
   product_name?: string
