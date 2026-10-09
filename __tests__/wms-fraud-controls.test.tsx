@@ -1,8 +1,8 @@
 import React from "react"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import "@testing-library/jest-dom"
-import StockScrapPage from "@/app/(app)/wms/scrap/page.tsx"
-import StockOpnamePage from "@/app/(app)/wms/opname/page.tsx"
+import StockScrapPage from "@/app/(app)/wms/scrap/page"
+import StockOpnamePage from "@/app/(app)/wms/opname/page"
 import DeliveryOrdersPanel from "@/components/wms/DeliveryOrdersPanel"
 
 // Mock hooks
