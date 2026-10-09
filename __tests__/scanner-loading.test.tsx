@@ -103,6 +103,12 @@ jest.mock('@/hooks/useWMSManifests', () => ({
   }),
 }))
 
+jest.mock('@/hooks/useWMSDocksAndLPNs', () => ({
+  useStockLPNs: () => ({ data: [], isLoading: false }),
+  useStockLPNDetail: () => ({ data: null, isLoading: false }),
+  useMoveLPN: () => ({ mutate: jest.fn(), isPending: false }),
+}))
+
 describe('Task 6: Barcode Scanner Truck Loading Mode', () => {
   beforeEach(() => {
     jest.clearAllMocks()

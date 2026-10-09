@@ -35,9 +35,14 @@ import {
   useShippingManifestDetail,
   useScanLoadingDO,
 } from "@/hooks/useWMSManifests"
+import {
+  useStockLPNs,
+  useStockLPNDetail,
+  useMoveLPN,
+} from "@/hooks/useWMSDocksAndLPNs"
 import { ResolvedProduct } from "@/lib/api"
 
-type ScannerMode = "PUTAWAY" | "OUTBOUND" | "PRICE_CHECK" | "LOADING_TRUCK"
+type ScannerMode = "PUTAWAY" | "OUTBOUND" | "PRICE_CHECK" | "LOADING_TRUCK" | "PALLET_LPN"
 
 export default function BarcodeScannerPage() {
   const [mode, setMode] = useState<ScannerMode>("PUTAWAY")
@@ -80,19 +85,108 @@ export default function BarcodeScannerPage() {
   const { data: manifestDetail } = useShippingManifestDetail(selectedManifestId || undefined)
   const scanLoadingMutation = useScanLoadingDO()
 
+  // State for PALLET_LPN mode
+  const [scannedLPNCode, setScannedLPNCode] = useState<string | null>(null)
+  const [matchedLPNId, setMatchedLPNId] = useState<string | null>(null)
+  const [targetRackLocation, setTargetRackLocation] = useState<string | null>(null)
+  const [targetRackLocationId, setTargetRackLocationId] = useState<string | null>(null)
+  const [lpnPutawaySuccessMessage, setLpnPutawaySuccessMessage] = useState<string | null>(null)
+  const [lpnPutawayErrorMessage, setLpnPutawayErrorMessage] = useState<string | null>(null)
+
   // Query product resolution
   const { data: resolvedProduct, isFetching: resolving, isError: resolveError } = useResolveBarcode(
     activeCode || null
   )
 
-  // Available locations for suggestion
+  // Available locations for suggestion and LPN queries
   const { data: locations = [] } = useWarehouseLocations()
+  const activeWarehouseId = locations[0]?.warehouse_id || null
+
+  // Queries and mutations for PALLET_LPN mode
+  const { data: stockLPNs = [] } = useStockLPNs(activeWarehouseId)
+  const { data: lpnDetail, isLoading: lpnDetailLoading } = useStockLPNDetail(matchedLPNId)
+  const moveLPNMutation = useMoveLPN()
 
   // Hardware Scanner Integration
   const handleBarcodeDetected = useCallback(
     (code: string) => {
       setLastScannedCode(code)
       setActiveCode(code)
+
+      // Pallet LPN Putaway Mode Logic
+      if (mode === "PALLET_LPN") {
+        // Step 1: Scan Palet LPN
+        if (!scannedLPNCode) {
+          const trimmedCode = code.trim()
+          const foundLPN = stockLPNs.find(
+            (l) =>
+              l.lpn_code.toUpperCase() === trimmedCode.toUpperCase() ||
+              l.id.toUpperCase() === trimmedCode.toUpperCase()
+          )
+
+          if (foundLPN || trimmedCode.toUpperCase().startsWith("LPN-")) {
+            const lpnCode = foundLPN ? foundLPN.lpn_code : trimmedCode.toUpperCase()
+            const lpnId = foundLPN ? foundLPN.id : trimmedCode
+            setScannedLPNCode(lpnCode)
+            setMatchedLPNId(lpnId)
+            setLpnPutawayErrorMessage(null)
+            setLpnPutawaySuccessMessage(`Palet [${lpnCode}] terpilih! Silakan scan barcode Rak Tujuan.`)
+            playTone("success")
+          } else {
+            playTone("error")
+            setLpnPutawayErrorMessage(`Barcode [${trimmedCode}] bukan palet LPN valid! (Gunakan format LPN-XXXX)`)
+            setLpnPutawaySuccessMessage(null)
+          }
+          return
+        }
+
+        // Step 2: Scan Rak Tujuan & Pindahkan Seluruh Isi Palet
+        const trimmedLocCode = code.trim().toUpperCase()
+        const loc = locations.find(
+          (l) =>
+            l.code.toUpperCase() === trimmedLocCode ||
+            l.id.toUpperCase() === trimmedLocCode ||
+            (l.barcode && l.barcode.toUpperCase() === trimmedLocCode)
+        )
+
+        if (!loc) {
+          playTone("error")
+          setLpnPutawayErrorMessage(`Lokasi rak [${code.trim()}] tidak valid atau tidak terdaftar!`)
+          return
+        }
+
+        setTargetRackLocation(loc.code)
+        setTargetRackLocationId(loc.id)
+
+        moveLPNMutation.mutate(
+          {
+            id: matchedLPNId!,
+            data: { target_location_id: loc.id },
+          },
+          {
+            onSuccess: () => {
+              playTone("success")
+              setLpnPutawaySuccessMessage(
+                `BERHASIL: Seluruh isi palet [${scannedLPNCode}] berhasil dipindahkan ke rak [${loc.code}]!`
+              )
+              setLpnPutawayErrorMessage(null)
+              setScannedLPNCode(null)
+              setMatchedLPNId(null)
+              setTargetRackLocation(null)
+              setTargetRackLocationId(null)
+            },
+            onError: (err: unknown) => {
+              playTone("error")
+              const errMsg =
+                err instanceof Error && err.message
+                  ? err.message
+                  : `Gagal memindahkan palet [${scannedLPNCode}] ke rak [${loc.code}]`
+              setLpnPutawayErrorMessage(errMsg)
+            },
+          }
+        )
+        return
+      }
 
       // Truck Loading Mode Logic
       if (mode === "LOADING_TRUCK") {
@@ -166,7 +260,18 @@ export default function BarcodeScannerPage() {
         }
       }
     },
-    [mode, selectedManifestId, scanLoadingMutation, putawayRack, locations, expectedSku]
+    [
+      mode,
+      scannedLPNCode,
+      matchedLPNId,
+      stockLPNs,
+      locations,
+      moveLPNMutation,
+      selectedManifestId,
+      scanLoadingMutation,
+      putawayRack,
+      expectedSku,
+    ]
   )
 
   const { triggerScan, playTone } = useBarcodeScanner({
@@ -325,7 +430,7 @@ export default function BarcodeScannerPage() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-5 space-y-5">
         {/* ── Mode Switcher Pills (min 48px touch target) ── */}
-        <div className="bg-white p-1.5 rounded-xl border border-[#E2E8F0] grid grid-cols-2 sm:grid-cols-4 gap-1 shadow-xs">
+        <div className="bg-white p-1.5 rounded-xl border border-[#E2E8F0] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 shadow-xs">
           <button
             type="button"
             onClick={() => {
@@ -377,6 +482,23 @@ export default function BarcodeScannerPage() {
 
           <button
             type="button"
+            onClick={() => {
+              setMode("PALLET_LPN")
+              setLpnPutawaySuccessMessage(null)
+              setLpnPutawayErrorMessage(null)
+            }}
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
+              mode === "PALLET_LPN"
+                ? "bg-[#2563EB] text-white shadow-xs"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <Box className="w-4 h-4 shrink-0" />
+            <span className="truncate">Palet (LPN Putaway)</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setMode("PRICE_CHECK")}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
               mode === "PRICE_CHECK"
@@ -410,6 +532,12 @@ export default function BarcodeScannerPage() {
                 <span>
                   <strong>Pemuatan Armada:</strong> Pilih nomor manifest pengiriman, kemudian scan barcode
                   Surat Jalan (DO) saat dimuat ke truk.
+                </span>
+              )}
+              {mode === "PALLET_LPN" && (
+                <span>
+                  <strong>Putaway Palet LPN:</strong> Langkah 1 Scan Barcode Palet LPN &rarr; Langkah 2 Scan
+                  Barcode Rak Lokasi Tujuan.
                 </span>
               )}
               {mode === "PRICE_CHECK" && (
@@ -687,6 +815,252 @@ export default function BarcodeScannerPage() {
           </div>
         )}
 
+        {/* ── Pallet LPN Putaway Mode Section ── */}
+        {mode === "PALLET_LPN" && (
+          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs space-y-4">
+            {/* Step Indicators */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Step 1 Indicator */}
+              <div
+                className={`p-3.5 rounded-xl border-2 transition-all ${
+                  scannedLPNCode
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-900"
+                    : "bg-blue-50 border-blue-500 text-blue-900"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                        scannedLPNCode
+                          ? "bg-emerald-600 text-white"
+                          : "bg-blue-600 text-white"
+                      }`}
+                    >
+                      1
+                    </span>
+                    <span className="font-bold text-xs uppercase tracking-wider">
+                      Langkah 1: Scan Barcode Palet LPN
+                    </span>
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded ${
+                      scannedLPNCode
+                        ? "text-emerald-700 bg-emerald-100"
+                        : "text-amber-800 bg-amber-100"
+                    }`}
+                  >
+                    {scannedLPNCode ? (
+                      <>
+                        <Check className="w-3 h-3" />
+                        Sudah Terpilih
+                      </>
+                    ) : (
+                      "Belum Terpilih"
+                    )}
+                  </span>
+                </div>
+                <div className="text-xs mt-2">
+                  {scannedLPNCode ? (
+                    <div>
+                      Palet terpilih:{" "}
+                      <span className="font-mono font-bold text-emerald-900">
+                        {scannedLPNCode}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-blue-700">
+                      Scan barcode palet LPN (format LPN-XXXX) untuk memulai.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Step 2 Indicator */}
+              <div
+                className={`p-3.5 rounded-xl border-2 transition-all ${
+                  !scannedLPNCode
+                    ? "bg-slate-50 border-slate-200 text-slate-400 opacity-70"
+                    : targetRackLocation
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-900"
+                    : "bg-amber-50 border-amber-500 text-amber-900"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                        !scannedLPNCode
+                          ? "bg-slate-300 text-slate-600"
+                          : targetRackLocation
+                          ? "bg-emerald-600 text-white"
+                          : "bg-amber-600 text-white"
+                      }`}
+                    >
+                      2
+                    </span>
+                    <span className="font-bold text-xs uppercase tracking-wider">
+                      Langkah 2: Scan Barcode Rak Lokasi Tujuan
+                    </span>
+                  </div>
+                  {targetRackLocation && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                      <Check className="w-3 h-3" />
+                      Rak Diset
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs mt-2">
+                  {!scannedLPNCode ? (
+                    <div>Selesaikan langkah 1 terlebih dahulu.</div>
+                  ) : targetRackLocation ? (
+                    <div>
+                      Rak tujuan:{" "}
+                      <span className="font-mono font-bold">
+                        {targetRackLocation}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-amber-800 font-medium">
+                      Arahkan forklift &amp; scan barcode rak lokasi tujuan penyimpanan.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Banners for feedback */}
+            {lpnPutawaySuccessMessage && (
+              <div className="p-4 rounded-xl border-2 bg-emerald-50 border-emerald-500 text-emerald-900 flex items-center gap-3 transition-all">
+                <div className="p-2 rounded-full bg-emerald-200 text-emerald-800 shrink-0">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold">PUTAWAY PALET BERHASIL</div>
+                  <div className="text-xs mt-0.5">{lpnPutawaySuccessMessage}</div>
+                </div>
+              </div>
+            )}
+
+            {lpnPutawayErrorMessage && (
+              <div className="p-4 rounded-xl border-2 bg-rose-50 border-rose-500 text-rose-900 flex items-center gap-3 transition-all">
+                <div className="p-2 rounded-full bg-rose-200 text-rose-800 shrink-0">
+                  <AlertCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold">PERINGATAN SCAN PALET</div>
+                  <div className="text-xs mt-0.5">{lpnPutawayErrorMessage}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Selected Pallet Details & Items List */}
+            {matchedLPNId && (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Box className="w-5 h-5 text-blue-600" />
+                    <span className="font-bold text-slate-800 text-sm">
+                      Informasi Palet Terpilih
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScannedLPNCode(null)
+                      setMatchedLPNId(null)
+                      setTargetRackLocation(null)
+                      setTargetRackLocationId(null)
+                      setLpnPutawaySuccessMessage(null)
+                      setLpnPutawayErrorMessage(null)
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-100 transition-colors shadow-2xs"
+                  >
+                    Ganti Palet
+                  </button>
+                </div>
+
+                {/* Pallet Badge: Kode LPN, Tipe Palet, Lokasi Saat Ini, Total Berat kg */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3.5 rounded-lg border border-slate-200 text-xs">
+                  <div>
+                    <div className="text-slate-500">Kode LPN:</div>
+                    <div className="font-mono font-bold text-slate-900 mt-0.5">
+                      {lpnDetail?.lpn?.lpn_code || scannedLPNCode}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Tipe Palet:</div>
+                    <div className="font-semibold text-slate-900 mt-0.5">
+                      {lpnDetail?.lpn?.pallet_type || "STANDARD"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Lokasi Saat Ini:</div>
+                    <div className="font-mono font-bold text-slate-900 mt-0.5">
+                      {lpnDetail?.lpn?.location_code || lpnDetail?.lpn?.location_name || "-"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Total Berat:</div>
+                    <div className="font-bold text-slate-900 mt-0.5">
+                      {lpnDetail?.lpn?.total_weight_kg ?? 0} kg
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table/List ringkas isi koli di dalam palet */}
+                <div>
+                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                    Daftar Koli Di Dalam Palet:
+                  </div>
+                  {lpnDetailLoading ? (
+                    <div className="text-xs text-slate-500 py-3 text-center">
+                      Memuat detail koli palet...
+                    </div>
+                  ) : !lpnDetail?.items || lpnDetail.items.length === 0 ? (
+                    <div className="text-xs text-slate-400 py-3 text-center italic bg-white rounded-lg border border-slate-200">
+                      Palet ini kosong (belum ada item yang dikemas).
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                          <tr>
+                            <th className="py-2.5 px-3 w-10">No</th>
+                            <th className="py-2.5 px-3">SKU</th>
+                            <th className="py-2.5 px-3">Nama Barang</th>
+                            <th className="py-2.5 px-3">Batch</th>
+                            <th className="py-2.5 px-3 text-right">Jumlah</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {lpnDetail.items.map((item, idx) => (
+                            <tr key={item.id || idx} className="hover:bg-slate-50">
+                              <td className="py-2.5 px-3 text-slate-500">{idx + 1}</td>
+                              <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
+                                {item.product_sku || "-"}
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-800">
+                                {item.product_name || "-"}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-slate-600">
+                                {item.batch_number || "-"}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-bold text-slate-900">
+                                {item.quantity}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Camera Viewfinder Card with Animated Reticle ── */}
         <div className="bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg border border-slate-800">
           <div className="aspect-4/3 sm:aspect-16/9 w-full relative flex items-center justify-center bg-black">
@@ -799,6 +1173,13 @@ export default function BarcodeScannerPage() {
               className="px-2.5 py-1 text-xs rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-mono"
             >
               [Lokasi] RAK-A-01
+            </button>
+            <button
+              type="button"
+              onClick={() => triggerScan("LPN-20261008-0001")}
+              className="px-2.5 py-1 text-xs rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-mono"
+            >
+              [Palet] LPN-0001
             </button>
             <button
               type="button"
