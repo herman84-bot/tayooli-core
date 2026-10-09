@@ -105,14 +105,34 @@ LIMIT 5`
 
 const dashboardWMSCounts = `
 SELECT
-  (SELECT COUNT(*) FROM products WHERE tenant_id = $1)                                   AS total_skus,
-  (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE tenant_id = $1)                 AS total_units,
+  (SELECT COUNT(DISTINCT p.id) FROM products p WHERE p.tenant_id = $1)                   AS total_skus,
+  (SELECT COALESCE(SUM(sm.qty_total), 0)
+     FROM (
+       SELECT sm.product_id, 
+              SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) AS qty_total
+       FROM stock_movements sm
+       JOIN warehouse_locations loc ON (loc.id = sm.dest_location_id OR loc.id = sm.source_location_id) AND loc.tenant_id = sm.tenant_id
+       WHERE sm.tenant_id = $1 AND sm.status = 'DONE' AND loc.type NOT IN ('QUARANTINE', 'STAGING_INBOUND', 'STAGING_OUTBOUND')
+       GROUP BY sm.product_id, loc.id
+       HAVING SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) > 0
+     ) sm
+   )                                                                                       AS total_units,
   (SELECT COUNT(*) FROM warehouses WHERE tenant_id = $1 AND is_active = true)             AS total_warehouses,
   (SELECT COUNT(*) FROM warehouse_locations WHERE tenant_id = $1)                         AS total_locations,
   (SELECT COUNT(*) FROM stock_movements WHERE tenant_id = $1 AND created_at >= CURRENT_DATE) AS today_movements,
-  (SELECT COALESCE(SUM(i.quantity * p.price), 0)
-     FROM inventory i JOIN products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
-    WHERE i.tenant_id = $1)                                                               AS total_stock_value`
+  (SELECT COALESCE(SUM(sm.qty_val), 0)
+     FROM (
+       SELECT sm.product_id, p.price,
+              SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) AS qty_on_hand,
+              SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) * COALESCE(p.price, 0) AS qty_val
+       FROM stock_movements sm
+       JOIN warehouse_locations loc ON (loc.id = sm.dest_location_id OR loc.id = sm.source_location_id) AND loc.tenant_id = sm.tenant_id
+       JOIN products p ON p.id = sm.product_id AND p.tenant_id = sm.tenant_id
+       WHERE sm.tenant_id = $1 AND sm.status = 'DONE' AND loc.type NOT IN ('QUARANTINE', 'STAGING_INBOUND', 'STAGING_OUTBOUND')
+       GROUP BY sm.product_id, p.price, loc.id
+       HAVING SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) > 0
+     ) sm
+   )                                                                                       AS total_stock_value`
 
 const dashboardSalesOrderStats = `
 SELECT
@@ -150,7 +170,8 @@ WHERE tenant_id = $1`
 const dashboardOutboundCounts = `
 SELECT
   COALESCE(SUM(quantity) FILTER (WHERE created_at >= CURRENT_DATE), 0) AS qty_today,
-  COALESCE(SUM(quantity) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)), 0) AS qty_month
+  COALESCE(SUM(quantity) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)), 0) AS qty_month,
+  (SELECT COUNT(*) FROM delivery_orders WHERE tenant_id = $1 AND status = 'CONFIRMED' AND created_at >= NOW() - ($2 || ' days')::interval) AS confirmed_do_count
 FROM stock_movements
 WHERE tenant_id = $1 AND status = 'DONE'
   AND reference_type IN ('DELIVERY_ORDER', 'POS_SALE')`
@@ -413,9 +434,10 @@ func (r *DashboardRepo) GetSummary(ctx context.Context, tenantID uuid.UUID, days
 	}
 
 	// 15. Outbound metrics (CR-04a)
-	err = tx.QueryRowContext(ctx, dashboardOutboundCounts, tenantID).Scan(
+	err = tx.QueryRowContext(ctx, dashboardOutboundCounts, tenantID, days).Scan(
 		&summary.Outbound.QtyToday,
 		&summary.Outbound.QtyMonth,
+		&summary.Outbound.ConfirmedDOCount,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("DashboardRepo.GetSummary: outbound counts: %w", err)

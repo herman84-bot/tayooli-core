@@ -129,6 +129,7 @@ export const TopCustomerSchema = z.object({
 export const OutboundStatsSchema = z.object({
   qty_today: amountString.default('0'),
   qty_month: amountString.default('0'),
+  confirmed_do_count: safeCount.default(0),
   top_products: z.array(TopOutboundProductSchema).default([]),
   top_customers: z.array(TopCustomerSchema).default([]),
 })
@@ -149,6 +150,7 @@ const EMPTY_SALES_ORDERS = { total: 0, confirmed: 0, pending: 0 }
 const EMPTY_OUTBOUND: OutboundStats = {
   qty_today: '0',
   qty_month: '0',
+  confirmed_do_count: 0,
   top_products: [],
   top_customers: [],
 }

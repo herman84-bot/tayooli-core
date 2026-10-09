@@ -558,7 +558,7 @@ export default function DashboardPage() {
             <MiniStat label="Keluar Hari Ini" value={`${s.outbound.qty_today} unit`} />
             <MiniStat label="Keluar Bulan Ini" value={`${s.outbound.qty_month} unit`} />
             <MiniStat label="Total Surat Jalan" value={s.sales_orders.total} />
-            <MiniStat label="DO Dikonfirmasi" value={s.sales_orders.confirmed} />
+            <MiniStat label="DO Dikonfirmasi" value={s.outbound.confirmed_do_count} />
             <MiniStat label="DO Pending" value={s.sales_orders.pending} />
             <MiniStat label="Pelanggan Aktif" value={s.customers.active} />
           </div>

@@ -29,10 +29,11 @@ type DashboardSummary struct {
 
 // OutboundDashStats holds aggregated outbound metrics (CR-04a).
 type OutboundDashStats struct {
-	QtyToday     decimal.Decimal      `json:"qty_today"`
-	QtyMonth     decimal.Decimal      `json:"qty_month"`
-	TopProducts  []TopOutboundProduct `json:"top_products"`
-	TopCustomers []TopCustomer        `json:"top_customers"`
+	QtyToday         decimal.Decimal      `json:"qty_today"`
+	QtyMonth         decimal.Decimal      `json:"qty_month"`
+	ConfirmedDOCount int                  `json:"confirmed_do_count"`
+	TopProducts      []TopOutboundProduct `json:"top_products"`
+	TopCustomers     []TopCustomer        `json:"top_customers"`
 }
 
 // TopOutboundProduct ranks top dispatched products over the period.
