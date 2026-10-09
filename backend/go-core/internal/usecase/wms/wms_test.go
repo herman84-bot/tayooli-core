@@ -2950,6 +2950,54 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		assert.Nil(t, o2.SalesOrderID, "no sales order without deduction")
 	})
 
+	t.Run("M9: channel enum validation and 5000-order batch ceiling", func(t *testing.T) {
+		makeReq := func(ch domain.MarketplaceChannel, count int) uc.ImportMarketplaceOrdersRequest {
+			orders := make([]uc.ImportOrderRequest, count)
+			for i := 0; i < count; i++ {
+				orders[i] = uc.ImportOrderRequest{
+					ExternalOrderID: fmt.Sprintf("M9-ORD-%d", i),
+					Items: []uc.ImportOrderItemRequest{
+						{ExternalSKU: "DIRECT-SKU-001", ItemName: "x", Quantity: decimal.NewFromInt(1)},
+					},
+				}
+			}
+			return uc.ImportMarketplaceOrdersRequest{
+				WarehouseID:      whID,
+				SourceLocationID: srcLocID,
+				Channel:          ch,
+				Orders:           orders,
+			}
+		}
+
+		// 1. Invalid channels rejected
+		for _, badCh := range []domain.MarketplaceChannel{"AMAZON", "EBAY", "SHOPEE_ID", "", "INVALID"} {
+			_, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", makeReq(badCh, 1))
+			assert.ErrorIs(t, err, domain.ErrInvalidInput, fmt.Sprintf("channel %q must be rejected", badCh))
+		}
+
+		// 2. Empty orders rejected
+		_, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", makeReq(domain.MarketplaceChannelShopee, 0))
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "empty orders list must be rejected")
+
+		// 3. Orders exceeding 5000 rejected
+		_, err = usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", makeReq(domain.MarketplaceChannelShopee, domain.MaxMarketplaceBatchOrders+1))
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "more than 5000 orders must be rejected")
+
+		// 4. All valid channels accepted
+		for _, goodCh := range []domain.MarketplaceChannel{
+			domain.MarketplaceChannelShopee,
+			domain.MarketplaceChannelTokopedia,
+			domain.MarketplaceChannelTikTok,
+			domain.MarketplaceChannelLazada,
+			domain.MarketplaceChannelBlibli,
+			domain.MarketplaceChannelOther,
+		} {
+			resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", makeReq(goodCh, 1))
+			require.NoError(t, err, fmt.Sprintf("channel %s must be accepted", goodCh))
+			assert.Equal(t, goodCh, resp.Batch.Channel)
+		}
+	})
+
 	t.Run("M2: multiplier ceiling and role gate", func(t *testing.T) {
 		m1000 := decimal.NewFromInt(1000)
 		m6 := decimal.NewFromInt(6)

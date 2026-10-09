@@ -1823,8 +1823,16 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 	}
 
 	ch := domain.MarketplaceChannel(strings.ToUpper(strings.TrimSpace(string(req.Channel))))
-	if ch == "" {
-		ch = domain.MarketplaceChannelOther
+	if !ch.IsValid() {
+		return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf("Channel %q tidak valid. Pilihan: SHOPEE, TOKOPEDIA, TIKTOK, LAZADA, BLIBLI, OTHER", req.Channel)}
+	}
+
+	// M9: row/batch order count limits.
+	if len(req.Orders) == 0 {
+		return nil, &domain.StockReceiptValidationError{Msg: "Tidak ada pesanan untuk diimpor"}
+	}
+	if len(req.Orders) > domain.MaxMarketplaceBatchOrders {
+		return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf("Jumlah pesanan (%d) melebihi batas maksimal %d per import", len(req.Orders), domain.MaxMarketplaceBatchOrders)}
 	}
 
 	// M1: validate every line before anything is written, so a bad file

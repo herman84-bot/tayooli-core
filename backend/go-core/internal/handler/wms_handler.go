@@ -1239,6 +1239,9 @@ func parseMarketplaceCSV(r io.Reader, channel domain.MarketplaceChannel) ([]uc.I
 	if len(records) < 2 {
 		return []uc.ImportOrderRequest{}, nil
 	}
+	if len(records)-1 > domain.MaxMarketplaceBatchOrders {
+		return nil, fmt.Errorf("jumlah baris CSV (%d) melebihi batas maksimal %d per import", len(records)-1, domain.MaxMarketplaceBatchOrders)
+	}
 
 	headerMap := make(map[string]int)
 	for i, h := range records[0] {
