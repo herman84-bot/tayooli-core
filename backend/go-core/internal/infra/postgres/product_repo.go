@@ -56,7 +56,7 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 
 const getProductByID = `
 SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
-FROM products WHERE id = $1 AND tenant_id = $2`
+FROM products WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`
 
 func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.Product, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -87,7 +87,7 @@ func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dom
 
 const listProductsByTenantPaged = `
 SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
-FROM products WHERE tenant_id = $1
+FROM products WHERE tenant_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3`
 
@@ -148,7 +148,7 @@ func (r *ProductRepo) ListByIDs(ctx context.Context, tenantID uuid.UUID, ids []u
 
 	query := fmt.Sprintf(`
 SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
-FROM products WHERE tenant_id = $1 AND id IN (%s)`, strings.Join(placeholders, ", "))
+FROM products WHERE tenant_id = $1 AND id IN (%s) AND deleted_at IS NULL`, strings.Join(placeholders, ", "))
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -190,7 +190,7 @@ FROM products WHERE tenant_id = $1 AND id IN (%s)`, strings.Join(placeholders, "
 
 const getProductBySKU = `
 SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
-FROM products WHERE tenant_id = $1 AND LOWER(TRIM(sku)) = LOWER(TRIM($2))`
+FROM products WHERE tenant_id = $1 AND LOWER(TRIM(sku)) = LOWER(TRIM($2)) AND deleted_at IS NULL`
 
 func (r *ProductRepo) GetBySKU(ctx context.Context, tenantID uuid.UUID, sku string) (*domain.Product, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -281,7 +281,70 @@ func (r *ProductRepo) HasMovementsOrStock(ctx context.Context, tenantID, id uuid
 	return hasMovements, nil
 }
 
-const deleteProduct = `DELETE FROM products WHERE id = $1 AND tenant_id = $2`
+// ListInventoryFromWMS aggregates qty_on_hand per product from stock_movements ledger
+// (WMS single source of truth), joining product details. Only counts DONE movements
+// on INTERNAL locations. Excludes soft-deleted products.
+const listInventoryFromWMS = `
+WITH movement_stock AS (
+    SELECT 
+        sm.product_id,
+        SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) AS qty
+    FROM stock_movements sm
+    JOIN warehouse_locations loc ON (loc.id = sm.dest_location_id OR loc.id = sm.source_location_id) AND loc.tenant_id = sm.tenant_id
+    WHERE sm.tenant_id = $1 AND sm.status = 'DONE' AND loc.type = 'INTERNAL'
+    GROUP BY sm.product_id
+)
+SELECT 
+    p.id,
+    p.name,
+    p.sku,
+    p.price,
+    COALESCE(ms.qty, 0) AS total_qty
+FROM products p
+LEFT JOIN movement_stock ms ON p.id = ms.product_id
+WHERE p.tenant_id = $1 AND p.deleted_at IS NULL
+ORDER BY p.name ASC`
+
+func (r *ProductRepo) ListInventoryFromWMS(ctx context.Context, tenantID uuid.UUID) ([]domain.InventoryItemWithProduct, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("ProductRepo.ListInventoryFromWMS: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("ProductRepo.ListInventoryFromWMS: set tenant: %w", err)
+	}
+
+	rows, err := tx.QueryContext(ctx, listInventoryFromWMS, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("ProductRepo.ListInventoryFromWMS: query: %w", err)
+	}
+	defer rows.Close()
+
+	var items []domain.InventoryItemWithProduct
+	for rows.Next() {
+		var item domain.InventoryItemWithProduct
+		if err := rows.Scan(&item.ProductID, &item.ProductName, &item.SKU, &item.Price, &item.TotalQuantity); err != nil {
+			return nil, fmt.Errorf("ProductRepo.ListInventoryFromWMS: scan row: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ProductRepo.ListInventoryFromWMS: rows err: %w", err)
+	}
+
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("ProductRepo.ListInventoryFromWMS: close rows: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("ProductRepo.ListInventoryFromWMS: commit: %w", err)
+	}
+	return items, nil
+}
+
+const deleteProduct = `UPDATE products SET deleted_at = NOW() WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`
 
 func (r *ProductRepo) Delete(ctx context.Context, tenantID, id uuid.UUID) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -292,11 +355,6 @@ func (r *ProductRepo) Delete(ctx context.Context, tenantID, id uuid.UUID) error 
 
 	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
 		return fmt.Errorf("ProductRepo.Delete: set tenant: %w", err)
-	}
-
-	// Also clean up 0-quantity inventory rows if any exist
-	if _, err := tx.ExecContext(ctx, `DELETE FROM inventory WHERE product_id = $1 AND tenant_id = $2`, id, tenantID); err != nil {
-		return fmt.Errorf("ProductRepo.Delete: clean inventory: %w", err)
 	}
 
 	res, err := tx.ExecContext(ctx, deleteProduct, id, tenantID)

@@ -21,6 +21,16 @@ type Product struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// InventoryItemWithProduct is returned by ListInventoryFromWMS repo method.
+// Aggregates WMS stock per product with product master data.
+type InventoryItemWithProduct struct {
+	ProductID     uuid.UUID
+	ProductName   string
+	SKU           string
+	Price         float64
+	TotalQuantity float64
+}
+
 type ProductRepository interface {
 	Create(ctx context.Context, p *Product) error
 	GetByID(ctx context.Context, tenantID, id uuid.UUID) (*Product, error)
@@ -32,4 +42,7 @@ type ProductRepository interface {
 	Update(ctx context.Context, p *Product) error
 	Delete(ctx context.Context, tenantID, id uuid.UUID) error
 	HasMovementsOrStock(ctx context.Context, tenantID, id uuid.UUID) (bool, error)
+	// ListInventoryFromWMS aggregates qty per product from stock_movements WMS ledger.
+	// Returns product name, SKU, price, and total qty from DONE movements to INTERNAL locations.
+	ListInventoryFromWMS(ctx context.Context, tenantID uuid.UUID) ([]InventoryItemWithProduct, error)
 }

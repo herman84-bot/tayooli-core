@@ -30,18 +30,24 @@ type CreateProductRequest struct {
 }
 
 func (u *Usecase) CreateProduct(ctx context.Context, tenantID uuid.UUID, req CreateProductRequest) (*domain.Product, error) {
-	if req.Name == "" || req.SKU == "" {
+	name := strings.TrimSpace(req.Name)
+	sku := strings.ToUpper(strings.TrimSpace(req.SKU))
+	if name == "" || sku == "" {
 		return nil, domain.ErrInvalidInput
 	}
-	if req.Price < 0 || !validCost(req.CostPrice) {
+	if req.Price <= 0 || !validCost(req.CostPrice) {
 		return nil, domain.ErrInvalidInput
+	}
+	// Check SKU uniqueness per-tenant among active products
+	if existing, err := u.productRepo.GetBySKU(ctx, tenantID, sku); err == nil && existing != nil {
+		return nil, domain.ErrConflict
 	}
 	p := &domain.Product{
 		ID:          uuid.New(),
 		TenantID:    tenantID,
-		Name:        req.Name,
+		Name:        name,
 		Description: req.Description,
-		SKU:         req.SKU,
+		SKU:         sku,
 		Price:       req.Price,
 		CostPrice:   req.CostPrice,
 		CreatedAt:   time.Now(),
@@ -77,11 +83,11 @@ func validCost(c float64) bool {
 
 func (u *Usecase) UpdateProduct(ctx context.Context, tenantID, id uuid.UUID, req UpdateProductRequest) (*domain.Product, error) {
 	name := strings.TrimSpace(req.Name)
-	sku := strings.TrimSpace(req.SKU)
+	sku := strings.ToUpper(strings.TrimSpace(req.SKU))
 	if len(name) < 3 || sku == "" {
 		return nil, domain.ErrInvalidInput
 	}
-	if req.Price < 0 || req.Price != req.Price {
+	if req.Price <= 0 || req.Price != req.Price {
 		return nil, domain.ErrInvalidInput
 	}
 	if req.CostPrice != nil && !validCost(*req.CostPrice) {
@@ -169,37 +175,40 @@ func (u *Usecase) GetInventory(ctx context.Context, tenantID, id uuid.UUID) (*do
 	return u.inventoryRepo.GetByID(ctx, tenantID, id)
 }
 
-// InventoryItem joins an inventory row with its product details for display.
+// InventoryItem represents aggregated stock from WMS ledger for a product.
+// Product details (name, SKU, price) are fetched from products table.
+// Quantity is sum of all DONE stock_movements to INTERNAL warehouse locations.
 type InventoryItem struct {
-	domain.Inventory
-	Product *domain.Product `json:"product,omitempty"`
+	ProductID     uuid.UUID `json:"product_id"`
+	ProductName   string    `json:"product_name"`
+	SKU           string    `json:"sku"`
+	Price         float64   `json:"price"`
+	TotalQuantity float64   `json:"total_quantity"`
+	Quantity      float64   `json:"quantity"`
 }
 
+// ListInventory returns inventory aggregated from WMS stock_movements ledger (single source of truth).
+// Only counts DONE movements to INTERNAL warehouse locations; excludes staging/scrap/transit.
+// Result ordered by product name.
 func (u *Usecase) ListInventory(ctx context.Context, tenantID uuid.UUID) ([]InventoryItem, error) {
-	rows, err := u.inventoryRepo.List(ctx, tenantID)
+	wmsItems, err := u.productRepo.ListInventoryFromWMS(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
-	if len(rows) == 0 {
+	if len(wmsItems) == 0 {
 		return []InventoryItem{}, nil
 	}
 
-	ids := make([]uuid.UUID, 0, len(rows))
-	for _, r := range rows {
-		ids = append(ids, r.ProductID)
-	}
-	products, err := u.productRepo.ListByIDs(ctx, tenantID, ids)
-	if err != nil {
-		return nil, err
-	}
-	byID := make(map[uuid.UUID]*domain.Product, len(products))
-	for i := range products {
-		byID[products[i].ID] = &products[i]
-	}
-
-	items := make([]InventoryItem, 0, len(rows))
-	for _, r := range rows {
-		items = append(items, InventoryItem{Inventory: r, Product: byID[r.ProductID]})
+	items := make([]InventoryItem, 0, len(wmsItems))
+	for _, item := range wmsItems {
+		items = append(items, InventoryItem{
+			ProductID:     item.ProductID,
+			ProductName:   item.ProductName,
+			SKU:           item.SKU,
+			Price:         item.Price,
+			TotalQuantity: item.TotalQuantity,
+			Quantity:      item.TotalQuantity,
+		})
 	}
 	return items, nil
 }

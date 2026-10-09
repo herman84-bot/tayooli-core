@@ -77,6 +77,10 @@ func (m *mockProductRepo) HasMovementsOrStock(ctx context.Context, tenantID, id 
 	return m.hasMovements, nil
 }
 
+func (m *mockProductRepo) ListInventoryFromWMS(ctx context.Context, tenantID uuid.UUID) ([]domain.InventoryItemWithProduct, error) {
+	return nil, nil
+}
+
 type mockInventoryRepo struct{}
 
 func (m *mockInventoryRepo) Create(ctx context.Context, i *domain.Inventory) error { return nil }

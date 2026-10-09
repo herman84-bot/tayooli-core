@@ -84,6 +84,22 @@ func (m *mockProductRepo) HasMovementsOrStock(ctx context.Context, tenantID, id 
 	return m.hasMovements, nil
 }
 
+func (m *mockProductRepo) ListInventoryFromWMS(ctx context.Context, tenantID uuid.UUID) ([]domain.InventoryItemWithProduct, error) {
+	var list []domain.InventoryItemWithProduct
+	for _, p := range m.products {
+		if p.TenantID == tenantID {
+			list = append(list, domain.InventoryItemWithProduct{
+				ProductID:     p.ID,
+				ProductName:   p.Name,
+				SKU:           p.SKU,
+				Price:         p.Price,
+				TotalQuantity: 10,
+			})
+		}
+	}
+	return list, nil
+}
+
 type mockInventoryRepo struct{}
 
 func (m *mockInventoryRepo) Create(ctx context.Context, i *domain.Inventory) error { return nil }
@@ -203,5 +219,105 @@ func TestProductCostPrice(t *testing.T) {
 	neg := -5.0
 	if _, err := uc.UpdateProduct(ctx, tenantID, p.ID, product.UpdateProductRequest{Name: "Teh Manis", SKU: "TEH-1", Price: 5500, CostPrice: &neg}); err != domain.ErrInvalidInput {
 		t.Errorf("negative cost on update: expected ErrInvalidInput, got %v", err)
+	}
+}
+
+func TestProductValidation(t *testing.T) {
+	ctx := context.Background()
+	tenantID := uuid.New()
+	pRepo := newMockProductRepo()
+	iRepo := &mockInventoryRepo{}
+	uc := product.New(pRepo, iRepo)
+
+	// 1. Price <= 0 rejected
+	_, err := uc.CreateProduct(ctx, tenantID, product.CreateProductRequest{
+		Name:  "Test Product",
+		SKU:   "TEST-001",
+		Price: 0,
+	})
+	if err != domain.ErrInvalidInput {
+		t.Errorf("expected ErrInvalidInput for price=0, got %v", err)
+	}
+
+	// 2. Negative price rejected
+	_, err = uc.CreateProduct(ctx, tenantID, product.CreateProductRequest{
+		Name:  "Test Product",
+		SKU:   "TEST-001",
+		Price: -100,
+	})
+	if err != domain.ErrInvalidInput {
+		t.Errorf("expected ErrInvalidInput for negative price, got %v", err)
+	}
+
+	// 3. SKU normalized to uppercase and trimmed
+	created, err := uc.CreateProduct(ctx, tenantID, product.CreateProductRequest{
+		Name:  "Test Product",
+		SKU:   "  test-sku  ",
+		Price: 10000,
+	})
+	if err != nil {
+		t.Fatalf("CreateProduct failed: %v", err)
+	}
+	if created.SKU != "TEST-SKU" {
+		t.Errorf("expected SKU TEST-SKU (uppercase, trimmed), got %s", created.SKU)
+	}
+
+	// 4. Duplicate SKU returns ErrConflict
+	_, err = uc.CreateProduct(ctx, tenantID, product.CreateProductRequest{
+		Name:  "Test Product 2",
+		SKU:   "test-sku",
+		Price: 15000,
+	})
+	if err != domain.ErrConflict {
+		t.Errorf("expected ErrConflict for duplicate SKU, got %v", err)
+	}
+
+	// 5. Empty name rejected
+	_, err = uc.CreateProduct(ctx, tenantID, product.CreateProductRequest{
+		Name:  "",
+		SKU:   "TEST-002",
+		Price: 10000,
+	})
+	if err != domain.ErrInvalidInput {
+		t.Errorf("expected ErrInvalidInput for empty name, got %v", err)
+	}
+
+	// 6. Empty SKU rejected
+	_, err = uc.CreateProduct(ctx, tenantID, product.CreateProductRequest{
+		Name:  "Test",
+		SKU:   "",
+		Price: 10000,
+	})
+	if err != domain.ErrInvalidInput {
+		t.Errorf("expected ErrInvalidInput for empty SKU, got %v", err)
+	}
+}
+
+func TestListInventoryFromWMS(t *testing.T) {
+	ctx := context.Background()
+	tenantID := uuid.New()
+	pRepo := newMockProductRepo()
+	iRepo := &mockInventoryRepo{}
+	uc := product.New(pRepo, iRepo)
+
+	// Create a product
+	p, err := uc.CreateProduct(ctx, tenantID, product.CreateProductRequest{
+		Name:  "Produk WMS",
+		SKU:   "WMS-001",
+		Price: 25000,
+	})
+	if err != nil {
+		t.Fatalf("CreateProduct failed: %v", err)
+	}
+
+	items, err := uc.ListInventory(ctx, tenantID)
+	if err != nil {
+		t.Fatalf("ListInventory failed: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 inventory item, got %d", len(items))
+	}
+	if items[0].ProductID != p.ID || items[0].TotalQuantity != 10 {
+		t.Errorf("unexpected item values: %+v", items[0])
 	}
 }

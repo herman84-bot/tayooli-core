@@ -69,6 +69,9 @@ func (m *mockProductRepo) Delete(ctx context.Context, tenantID, id uuid.UUID) er
 func (m *mockProductRepo) HasMovementsOrStock(ctx context.Context, tenantID, id uuid.UUID) (bool, error) {
 	return false, nil
 }
+func (m *mockProductRepo) ListInventoryFromWMS(ctx context.Context, tenantID uuid.UUID) ([]domain.InventoryItemWithProduct, error) {
+	return nil, nil
+}
 
 type mockInventoryRepo struct {
 	stocks map[uuid.UUID]*domain.Inventory

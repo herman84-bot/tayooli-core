@@ -230,6 +230,9 @@ func (m *e2eProductRepo) Delete(ctx context.Context, tenantID, id uuid.UUID) err
 func (m *e2eProductRepo) HasMovementsOrStock(ctx context.Context, tenantID, id uuid.UUID) (bool, error) {
 	return false, nil
 }
+func (m *e2eProductRepo) ListInventoryFromWMS(ctx context.Context, tenantID uuid.UUID) ([]domain.InventoryItemWithProduct, error) {
+	return nil, nil
+}
 
 type e2eInventoryRepo struct {
 	stocks map[uuid.UUID]*domain.Inventory
