@@ -142,17 +142,17 @@ git commit -m "feat(wms): implement usecases and REST handlers for dock scheduli
 - Consumes: Backend endpoints `/api/v1/wms/docks`, `/api/v1/wms/dock-appointments`, `/api/v1/wms/lpns`
 - Produces: Types `InboundDock`, `DockAppointment`, `StockLPN`, `StockLPNDetail`, hooks `useInboundDocks`, `useDockAppointments`, `useStockLPNs`, mutations `useCreateDock`, `useAssignDock`, `useMoveLPN`, dll.
 
-- [ ] **Step 1: Tambahkan types dan client methods di `lib/api.ts`**
+- [x] **Step 1: Tambahkan types dan client methods di `lib/api.ts`**
 Tambahkan types dock/appointment/LPN dan objek `api.wms.docks`, `api.wms.dockAppointments`, `api.wms.lpns`.
 
-- [ ] **Step 2: Buat TanStack Query hooks di `hooks/useWMSDocksAndLPNs.ts`**
+- [x] **Step 2: Buat TanStack Query hooks di `hooks/useWMSDocksAndLPNs.ts`**
 Hooks lengkap dengan query key invalidation untuk `["inbound-docks"]`, `["dock-appointments"]`, `["stock-lpns"]`, `["wms-stock"]`.
 
-- [ ] **Step 3: Uji typecheck TypeScript**
+- [x] **Step 3: Uji typecheck TypeScript**
 Run: `npx tsc --noEmit`
 Expected: 0 error
 
-- [ ] **Step 4: Commit API client & hooks**
+- [x] **Step 4: Commit API client & hooks**
 ```bash
 git add lib/api.ts hooks/useWMSDocksAndLPNs.ts
 git commit -m "feat(wms): add API client methods and TanStack Query hooks for docks and LPNs"
@@ -232,16 +232,16 @@ git commit -m "feat(wms): implement pallet LPN containerization modal and therma
 - Consumes: `useStockLPNs`, `useMoveLPN`
 - Produces: Mode scanner `PALLET_LPN` untuk forklift / operator MHE
 
-- [ ] **Step 1: Tambahkan mode `PALLET_LPN` di scanner**
+- [x] **Step 1: Tambahkan mode `PALLET_LPN` di scanner**
 - Mode 2 langkah: Scan Barcode Palet LPN -> Tampilkan detail isi koli & rekomendasi rak -> Scan Barcode Rak Tujuan.
 - Panggil mutation `moveLPN` untuk memindahkan seluruh isi palet secara atomik.
 - Berikan audio feedback sukses / gagal misplacement.
 
-- [ ] **Step 2: Uji Jest & typecheck**
+- [x] **Step 2: Uji Jest & typecheck**
 Run: `npx tsc --noEmit` && `npm test -- __tests__/scanner-lpn.test.tsx`
 Expected: PASS
 
-- [ ] **Step 3: Commit Scanner LPN Putaway**
+- [x] **Step 3: Commit Scanner LPN Putaway**
 ```bash
 git add app/(app)/wms/scanner/page.tsx __tests__/scanner-lpn.test.tsx
 git commit -m "feat(wms): add pallet LPN forklift putaway scan mode to barcode scanner"

@@ -579,12 +579,12 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [x] **DEPLOY-04:** Push commit ke `main`, verifikasi CI GitHub Actions, dan verifikasi endpoint live produksi Zeabur.
 
 ### SPRINT 5: Fitur Lanjutan Enterprise (Dock Scheduling & Kontainerisasi LPN)
-- [ ] **DB-05:** Tabel master dermaga `inbound_docks`, jadwal armada ASN, dan kontainer palet `stock_lpns`.
-- [ ] **BE-09:** Endpoint penjadwalan dock & generator penomoran LPN palet dinamis.
-- [ ] **FE-11:** Papan jadwal dermaga `/wms/inbound/dock-board` untuk antrean truk di gerbang.
-- [ ] **FE-12:** Mode PDA interaktif penuh untuk operator MHE / Forklift.
-- [ ] **TEST-05:** Pengujian menyeluruh end-to-end simulasi 100 transaksi barang masuk dan keluar.
-- [ ] **DEPLOY-05:** Verifikasi final seluruh alur di domain resmi `https://tayooli.my.id`.
+- [x] **DB-05:** Tabel master dermaga `inbound_docks`, jadwal armada ASN `dock_appointments`, kontainer palet `stock_lpns`, dan rincian koli `stock_lpn_items` (`037_wms_docks_and_lpns.sql`, RLS, indexes) — commit `17b7bef`.
+- [x] **BE-09:** Domain model, PostgreSQL repository, usecase, dan REST handlers untuk manajemen dermaga, anti-collision dock guard, serta pemindahan massal isi palet LPN atomik (`MoveLPN`) dengan ADR-014 Invariant 1 batch preservation — commit `4b82f7f`, `b54836e`, `067e01f`, `25c149b`.
+- [x] **FE-11:** Papan jadwal dermaga (Dock Board) terintegrasi di tab "Antrean Dermaga (Dock)" `/wms/arus-barang?mode=masuk` (mematuhi batas 12 modul KO-2) dengan kontrol siklus armada & pencegahan tabrakan dermaga — commit `ed219b1`.
+- [x] **FE-12:** Modal manajemen palet koli (`LPNManagementModal.tsx`), cetak label stiker palet termal ISO-28219 Code 128 ukuran 100x150 mm (`PrintLPNLabel.tsx`), dan mode scanner PDA 2-step forklift putaway di `/wms/scanner` (mode `PALLET_LPN`) — commit `f966397`, `ae96e07`, `753673c`, `25c149b`.
+- [x] **TEST-05:** Pengujian menyeluruh unit, HTTP handler, dan komponen frontend (33 test case domain, 15 usecase/handler Go, 38 Jest test suites / 375 frontend tests) dengan audit AI Debt clean — commit `4b82f7f`, `067e01f`, `ed219b1`, `f966397`, `753673c`, `25c149b`.
+- [ ] **DEPLOY-05:** Push commit ke `main`, verifikasi CI GitHub Actions, dan verifikasi endpoint live produksi Zeabur (`https://tayooli-backend.zeabur.app/health` & `https://tayooli.my.id`).
 
 ---
 *Dokumen ini merupakan properti arsitektur resmi Tayooli ERP Core. Seluruh modifikasi wajib melalui peninjauan arsitektur tim CTO.*
