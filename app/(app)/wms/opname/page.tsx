@@ -38,6 +38,7 @@ import {
 } from "@/hooks/useWMS"
 import { useProducts } from "@/hooks/useProducts"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
+import { useAuthStore } from "@/hooks/useAuth"
 import {
   StockOpname,
   StockOpnameItem,
@@ -47,6 +48,10 @@ import {
 } from "@/lib/api"
 
 export default function StockOpnamePage() {
+  const currentUser = useAuthStore((s) => s.user)
+  const currentRole = (currentUser?.role ?? "").toLowerCase()
+  const isApprover = currentRole === "admin" || currentRole === "owner" || currentRole === "regional_manager"
+
   const { data: warehouses = [], isLoading: loadingWarehouses, refetch: refetchWarehouses } = useWarehouses()
   const { data: products = [], isLoading: loadingProducts } = useProducts()
 
@@ -258,11 +263,19 @@ export default function StockOpnamePage() {
 
     try {
       await completeOpnameMutation.mutateAsync(activeOpnameId)
-      setToast({
-        type: "success",
-        title: "Posting Penyesuaian Berhasil (@LOSS)",
-        message: "Sesi opname telah dikunci. Mutasi penyeimbang otomatis diposting ke ledger virtual @LOSS.",
-      })
+      if (!isApprover) {
+        setToast({
+          type: "info",
+          title: "Diajukan untuk Persetujuan",
+          message: "Sesi opname diajukan ke status PENDING_APPROVAL. Menunggu persetujuan Admin/Owner/Regional Manager sebelum mutasi stok diposting.",
+        })
+      } else {
+        setToast({
+          type: "success",
+          title: "Posting Penyesuaian Berhasil (@LOSS)",
+          message: "Sesi opname telah disetujui & dikunci. Mutasi penyeimbang otomatis diposting ke ledger virtual @LOSS.",
+        })
+      }
       refetchOpnames()
       refetchActiveOpname()
     } catch (err: unknown) {
@@ -375,7 +388,7 @@ export default function StockOpnamePage() {
   // Helper for location name
   const getLocationName = (id: string) => {
     const loc = opnameLocations.find((l) => l.id === id)
-    return loc ? `${loc.name} [${loc.code}]` : id.slice(0, 8)
+    return loc ? `${loc.name} [${loc.code}]` : (id ? id.slice(0, 8) : "-")
   }
 
   // Helper for product details
@@ -398,6 +411,13 @@ export default function StockOpnamePage() {
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300 animate-pulse">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Sedang Dihitung
+          </span>
+        )
+      case "PENDING_APPROVAL":
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+            Menunggu Approval
           </span>
         )
       case "COMPLETED":
@@ -618,7 +638,7 @@ export default function StockOpnamePage() {
 
           {/* Status Filter Tabs */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-            {(["ALL", "IN_PROGRESS", "DRAFT", "COMPLETED"] as const).map((st) => (
+            {(["ALL", "IN_PROGRESS", "PENDING_APPROVAL", "DRAFT", "COMPLETED"] as const).map((st) => (
               <button
                 key={st}
                 onClick={() => setStatusFilter(st)}
@@ -630,6 +650,7 @@ export default function StockOpnamePage() {
               >
                 {st === "ALL" && "Semua Status"}
                 {st === "IN_PROGRESS" && "Sedang Dihitung"}
+                {st === "PENDING_APPROVAL" && "Menunggu Approval"}
                 {st === "DRAFT" && "Draft"}
                 {st === "COMPLETED" && "Selesai"}
               </button>
@@ -1147,15 +1168,52 @@ export default function StockOpnamePage() {
                   </span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowPostingConfirmModal(true)}
-                  disabled={countedItems.length === 0}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#EA580C] hover:bg-orange-700 disabled:opacity-50 text-white font-bold text-sm rounded-lg shadow-md transition-all min-h-[48px]"
-                >
-                  <Lock className="w-5 h-5" />
-                  <span>Posting Penyesuaian (@LOSS)</span>
-                </button>
+                {(() => {
+                  const isConductor = Boolean(currentUser?.id && activeOpname.conducted_by === currentUser.id)
+                  const isPending = activeOpname.status === "PENDING_APPROVAL"
+
+                  if (isPending && !isApprover) {
+                    return (
+                      <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs font-medium text-center">
+                        Menunggu keputusan persetujuan dari Admin / Owner / Regional Manager.
+                      </div>
+                    )
+                  }
+
+                  if (isPending && isConductor) {
+                    return (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          disabled
+                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-slate-200 text-slate-500 font-bold text-sm rounded-lg cursor-not-allowed min-h-[48px]"
+                        >
+                          <Lock className="w-5 h-5" />
+                          <span>Menunggu Approver Lain (Pemisahan Tugas)</span>
+                        </button>
+                        <p className="text-[11px] text-amber-700 text-center">
+                          Anda pelaksana sesi opname ini. Persetujuan akhir wajib dilakukan oleh approver lain.
+                        </p>
+                      </div>
+                    )
+                  }
+
+                  const buttonLabel = isApprover && !isConductor
+                    ? (isPending ? "Setujui & Posting Penyesuaian (@LOSS)" : "Posting Penyesuaian (@LOSS)")
+                    : "Ajukan untuk Persetujuan (Pending Approval)"
+
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setShowPostingConfirmModal(true)}
+                      disabled={countedItems.length === 0}
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#EA580C] hover:bg-orange-700 disabled:opacity-50 text-white font-bold text-sm rounded-lg shadow-md transition-all min-h-[48px]"
+                    >
+                      <Lock className="w-5 h-5" />
+                      <span>{buttonLabel}</span>
+                    </button>
+                  )
+                })()}
               </div>
             )}
           </div>

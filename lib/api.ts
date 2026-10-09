@@ -674,7 +674,7 @@ export interface StockMovement {
   created_at: string
 }
 
-export type StockOpnameStatus = "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
+export type StockOpnameStatus = "DRAFT" | "IN_PROGRESS" | "PENDING_APPROVAL" | "COMPLETED" | "CANCELLED"
 
 export interface StockOpname {
   id: string
@@ -912,6 +912,7 @@ export interface StockReceiptItem {
   batch_id?: string
   batch_number?: string
   expiry_date?: string
+  ordered_qty?: string | number
   expected_qty?: string | number
   accepted_qty: string | number
   rejected_qty: string | number
@@ -923,6 +924,7 @@ export interface StockReceiptItemInput {
   product_id: string
   batch_number?: string
   expiry_date?: string
+  ordered_qty?: number
   expected_qty?: number
   accepted_qty: number
   rejected_qty: number

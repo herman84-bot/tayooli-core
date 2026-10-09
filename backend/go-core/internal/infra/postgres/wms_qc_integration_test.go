@@ -81,9 +81,10 @@ func TestQCQuarantineRealPostgres(t *testing.T) {
 	repo := postgres.NewWMSRepo(app)
 	uc := wmsuc.New(repo)
 	dec := decimal.NewFromInt
+	poRef := "PO-QC-001"
 	newPosted := func(qty int64) (uuid.UUID, uuid.UUID) {
 		rc, _, err := uc.CreateStockReceipt(ctx, tenantID, userID, "admin", wmsuc.StockReceiptRequest{
-			WarehouseID: warehouseID, DestLocationID: binID, SupplierName: "PT Teh",
+			WarehouseID: warehouseID, DestLocationID: binID, SupplierName: "PT Teh", SourceRef: &poRef,
 			Items: []wmsuc.StockReceiptItemRequest{{ProductID: productID, AcceptedQty: dec(qty)}},
 		})
 		require.NoError(t, err)

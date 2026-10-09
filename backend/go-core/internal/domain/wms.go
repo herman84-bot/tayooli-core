@@ -52,6 +52,12 @@ var (
 	ErrActorRequired        = errors.New("authenticated user is required")
 	ErrReceiptNotOnHold     = errors.New("receipt has no batch awaiting release")
 	ErrBatchOnHold          = errors.New("batch is on hold")
+
+	// Outbound DO & Fraud Controls
+	ErrDeliveryOrderIncompleteShip = errors.New("delivery order missing driver, vehicle plate, or expedition for shipment")
+	ErrDeliveryOrderNotPacked      = errors.New("delivery order must be in PACKED status before dispatch")
+	ErrOpnamePendingApproval       = errors.New("stock opname requires approval")
+	ErrScrapApprovalRequired       = errors.New("stock scrap exceeds threshold and requires approval")
 )
 
 // StockBatchStatus controls whether a batch may be allocated to sales.
@@ -185,10 +191,11 @@ const (
 type StockOpnameStatus string
 
 const (
-	StockOpnameStatusDraft      StockOpnameStatus = "DRAFT"
-	StockOpnameStatusInProgress StockOpnameStatus = "IN_PROGRESS"
-	StockOpnameStatusCompleted  StockOpnameStatus = "COMPLETED"
-	StockOpnameStatusCancelled  StockOpnameStatus = "CANCELLED"
+	StockOpnameStatusDraft           StockOpnameStatus = "DRAFT"
+	StockOpnameStatusInProgress      StockOpnameStatus = "IN_PROGRESS"
+	StockOpnameStatusPendingApproval StockOpnameStatus = "PENDING_APPROVAL"
+	StockOpnameStatusCompleted       StockOpnameStatus = "COMPLETED"
+	StockOpnameStatusCancelled       StockOpnameStatus = "CANCELLED"
 )
 
 // Reference types for stock movements
@@ -494,6 +501,7 @@ type StockScrap struct {
 	Quantity           decimal.Decimal `json:"quantity"`
 	Reason             string          `json:"reason"`
 	ReportedBy         uuid.UUID       `json:"reported_by"`
+	ApprovedBy         *uuid.UUID      `json:"approved_by,omitempty"`
 	CreatedAt          time.Time       `json:"created_at"`
 }
 
@@ -553,6 +561,7 @@ type StockReceiptItem struct {
 	ProductName  string           `json:"product_name"`
 	ProductSKU   string           `json:"product_sku"`
 	ExpectedQty  *decimal.Decimal `json:"expected_qty,omitempty"`
+	OrderedQty   *decimal.Decimal `json:"ordered_qty,omitempty"`
 	AcceptedQty  decimal.Decimal  `json:"accepted_qty"`
 	RejectedQty  decimal.Decimal  `json:"rejected_qty"`
 	RejectReason *string          `json:"reject_reason,omitempty"`

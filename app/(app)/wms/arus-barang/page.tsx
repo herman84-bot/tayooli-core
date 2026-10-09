@@ -780,6 +780,18 @@ function InboundReceiptForm({
       setError("Pilih rak/lokasi rencana penyimpanan.")
       return
     }
+    if (form.receipt_type === "VENDOR") {
+      if (!form.source_ref || form.source_ref.trim().length <= 3) {
+        setError("Untuk penerimaan vendor/pemasok, No. PO / Referensi dokumen wajib diisi (minimal 4 karakter).")
+        return
+      }
+    }
+    if (form.receipt_type === "TRANSFER") {
+      if (!form.from_warehouse_id) {
+        setError("Untuk transfer antar-gudang, gudang pengirim (asal) wajib dipilih.")
+        return
+      }
+    }
     const lineError = validateReceiptLines(form.lines)
     if (lineError) {
       setError(lineError)
@@ -860,6 +872,33 @@ function InboundReceiptForm({
             className="w-full px-3 py-2 border border-slate-300 rounded-lg"
           />
         </div>
+
+        {form.receipt_type === "TRANSFER" && (
+          <div>
+            <label className="block font-medium text-slate-700 mb-1">Gudang Pengirim (Asal Transfer)</label>
+            <select
+              value={form.from_warehouse_id}
+              onChange={(e) => {
+                const wh = warehouses.find((w) => w.id === e.target.value)
+                setForm({
+                  ...form,
+                  from_warehouse_id: e.target.value,
+                  from_name: wh ? wh.name : form.from_name,
+                })
+              }}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+            >
+              <option value="">-- Pilih Gudang Asal --</option>
+              {warehouses
+                .filter((w) => w.id !== form.warehouse_id)
+                .map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="block font-medium text-slate-700 mb-1">No. Surat Jalan / Referensi</label>

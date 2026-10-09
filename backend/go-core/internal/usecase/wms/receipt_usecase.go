@@ -18,6 +18,7 @@ import (
 type StockReceiptItemRequest struct {
 	ProductID    uuid.UUID        `json:"product_id"`
 	ExpectedQty  *decimal.Decimal `json:"expected_qty,omitempty"`
+	OrderedQty   *decimal.Decimal `json:"ordered_qty,omitempty"`
 	AcceptedQty  decimal.Decimal  `json:"accepted_qty"`
 	RejectedQty  decimal.Decimal  `json:"rejected_qty"`
 	RejectReason *string          `json:"reject_reason,omitempty"`
@@ -88,15 +89,25 @@ func (u *Usecase) validateStockReceiptRequest(ctx context.Context, tenantID, use
 			fromName = "Hasil Produksi"
 		}
 	} else if req.ReceiptType == domain.StockReceiptTypeTransfer {
-		if req.FromWarehouseID != nil && *req.FromWarehouseID == req.WarehouseID {
-			return nil, receiptInvalid("Gudang pengirim (asal) tidak boleh sama dengan gudang penerima (tujuan)")
+		if req.FromWarehouseID == nil || *req.FromWarehouseID == uuid.Nil {
+			return nil, receiptInvalid("Gudang pengirim (asal transfer) wajib dipilih")
 		}
-		if fromName == "" && req.FromWarehouseID == nil {
-			return nil, receiptInvalid("Gudang pengirim atau asal transfer wajib ditentukan")
+		if *req.FromWarehouseID == req.WarehouseID {
+			return nil, receiptInvalid("Gudang pengirim (asal) tidak boleh sama dengan gudang penerima (tujuan)")
 		}
 	} else if req.ReceiptType == domain.StockReceiptTypeVendor {
 		if fromName == "" {
 			return nil, receiptInvalid("Nama pemasok wajib diisi")
+		}
+		var ref string
+		if req.SourceRef != nil && strings.TrimSpace(*req.SourceRef) != "" {
+			ref = strings.TrimSpace(*req.SourceRef)
+		}
+		if (ref == "" || len(ref) <= 3) && req.SupplierRef != nil && strings.TrimSpace(*req.SupplierRef) != "" {
+			ref = strings.TrimSpace(*req.SupplierRef)
+		}
+		if ref == "" || len(ref) <= 3 {
+			return nil, receiptInvalid("Nomor PO atau referensi dokumen pemasok wajib diisi (minimal 4 karakter)")
 		}
 	}
 
@@ -126,8 +137,15 @@ func (u *Usecase) validateStockReceiptRequest(ctx context.Context, tenantID, use
 			return nil, receiptInvalid(fmt.Sprintf("Baris %d: kombinasi produk dan nomor batch yang sama tidak boleh diinput dua kali", line))
 		}
 		seen[key] = true
-		if it.ExpectedQty != nil && it.ExpectedQty.IsNegative() {
+		ordQty := it.OrderedQty
+		if ordQty == nil {
+			ordQty = it.ExpectedQty
+		}
+		if ordQty != nil && ordQty.IsNegative() {
 			return nil, receiptInvalid(fmt.Sprintf("Baris %d: jumlah dipesan tidak boleh negatif", line))
+		}
+		if ordQty != nil && it.AcceptedQty.Add(it.RejectedQty).GreaterThan(*ordQty) {
+			return nil, receiptInvalid(fmt.Sprintf("Baris %d: total diterima + ditolak (%s) melebihi jumlah dipesan (%s)", line, it.AcceptedQty.Add(it.RejectedQty).String(), ordQty.String()))
 		}
 		if it.AcceptedQty.IsNegative() || it.RejectedQty.IsNegative() {
 			return nil, receiptInvalid(fmt.Sprintf("Baris %d: jumlah diterima/ditolak tidak boleh negatif", line))
@@ -146,7 +164,8 @@ func (u *Usecase) validateStockReceiptRequest(ctx context.Context, tenantID, use
 		totalRejected = totalRejected.Add(it.RejectedQty)
 		items = append(items, domain.StockReceiptItem{
 			ProductID:    it.ProductID,
-			ExpectedQty:  it.ExpectedQty,
+			ExpectedQty:  ordQty,
+			OrderedQty:   ordQty,
 			AcceptedQty:  it.AcceptedQty,
 			RejectedQty:  it.RejectedQty,
 			RejectReason: reason,
@@ -406,6 +425,11 @@ func (u *Usecase) CancelStockReceipt(ctx context.Context, tenantID, userID uuid.
 	}
 	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, existing.WarehouseID); err != nil {
 		return nil, err
+	}
+	if existing.Status == domain.StockReceiptStatusDraft {
+		if role != "admin" && role != "owner" && existing.CreatedBy != userID {
+			return nil, domain.ErrForbidden
+		}
 	}
 	if existing.Status == domain.StockReceiptStatusCancelled {
 		return nil, domain.ErrStockReceiptAlreadyCancelled

@@ -32,8 +32,8 @@ INSERT INTO stock_receipts (
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`
 
 const createStockReceiptItemSQL = `
-INSERT INTO stock_receipt_items (id, tenant_id, receipt_id, product_id, expected_qty, accepted_qty, rejected_qty, reject_reason, batch_number, expiry_date, batch_id, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+INSERT INTO stock_receipt_items (id, tenant_id, receipt_id, product_id, expected_qty, ordered_qty, accepted_qty, rejected_qty, reject_reason, batch_number, expiry_date, batch_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
 
 const stockReceiptColumns = `
 r.id, r.tenant_id, r.receipt_number, r.receipt_type, r.warehouse_id, r.dest_location_id,
@@ -52,7 +52,7 @@ COALESCE(u_re.full_name, u_re.email, ''),
 
 const getStockReceiptItemsSQL = `
 SELECT i.id, i.tenant_id, i.receipt_id, i.product_id, COALESCE(p.name, ''), COALESCE(p.sku, ''),
-       i.expected_qty, i.accepted_qty, i.rejected_qty, i.reject_reason,
+       i.expected_qty, i.ordered_qty, i.accepted_qty, i.rejected_qty, i.reject_reason,
        i.batch_number, i.expiry_date, i.batch_id, i.created_at
 FROM stock_receipt_items i
 LEFT JOIN products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
@@ -135,17 +135,18 @@ func getStockReceiptItemsTx(ctx context.Context, tx *sql.Tx, tenantID, id uuid.U
 	items := []domain.StockReceiptItem{}
 	for rows.Next() {
 		var it domain.StockReceiptItem
-		var expected decimal.NullDecimal
+		var expected, ordered decimal.NullDecimal
 		var reason sql.NullString
 		var batchNum sql.NullString
 		var exp sql.NullTime
 		var batchID sql.NullString
 		if err := rows.Scan(&it.ID, &it.TenantID, &it.ReceiptID, &it.ProductID, &it.ProductName, &it.ProductSKU,
-			&expected, &it.AcceptedQty, &it.RejectedQty, &reason,
+			&expected, &ordered, &it.AcceptedQty, &it.RejectedQty, &reason,
 			&batchNum, &exp, &batchID, &it.CreatedAt); err != nil {
 			return nil, err
 		}
 		it.ExpectedQty = nullDecimalToPtr(expected)
+		it.OrderedQty = nullDecimalToPtr(ordered)
 		it.RejectReason = nullStringToPtr(reason)
 		it.BatchNumber = nullStringToPtr(batchNum)
 		it.ExpiryDate = nullTimeToPtr(exp)
@@ -167,7 +168,7 @@ func insertStockReceiptItemsTx(ctx context.Context, tx *sql.Tx, rc *domain.Stock
 			it.CreatedAt = now
 		}
 		if _, err := tx.ExecContext(ctx, createStockReceiptItemSQL,
-			it.ID, it.TenantID, it.ReceiptID, it.ProductID, ptrToNullDecimal(it.ExpectedQty),
+			it.ID, it.TenantID, it.ReceiptID, it.ProductID, ptrToNullDecimal(it.ExpectedQty), ptrToNullDecimal(it.OrderedQty),
 			it.AcceptedQty, it.RejectedQty, ptrToNullString(it.RejectReason),
 			ptrToNullString(it.BatchNumber), ptrToNullTime(it.ExpiryDate), ptrToNullUUID(it.BatchID),
 			it.CreatedAt); err != nil {

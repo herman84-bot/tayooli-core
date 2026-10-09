@@ -134,6 +134,14 @@ func (u *Usecase) ConfirmPutaway(ctx context.Context, tenantID, userID uuid.UUID
 		return nil, err
 	}
 
+	batch, err := u.repo.GetBatchByID(ctx, tenantID, req.BatchID)
+	if err != nil {
+		return nil, err
+	}
+	if batch.Status != domain.StockBatchStatusReleased {
+		return nil, domain.ErrBatchOnHold
+	}
+
 	destLoc, err := u.repo.GetLocationByID(ctx, tenantID, req.DestLocationID)
 	if err != nil {
 		return nil, fmt.Errorf("ConfirmPutaway: dest location: %w", err)

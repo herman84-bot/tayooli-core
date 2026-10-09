@@ -98,6 +98,7 @@ type BatchBalanceFilter struct {
 	WarehouseID  *uuid.UUID
 	ProductID    *uuid.UUID
 	LocationType *LocationType
+	BatchStatus  *StockBatchStatus
 }
 
 // PutawayCommand moves one batch quantity from inbound staging to a rack
@@ -139,6 +140,7 @@ type PutawayPendingLine struct {
 type WMSSettings struct {
 	TenantID               uuid.UUID  `json:"tenant_id"`
 	RequireReleaseApproval bool       `json:"require_release_approval"`
+	RequirePickPack        bool       `json:"require_pick_pack"`
 	UpdatedBy              *uuid.UUID `json:"updated_by,omitempty"`
 	UpdatedAt              time.Time  `json:"updated_at"`
 }

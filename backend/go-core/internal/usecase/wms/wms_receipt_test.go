@@ -583,4 +583,179 @@ func TestStockReceiptLifecycle(t *testing.T) {
 	})
 }
 
+func TestWMSFraudControls_F1_F5_F6(t *testing.T) {
+	repo := newMockWMSRepo()
+	usecase := uc.New(repo)
+	ctx := context.Background()
+
+	tenantID := uuid.New()
+	whID := uuid.New()
+	otherWhID := uuid.New()
+	creatorID := uuid.New()
+	otherUserID := uuid.New()
+	adminID := uuid.New()
+
+	require.NoError(t, repo.CreateWarehouse(ctx, &domain.Warehouse{ID: whID, TenantID: tenantID, Name: "Main WH", IsActive: true}))
+	require.NoError(t, repo.CreateWarehouse(ctx, &domain.Warehouse{ID: otherWhID, TenantID: tenantID, Name: "Other WH", IsActive: true}))
+	require.NoError(t, repo.AssignUserWarehouse(ctx, &domain.UserWarehouse{UserID: creatorID, WarehouseID: whID, TenantID: tenantID}))
+	require.NoError(t, repo.AssignUserWarehouse(ctx, &domain.UserWarehouse{UserID: otherUserID, WarehouseID: whID, TenantID: tenantID}))
+	require.NoError(t, repo.AssignUserWarehouse(ctx, &domain.UserWarehouse{UserID: adminID, WarehouseID: whID, TenantID: tenantID}))
+
+	binLoc := uuid.New()
+	require.NoError(t, repo.CreateLocation(ctx, &domain.WarehouseLocation{ID: binLoc, TenantID: tenantID, WarehouseID: &whID, Code: "BIN-A", Type: domain.LocationTypeInternal}))
+
+	prodID := uuid.New()
+
+	assertInvalid := func(t *testing.T, err error, contains string) {
+		t.Helper()
+		require.Error(t, err)
+		var ve *domain.StockReceiptValidationError
+		require.True(t, errors.As(err, &ve), "expected validation error, got %v", err)
+		assert.True(t, errors.Is(err, domain.ErrInvalidInput))
+		assert.Contains(t, ve.Msg, contains)
+	}
+
+	t.Run("F1: Vendor receipt reference validations", func(t *testing.T) {
+		reqNoRef := uc.StockReceiptRequest{
+			ReceiptType:    domain.StockReceiptTypeVendor,
+			WarehouseID:    whID,
+			DestLocationID: binLoc,
+			SupplierName:   "PT Sumber Makmur",
+			Items: []uc.StockReceiptItemRequest{
+				{ProductID: prodID, AcceptedQty: dec(5), RejectedQty: dec(0)},
+			},
+		}
+		_, _, err := usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqNoRef)
+		assertInvalid(t, err, "Nomor PO atau referensi dokumen pemasok wajib diisi (minimal 4 karakter)")
+
+		reqShortRef := reqNoRef
+		reqShortRef.SourceRef = strp("PO")
+		_, _, err = usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqShortRef)
+		assertInvalid(t, err, "Nomor PO atau referensi dokumen pemasok wajib diisi (minimal 4 karakter)")
+
+		reqShortSupRef := reqNoRef
+		reqShortSupRef.SupplierRef = strp("ABC")
+		_, _, err = usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqShortSupRef)
+		assertInvalid(t, err, "Nomor PO atau referensi dokumen pemasok wajib diisi (minimal 4 karakter)")
+
+		reqValidRef := reqNoRef
+		reqValidRef.SourceRef = strp("PO-2026-001")
+		rc, items, err := usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqValidRef)
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptStatusDraft, rc.Status)
+		assert.NotEmpty(t, items)
+	})
+
+	t.Run("F1: Transfer receipt without FromWarehouseID returns validation error", func(t *testing.T) {
+		reqTransferNoFrom := uc.StockReceiptRequest{
+			ReceiptType:     domain.StockReceiptTypeTransfer,
+			WarehouseID:     whID,
+			DestLocationID:  binLoc,
+			FromName:        "Transfer Gudang",
+			FromWarehouseID: nil,
+			Items: []uc.StockReceiptItemRequest{
+				{ProductID: prodID, AcceptedQty: dec(5), RejectedQty: dec(0)},
+			},
+		}
+		_, _, err := usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqTransferNoFrom)
+		assertInvalid(t, err, "Gudang pengirim (asal transfer) wajib dipilih")
+
+		nilUUID := uuid.Nil
+		reqTransferNilUUID := reqTransferNoFrom
+		reqTransferNilUUID.FromWarehouseID = &nilUUID
+		_, _, err = usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqTransferNilUUID)
+		assertInvalid(t, err, "Gudang pengirim (asal transfer) wajib dipilih")
+
+		reqTransferValid := reqTransferNoFrom
+		reqTransferValid.FromWarehouseID = &otherWhID
+		rc, _, err := usecase.CreateStockReceipt(ctx, tenantID, creatorID, "admin", reqTransferValid)
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptStatusDraft, rc.Status)
+	})
+
+	t.Run("F5: AcceptedQty + RejectedQty > OrderedQty returns validation error; <= succeeds", func(t *testing.T) {
+		ordered10 := dec(10)
+		reqOver := uc.StockReceiptRequest{
+			ReceiptType:    domain.StockReceiptTypeVendor,
+			WarehouseID:    whID,
+			DestLocationID: binLoc,
+			SupplierName:   "PT Sumber Makmur",
+			SourceRef:      strp("PO-2026-001"),
+			Items: []uc.StockReceiptItemRequest{
+				{ProductID: prodID, OrderedQty: &ordered10, AcceptedQty: dec(8), RejectedQty: dec(3), RejectReason: strp("Cacat")},
+			},
+		}
+		_, _, err := usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqOver)
+		assertInvalid(t, err, "total diterima + ditolak (11) melebihi jumlah dipesan (10)")
+
+		reqOverExpected := uc.StockReceiptRequest{
+			ReceiptType:    domain.StockReceiptTypeVendor,
+			WarehouseID:    whID,
+			DestLocationID: binLoc,
+			SupplierName:   "PT Sumber Makmur",
+			SourceRef:      strp("PO-2026-001"),
+			Items: []uc.StockReceiptItemRequest{
+				{ProductID: prodID, ExpectedQty: &ordered10, AcceptedQty: dec(11), RejectedQty: dec(0)},
+			},
+		}
+		_, _, err = usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqOverExpected)
+		assertInvalid(t, err, "total diterima + ditolak (11) melebihi jumlah dipesan (10)")
+
+		negQty := dec(-1)
+		reqNeg := reqOver
+		reqNeg.Items[0].OrderedQty = &negQty
+		_, _, err = usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqNeg)
+		assertInvalid(t, err, "jumlah dipesan tidak boleh negatif")
+
+		reqValid := uc.StockReceiptRequest{
+			ReceiptType:    domain.StockReceiptTypeVendor,
+			WarehouseID:    whID,
+			DestLocationID: binLoc,
+			SupplierName:   "PT Sumber Makmur",
+			SourceRef:      strp("PO-2026-001"),
+			Items: []uc.StockReceiptItemRequest{
+				{ProductID: prodID, OrderedQty: &ordered10, AcceptedQty: dec(7), RejectedQty: dec(3), RejectReason: strp("Pecah")},
+			},
+		}
+		rc, items, err := usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", reqValid)
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptStatusDraft, rc.Status)
+		require.Len(t, items, 1)
+		require.NotNil(t, items[0].OrderedQty)
+		assert.True(t, items[0].OrderedQty.Equal(ordered10))
+		require.NotNil(t, items[0].ExpectedQty)
+		assert.True(t, items[0].ExpectedQty.Equal(ordered10))
+	})
+
+	t.Run("F6: Cancel draft receipt authorization checks", func(t *testing.T) {
+		req := uc.StockReceiptRequest{
+			ReceiptType:    domain.StockReceiptTypeVendor,
+			WarehouseID:    whID,
+			DestLocationID: binLoc,
+			SupplierName:   "PT Sumber Makmur",
+			SourceRef:      strp("PO-2026-001"),
+			Items: []uc.StockReceiptItemRequest{
+				{ProductID: prodID, AcceptedQty: dec(5), RejectedQty: dec(0)},
+			},
+		}
+		rc, _, err := usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", req)
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptStatusDraft, rc.Status)
+		assert.Equal(t, creatorID, rc.CreatedBy)
+
+		_, err = usecase.CancelStockReceipt(ctx, tenantID, otherUserID, "warehouse", rc.ID, "Batal oleh staf lain")
+		assert.ErrorIs(t, err, domain.ErrForbidden)
+
+		cancelledByAdmin, err := usecase.CancelStockReceipt(ctx, tenantID, adminID, "admin", rc.ID, "Batal oleh admin")
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptStatusCancelled, cancelledByAdmin.Status)
+
+		rc2, _, err := usecase.CreateStockReceipt(ctx, tenantID, creatorID, "warehouse", req)
+		require.NoError(t, err)
+		cancelledByCreator, err := usecase.CancelStockReceipt(ctx, tenantID, creatorID, "warehouse", rc2.ID, "Batal oleh pembuat")
+		require.NoError(t, err)
+		assert.Equal(t, domain.StockReceiptStatusCancelled, cancelledByCreator.Status)
+	})
+}
+
 func decPtr(i int64) *decimal.Decimal { d := decimal.NewFromInt(i); return &d }

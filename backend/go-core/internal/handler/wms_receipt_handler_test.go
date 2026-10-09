@@ -78,7 +78,7 @@ func TestWMSStockReceiptHandlers(t *testing.T) {
 		}
 		router := setupWMSTestRouter(mock)
 		prodID := uuid.New()
-		body := fmt.Sprintf(`{"warehouse_id":"%s","dest_location_id":"%s","supplier_name":"PT Sumber","items":[{"product_id":"%s","accepted_qty":"10","rejected_qty":"0"}]}`, uuid.New(), uuid.New(), prodID)
+		body := fmt.Sprintf(`{"warehouse_id":"%s","dest_location_id":"%s","supplier_name":"PT Sumber","source_ref":"PO-2026-001","items":[{"product_id":"%s","accepted_qty":"10","rejected_qty":"0"}]}`, uuid.New(), uuid.New(), prodID)
 		req := withWMSAuth(httptest.NewRequest(http.MethodPost, "/api/v1/wms/receipts", bytes.NewBufferString(body)), tenantID, userID, role)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)

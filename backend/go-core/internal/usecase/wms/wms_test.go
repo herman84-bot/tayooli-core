@@ -1308,9 +1308,10 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		repo.stockLevels[locKey] = decimal.NewFromInt(2)
 
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &salesOrderID,
-			WarehouseID:  whID,
-			DONumber:     "DO-FAIL-01",
+			SalesOrderID:  &salesOrderID,
+			WarehouseID:   whID,
+			DONumber:      "DO-FAIL-01",
+			RecipientName: ptr("Customer Test"),
 			Items: []uc.CreateDeliveryOrderItemRequest{
 				{
 					ProductID:  productID,
@@ -1330,9 +1331,13 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		repo.stockLevels[locKey] = decimal.NewFromInt(10)
 
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &salesOrderID,
-			WarehouseID:  whID,
-			DONumber:     "DO-FAIL-02",
+			SalesOrderID:   &salesOrderID,
+			WarehouseID:    whID,
+			DONumber:       "DO-FAIL-02",
+			RecipientName:  ptr("Customer Test"),
+			DriverName:     ptr("Pak Driver"),
+			VehiclePlate:   ptr("B 1234 CD"),
+			ExpeditionName: ptr("JNE"),
 			Items: []uc.CreateDeliveryOrderItemRequest{
 				{
 					ProductID:  productID,
@@ -1343,6 +1348,9 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		}
 
 		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", req)
+		require.NoError(t, err)
+
+		_, err = usecase.ConfirmDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
 		require.NoError(t, err)
 
 		// Stock drops before dispatch
@@ -1359,9 +1367,13 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		repo.stockLevels[locKey] = decimal.NewFromInt(20)
 
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &salesOrderID,
-			WarehouseID:  whID,
-			DONumber:     "DO-SUCCESS-01",
+			SalesOrderID:   &salesOrderID,
+			WarehouseID:    whID,
+			DONumber:       "DO-SUCCESS-01",
+			RecipientName:  ptr("Customer Test"),
+			DriverName:     ptr("Pak Driver"),
+			VehiclePlate:   ptr("B 1234 CD"),
+			ExpeditionName: ptr("JNE"),
 			Items: []uc.CreateDeliveryOrderItemRequest{
 				{
 					ProductID:  productID,
@@ -1375,6 +1387,9 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, domain.DeliveryOrderStatusDraft, do.Status)
 
+		_, err = usecase.ConfirmDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
+		require.NoError(t, err)
+
 		shippedDO, err := usecase.DispatchDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
 		require.NoError(t, err)
 		assert.Equal(t, domain.DeliveryOrderStatusShipped, shippedDO.Status)
@@ -1384,9 +1399,9 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, currentStock.Equal(decimal.NewFromInt(12)), "stock should be 12 after shipping 8")
 
-		// Re-dispatching shipped DO should return ErrInvalidStatus
+		// Re-dispatching shipped DO should return ErrDeliveryOrderNotPacked
 		_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
-		assert.ErrorIs(t, err, domain.ErrInvalidStatus)
+		assert.ErrorIs(t, err, domain.ErrDeliveryOrderNotPacked)
 	})
 
 	// Regression: the 13-module app has no Sales Order screen, so a direct
@@ -1396,12 +1411,19 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		repo.stockLevels[locKey] = decimal.NewFromInt(5)
 
 		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", uc.CreateDeliveryOrderRequest{
-			WarehouseID: whID,
-			DONumber:    "DO-DIRECT-01",
-			Items:       []uc.CreateDeliveryOrderItemRequest{{ProductID: productID, Quantity: decimal.NewFromInt(2), LocationID: locID}},
+			WarehouseID:    whID,
+			DONumber:       "DO-DIRECT-01",
+			RecipientName:  ptr("Customer Test"),
+			DriverName:     ptr("Pak Driver"),
+			VehiclePlate:   ptr("B 1234 CD"),
+			ExpeditionName: ptr("JNE"),
+			Items:          []uc.CreateDeliveryOrderItemRequest{{ProductID: productID, Quantity: decimal.NewFromInt(2), LocationID: locID}},
 		})
 		require.NoError(t, err)
 		assert.Nil(t, do.SalesOrderID, "direct DO must not carry a Sales Order id")
+
+		_, err = usecase.ConfirmDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
+		require.NoError(t, err)
 
 		shipped, err := usecase.DispatchDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
 		require.NoError(t, err)
@@ -1414,10 +1436,11 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 	t.Run("Zero UUID Sales Order is normalised to none", func(t *testing.T) {
 		zero := uuid.Nil
 		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &zero,
-			WarehouseID:  whID,
-			DONumber:     "DO-DIRECT-02",
-			Items:        []uc.CreateDeliveryOrderItemRequest{{ProductID: productID, Quantity: decimal.NewFromInt(1), LocationID: locID}},
+			SalesOrderID:  &zero,
+			WarehouseID:   whID,
+			DONumber:      "DO-DIRECT-02",
+			RecipientName: ptr("Customer Test"),
+			Items:         []uc.CreateDeliveryOrderItemRequest{{ProductID: productID, Quantity: decimal.NewFromInt(1), LocationID: locID}},
 		})
 		require.NoError(t, err)
 		assert.Nil(t, do.SalesOrderID)
@@ -1425,10 +1448,11 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 
 	t.Run("Real Sales Order id is preserved", func(t *testing.T) {
 		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &salesOrderID,
-			WarehouseID:  whID,
-			DONumber:     "DO-WITH-SO-01",
-			Items:        []uc.CreateDeliveryOrderItemRequest{{ProductID: productID, Quantity: decimal.NewFromInt(1), LocationID: locID}},
+			SalesOrderID:  &salesOrderID,
+			WarehouseID:   whID,
+			DONumber:      "DO-WITH-SO-01",
+			RecipientName: ptr("Customer Test"),
+			Items:         []uc.CreateDeliveryOrderItemRequest{{ProductID: productID, Quantity: decimal.NewFromInt(1), LocationID: locID}},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, do.SalesOrderID)
@@ -1438,10 +1462,11 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 	t.Run("Force Delivery Order status to DRAFT on creation", func(t *testing.T) {
 		shippedStatus := domain.DeliveryOrderStatusShipped
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &salesOrderID,
-			WarehouseID:  whID,
-			DONumber:     "DO-FORCE-DRAFT-01",
-			Status:       &shippedStatus, // Attempt to create as SHIPPED
+			SalesOrderID:  &salesOrderID,
+			WarehouseID:   whID,
+			DONumber:      "DO-FORCE-DRAFT-01",
+			RecipientName: ptr("Customer Test"),
+			Status:        &shippedStatus, // Attempt to create as SHIPPED
 			Items: []uc.CreateDeliveryOrderItemRequest{
 				{
 					ProductID:  productID,
@@ -1458,9 +1483,13 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 
 	t.Run("Reject dispatching CANCELLED or RETURNED delivery orders", func(t *testing.T) {
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &salesOrderID,
-			WarehouseID:  whID,
-			DONumber:     "DO-STATUS-TEST-01",
+			SalesOrderID:   &salesOrderID,
+			WarehouseID:    whID,
+			DONumber:       "DO-STATUS-TEST-01",
+			RecipientName:  ptr("Customer Test"),
+			DriverName:     ptr("Pak Driver"),
+			VehiclePlate:   ptr("B 1234 CD"),
+			ExpeditionName: ptr("JNE"),
 			Items: []uc.CreateDeliveryOrderItemRequest{
 				{
 					ProductID:  productID,
@@ -1476,17 +1505,17 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		// CANCELLED status -> rejected
 		do.Status = domain.DeliveryOrderStatusCancelled
 		_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
-		assert.ErrorIs(t, err, domain.ErrInvalidStatus, "dispatching CANCELLED delivery order must be rejected")
+		assert.ErrorIs(t, err, domain.ErrDeliveryOrderNotPacked, "dispatching CANCELLED delivery order must be rejected")
 
 		// RETURNED status -> rejected
 		do.Status = domain.DeliveryOrderStatusReturned
 		_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
-		assert.ErrorIs(t, err, domain.ErrInvalidStatus, "dispatching RETURNED delivery order must be rejected")
+		assert.ErrorIs(t, err, domain.ErrDeliveryOrderNotPacked, "dispatching RETURNED delivery order must be rejected")
 
 		// DELIVERED status -> rejected
 		do.Status = domain.DeliveryOrderStatusDelivered
 		_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
-		assert.ErrorIs(t, err, domain.ErrInvalidStatus, "dispatching DELIVERED delivery order must be rejected")
+		assert.ErrorIs(t, err, domain.ErrDeliveryOrderNotPacked, "dispatching DELIVERED delivery order must be rejected")
 	})
 
 	t.Run("Reject location spoofing on delivery order create and dispatch", func(t *testing.T) {
@@ -1497,9 +1526,10 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 
 		// CreateDeliveryOrder with LocationID belonging to otherWH
 		reqSpoof := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &salesOrderID,
-			WarehouseID:  whID,
-			DONumber:     "DO-SPOOF-01",
+			SalesOrderID:  &salesOrderID,
+			WarehouseID:   whID,
+			DONumber:      "DO-SPOOF-01",
+			RecipientName: ptr("Customer Test"),
 			Items: []uc.CreateDeliveryOrderItemRequest{
 				{
 					ProductID:  productID,
@@ -1513,9 +1543,13 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 
 		// Create legit DO, then tamper item location before dispatch
 		legitReq := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &salesOrderID,
-			WarehouseID:  whID,
-			DONumber:     "DO-SPOOF-02",
+			SalesOrderID:   &salesOrderID,
+			WarehouseID:    whID,
+			DONumber:       "DO-SPOOF-02",
+			RecipientName:  ptr("Customer Test"),
+			DriverName:     ptr("Pak Driver"),
+			VehiclePlate:   ptr("B 1234 CD"),
+			ExpeditionName: ptr("JNE"),
 			Items: []uc.CreateDeliveryOrderItemRequest{
 				{
 					ProductID:  productID,
@@ -1525,6 +1559,9 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 			},
 		}
 		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", legitReq)
+		require.NoError(t, err)
+
+		_, err = usecase.ConfirmDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
 		require.NoError(t, err)
 
 		// Tamper item location
@@ -1539,9 +1576,13 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 	t.Run("Auditor cannot create or dispatch delivery order", func(t *testing.T) {
 		auditorID := uuid.New()
 		req := uc.CreateDeliveryOrderRequest{
-			SalesOrderID: &salesOrderID,
-			WarehouseID:  whID,
-			DONumber:     "DO-AUD-01",
+			SalesOrderID:   &salesOrderID,
+			WarehouseID:    whID,
+			DONumber:       "DO-AUD-01",
+			RecipientName:  ptr("Customer Test"),
+			DriverName:     ptr("Pak Driver"),
+			VehiclePlate:   ptr("B 1234 CD"),
+			ExpeditionName: ptr("JNE"),
 			Items: []uc.CreateDeliveryOrderItemRequest{
 				{
 					ProductID:  productID,
@@ -1555,6 +1596,9 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 
 		// Create as admin
 		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", req)
+		require.NoError(t, err)
+
+		_, err = usecase.ConfirmDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
 		require.NoError(t, err)
 
 		// Dispatch as auditor -> rejected
@@ -1641,9 +1685,10 @@ func TestCrossTenantMultiTenancyIsolation(t *testing.T) {
 
 	// Delivery Order for Tenant B
 	doB, err := usecase.CreateDeliveryOrder(ctx, tenantB, userB, "admin", uc.CreateDeliveryOrderRequest{
-		SalesOrderID: ptrUUID(uuid.New()),
-		WarehouseID:  whB.ID,
-		DONumber:     "DO-TENANT-B-001",
+		SalesOrderID:  ptrUUID(uuid.New()),
+		WarehouseID:   whB.ID,
+		DONumber:      "DO-TENANT-B-001",
+		RecipientName: ptr("Customer Tenant B"),
 		Items: []uc.CreateDeliveryOrderItemRequest{
 			{
 				ProductID:  prodB.ID,
@@ -1784,9 +1829,10 @@ func TestCrossTenantMultiTenancyIsolation(t *testing.T) {
 
 		// CreateDeliveryOrder in Tenant B warehouse
 		_, err = usecase.CreateDeliveryOrder(ctx, tenantA, userA, "admin", uc.CreateDeliveryOrderRequest{
-			SalesOrderID: ptrUUID(uuid.New()),
-			WarehouseID:  whB.ID,
-			DONumber:     "DO-ROGUE-01",
+			SalesOrderID:  ptrUUID(uuid.New()),
+			WarehouseID:   whB.ID,
+			DONumber:      "DO-ROGUE-01",
+			RecipientName: ptr("Customer Rogue"),
 			Items: []uc.CreateDeliveryOrderItemRequest{
 				{ProductID: prodA.ID, Quantity: decimal.NewFromInt(1), LocationID: locA.ID},
 			},
@@ -1921,6 +1967,7 @@ func TestStockOpnameDiscrepancyAndLedgerPosting(t *testing.T) {
 			ProductID:   prod1,
 			LocationID:  loc1,
 			PhysicalQty: decimal.NewFromInt(15),
+			Notes:       ptr("Surplus items found"),
 		})
 		require.NoError(t, err)
 		assert.True(t, item1.SystemQty.Equal(decimal.NewFromInt(10)))
@@ -1932,6 +1979,7 @@ func TestStockOpnameDiscrepancyAndLedgerPosting(t *testing.T) {
 			ProductID:   prod2,
 			LocationID:  loc2,
 			PhysicalQty: decimal.NewFromInt(14),
+			Notes:       ptr("Damaged goods missing"),
 		})
 		require.NoError(t, err)
 		assert.True(t, item2.SystemQty.Equal(decimal.NewFromInt(20)))
@@ -1967,6 +2015,7 @@ func TestStockOpnameDiscrepancyAndLedgerPosting(t *testing.T) {
 			ProductID:   prod1,
 			LocationID:  loc1,
 			PhysicalQty: decimal.NewFromInt(15),
+			Notes:       ptr("Surplus found"),
 		})
 		require.NoError(t, err)
 
@@ -1975,6 +2024,7 @@ func TestStockOpnameDiscrepancyAndLedgerPosting(t *testing.T) {
 			ProductID:   prod2,
 			LocationID:  loc2,
 			PhysicalQty: decimal.NewFromInt(14),
+			Notes:       ptr("Deficit found"),
 		})
 		require.NoError(t, err)
 
@@ -2625,4 +2675,315 @@ func TestTransferLocationResilience(t *testing.T) {
 	})
 }
 func ptrUUID(id uuid.UUID) *uuid.UUID { return &id }
+func ptr[T any](v T) *T { return &v }
+
+func TestWMSFraudControls_F2_Dispatch(t *testing.T) {
+	repo := newMockWMSRepo()
+	usecase := uc.New(repo)
+	ctx := context.Background()
+
+	tenantID := uuid.New()
+	whID := uuid.New()
+	locID := uuid.New()
+	productID := uuid.New()
+	creatorID := uuid.New()
+	dispatcherID := uuid.New()
+
+	repo.warehouses[whID] = domain.Warehouse{ID: whID, TenantID: tenantID, Code: "WH-F2", Name: "F2 Warehouse", IsActive: true}
+	repo.locations[locID] = domain.WarehouseLocation{ID: locID, TenantID: tenantID, WarehouseID: &whID, Code: "LOC-F2", Name: "Rack F2", Type: domain.LocationTypeInternal}
+	repo.userWarehouses[fmt.Sprintf("%s:%s", tenantID, creatorID)] = []uuid.UUID{whID}
+	repo.userWarehouses[fmt.Sprintf("%s:%s", tenantID, dispatcherID)] = []uuid.UUID{whID}
+
+	locKey := fmt.Sprintf("%s:%s:%s", tenantID, locID, productID)
+	repo.stockLevels[locKey] = decimal.NewFromInt(100)
+
+	// 1. Dispatch from DRAFT returns ErrDeliveryOrderNotPacked
+	req := uc.CreateDeliveryOrderRequest{
+		WarehouseID:    whID,
+		DONumber:       "DO-F2-01",
+		RecipientName:  ptr("PT Sukses"),
+		DriverName:     ptr("Pak Supir"),
+		VehiclePlate:   ptr("B 1234 ABC"),
+		ExpeditionName: ptr("JNE"),
+		Items: []uc.CreateDeliveryOrderItemRequest{
+			{ProductID: productID, Quantity: decimal.NewFromInt(5), LocationID: locID},
+		},
+	}
+	do, err := usecase.CreateDeliveryOrder(ctx, tenantID, creatorID, "warehouse", req)
+	require.NoError(t, err)
+	assert.Equal(t, domain.DeliveryOrderStatusDraft, do.Status)
+
+	_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, dispatcherID, "warehouse", do.ID)
+	assert.ErrorIs(t, err, domain.ErrDeliveryOrderNotPacked, "dispatch from DRAFT must return ErrDeliveryOrderNotPacked")
+
+	// 2. Dispatch without driver/plate/expedition returns ErrDeliveryOrderIncompleteShip
+	// Move DO to CONFIRMED
+	repo.deliveryOrders[do.ID].Status = domain.DeliveryOrderStatusConfirmed
+	repo.deliveryOrders[do.ID].DriverName = nil
+	_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, dispatcherID, "warehouse", do.ID)
+	assert.ErrorIs(t, err, domain.ErrDeliveryOrderIncompleteShip, "dispatch without driver name must return ErrDeliveryOrderIncompleteShip")
+
+	repo.deliveryOrders[do.ID].DriverName = ptr("Pak Supir")
+	repo.deliveryOrders[do.ID].VehiclePlate = nil
+	_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, dispatcherID, "warehouse", do.ID)
+	assert.ErrorIs(t, err, domain.ErrDeliveryOrderIncompleteShip, "dispatch without vehicle plate must return ErrDeliveryOrderIncompleteShip")
+
+	repo.deliveryOrders[do.ID].VehiclePlate = ptr("B 1234 ABC")
+	repo.deliveryOrders[do.ID].ExpeditionName = nil
+	_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, dispatcherID, "warehouse", do.ID)
+	assert.ErrorIs(t, err, domain.ErrDeliveryOrderIncompleteShip, "dispatch without expedition name must return ErrDeliveryOrderIncompleteShip")
+
+	// 3. Dispatch by same user with role warehouse returns ErrSelfApprovalForbidden
+	repo.deliveryOrders[do.ID].ExpeditionName = ptr("JNE")
+	_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, creatorID, "warehouse", do.ID)
+	assert.ErrorIs(t, err, domain.ErrSelfApprovalForbidden, "dispatch by creator with role warehouse must return ErrSelfApprovalForbidden")
+
+	// 4. Dispatch from PACKED with shipping details by different user succeeds
+	repo.deliveryOrders[do.ID].Status = domain.DeliveryOrderStatusPacked
+	repo.deliveryOrders[do.ID].PackedBy = ptr(uuid.New())
+	dispatched, err := usecase.DispatchDeliveryOrder(ctx, tenantID, dispatcherID, "warehouse", do.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.DeliveryOrderStatusShipped, dispatched.Status)
+}
+
+func TestWMSFraudControls_F3_Opname(t *testing.T) {
+	repo := newMockWMSRepo()
+	usecase := uc.New(repo)
+	ctx := context.Background()
+
+	tenantID := uuid.New()
+	whID := uuid.New()
+	locID := uuid.New()
+	prodID := uuid.New()
+	conductorID := uuid.New()
+	adminID := uuid.New()
+
+	repo.warehouses[whID] = domain.Warehouse{ID: whID, TenantID: tenantID, Code: "WH-F3", Name: "F3 Warehouse", IsActive: true}
+	repo.locations[locID] = domain.WarehouseLocation{ID: locID, TenantID: tenantID, WarehouseID: &whID, Code: "LOC-F3", Name: "Rack F3", Type: domain.LocationTypeInternal}
+	repo.userWarehouses[fmt.Sprintf("%s:%s", tenantID, conductorID)] = []uuid.UUID{whID}
+	repo.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, locID, prodID)] = decimal.NewFromInt(20)
+
+	// 1. Complete opname by warehouse non-approver transitions to PENDING_APPROVAL (no movements)
+	op1, err := usecase.CreateStockOpname(ctx, tenantID, conductorID, "warehouse", uc.CreateStockOpnameRequest{WarehouseID: whID})
+	require.NoError(t, err)
+	_, err = usecase.AddOpnameItem(ctx, tenantID, conductorID, "warehouse", op1.ID, uc.AddOpnameItemRequest{
+		ProductID:   prodID,
+		LocationID:  locID,
+		PhysicalQty: decimal.NewFromInt(25),
+		Notes:       ptr("Surplus found on top shelf"),
+	})
+	require.NoError(t, err)
+
+	movementsBefore := len(repo.stockMovements)
+	pendingOp, err := usecase.CompleteStockOpname(ctx, tenantID, conductorID, "warehouse", op1.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.StockOpnameStatusPendingApproval, pendingOp.Status)
+	assert.Equal(t, movementsBefore, len(repo.stockMovements), "no movements should be posted when transitioning to PENDING_APPROVAL")
+
+	// 2. Complete opname by conductor with admin role returns ErrSelfApprovalForbidden
+	op2, err := usecase.CreateStockOpname(ctx, tenantID, adminID, "admin", uc.CreateStockOpnameRequest{WarehouseID: whID})
+	require.NoError(t, err)
+	_, err = usecase.AddOpnameItem(ctx, tenantID, adminID, "admin", op2.ID, uc.AddOpnameItemRequest{
+		ProductID:   prodID,
+		LocationID:  locID,
+		PhysicalQty: decimal.NewFromInt(18),
+		Notes:       ptr("Slight shortage"),
+	})
+	require.NoError(t, err)
+
+	_, err = usecase.CompleteStockOpname(ctx, tenantID, adminID, "admin", op2.ID)
+	assert.ErrorIs(t, err, domain.ErrSelfApprovalForbidden, "conductor cannot self-approve their own opname")
+
+	// 3. Complete opname with discrepancy and no notes returns ErrInvalidInput
+	op3, err := usecase.CreateStockOpname(ctx, tenantID, conductorID, "warehouse", uc.CreateStockOpnameRequest{WarehouseID: whID})
+	require.NoError(t, err)
+	_, err = usecase.AddOpnameItem(ctx, tenantID, conductorID, "warehouse", op3.ID, uc.AddOpnameItemRequest{
+		ProductID:   prodID,
+		LocationID:  locID,
+		PhysicalQty: decimal.NewFromInt(15), // Discrepancy = -5, notes = nil
+	})
+	require.NoError(t, err)
+
+	_, err = usecase.CompleteStockOpname(ctx, tenantID, adminID, "admin", op3.ID)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "opname with discrepancy and no notes must return ErrInvalidInput")
+
+	// 4. Complete opname by different admin with valid notes completes and posts movements
+	op4, err := usecase.CreateStockOpname(ctx, tenantID, conductorID, "warehouse", uc.CreateStockOpnameRequest{WarehouseID: whID})
+	require.NoError(t, err)
+	_, err = usecase.AddOpnameItem(ctx, tenantID, conductorID, "warehouse", op4.ID, uc.AddOpnameItemRequest{
+		ProductID:   prodID,
+		LocationID:  locID,
+		PhysicalQty: decimal.NewFromInt(15),
+		Notes:       ptr("Damaged items removed during physical check"),
+	})
+	require.NoError(t, err)
+
+	completedOp, err := usecase.CompleteStockOpname(ctx, tenantID, adminID, "admin", op4.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.StockOpnameStatusCompleted, completedOp.Status)
+	assert.Equal(t, &adminID, completedOp.ApprovedBy)
+	assert.Greater(t, len(repo.stockMovements), movementsBefore, "movements must be posted upon opname completion")
+}
+
+func TestWMSFraudControls_F3_Scrap(t *testing.T) {
+	repo := newMockWMSRepo()
+	usecase := uc.New(repo)
+	ctx := context.Background()
+
+	tenantID := uuid.New()
+	whID := uuid.New()
+	locID := uuid.New()
+	prodID := uuid.New()
+	staffID := uuid.New()
+	adminID := uuid.New()
+
+	repo.warehouses[whID] = domain.Warehouse{ID: whID, TenantID: tenantID, Code: "WH-F3-S", Name: "Scrap WH", IsActive: true}
+	repo.locations[locID] = domain.WarehouseLocation{ID: locID, TenantID: tenantID, WarehouseID: &whID, Code: "LOC-SCRAP", Name: "Rack Scrap", Type: domain.LocationTypeInternal}
+	repo.userWarehouses[fmt.Sprintf("%s:%s", tenantID, staffID)] = []uuid.UUID{whID}
+	repo.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, locID, prodID)] = decimal.NewFromInt(100)
+
+	// 1. Scrap with reason < 10 chars returns ErrInvalidInput
+	reqShortReason := uc.CreateStockScrapRequest{
+		WarehouseID:      whID,
+		ProductID:        prodID,
+		SourceLocationID: locID,
+		Quantity:         decimal.NewFromInt(5),
+		Reason:           "short",
+	}
+	_, err := usecase.CreateStockScrap(ctx, tenantID, staffID, "warehouse", reqShortReason)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "reason < 10 characters must return ErrInvalidInput")
+
+	// 2. Scrap > 10 units by role warehouse returns ErrScrapApprovalRequired
+	reqThresholdExceeded := uc.CreateStockScrapRequest{
+		WarehouseID:      whID,
+		ProductID:        prodID,
+		SourceLocationID: locID,
+		Quantity:         decimal.NewFromInt(15), // > 10
+		Reason:           "Water leakage spoiled whole carton of goods",
+	}
+	_, err = usecase.CreateStockScrap(ctx, tenantID, staffID, "warehouse", reqThresholdExceeded)
+	assert.ErrorIs(t, err, domain.ErrScrapApprovalRequired, "scrap > 10 units by warehouse role must require approval")
+
+	// 3. Scrap > 10 units by admin succeeds
+	scrap, err := usecase.CreateStockScrap(ctx, tenantID, adminID, "admin", reqThresholdExceeded)
+	require.NoError(t, err)
+	assert.NotNil(t, scrap.ApprovedBy)
+	assert.Equal(t, adminID, *scrap.ApprovedBy)
+}
+
+func TestWMSFraudControls_F4_Putaway_OnHold(t *testing.T) {
+	repo := newMockWMSRepo()
+	usecase := uc.New(repo)
+	ctx := context.Background()
+
+	tenantID := uuid.New()
+	whID := uuid.New()
+	adminID := uuid.New()
+	prodID := uuid.New()
+	batchID := uuid.New()
+
+	repo.warehouses[whID] = domain.Warehouse{ID: whID, TenantID: tenantID, Code: "WH-F4", Name: "Putaway WH", IsActive: true}
+	destLoc := uuid.New()
+	repo.locations[destLoc] = domain.WarehouseLocation{
+		ID:          destLoc,
+		TenantID:    tenantID,
+		WarehouseID: &whID,
+		Code:        "RACK-F4",
+		Type:        domain.LocationTypeInternal,
+	}
+
+	stgLoc, err := repo.GetOrCreateStagingLocation(ctx, tenantID, whID)
+	require.NoError(t, err)
+
+	b := &domain.StockBatch{
+		ID:          batchID,
+		TenantID:    tenantID,
+		ProductID:   prodID,
+		BatchNumber: "LOT-HOLD-001",
+		Status:      domain.StockBatchStatusOnHold,
+		CreatedAt:   time.Now().UTC(),
+	}
+	_, err = repo.GetOrCreateBatch(ctx, b)
+	require.NoError(t, err)
+
+	repo.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, stgLoc.ID, prodID)] = decimal.NewFromInt(50)
+
+	// ConfirmPutaway for batch with status ON_HOLD returns ErrBatchOnHold
+	req := uc.PutawayRequest{
+		WarehouseID:    whID,
+		ProductID:      prodID,
+		BatchID:        batchID,
+		Quantity:       decimal.NewFromInt(10),
+		DestLocationID: destLoc,
+		Reason:         ptr("Rack selection"),
+	}
+	_, err = usecase.ConfirmPutaway(ctx, tenantID, adminID, "admin", req)
+	assert.ErrorIs(t, err, domain.ErrBatchOnHold, "putaway for ON_HOLD batch must return ErrBatchOnHold")
+}
+
+func TestWMSFraudControls_F6_DO_CustomerRecipient(t *testing.T) {
+	repo := newMockWMSRepo()
+	usecase := uc.New(repo)
+	ctx := context.Background()
+
+	tenantID := uuid.New()
+	whID := uuid.New()
+	locID := uuid.New()
+	prodID := uuid.New()
+	adminID := uuid.New()
+
+	repo.warehouses[whID] = domain.Warehouse{ID: whID, TenantID: tenantID, Code: "WH-F6", Name: "DO Recipient WH", IsActive: true}
+	repo.locations[locID] = domain.WarehouseLocation{ID: locID, TenantID: tenantID, WarehouseID: &whID, Code: "LOC-F6", Name: "Rack F6", Type: domain.LocationTypeInternal}
+	repo.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, locID, prodID)] = decimal.NewFromInt(50)
+
+	// 1. Neither CustomerID nor RecipientName provided -> ErrInvalidInput
+	reqBothNil := uc.CreateDeliveryOrderRequest{
+		WarehouseID: whID,
+		DONumber:    "DO-F6-01",
+		Items: []uc.CreateDeliveryOrderItemRequest{
+			{ProductID: prodID, Quantity: decimal.NewFromInt(5), LocationID: locID},
+		},
+	}
+	_, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", reqBothNil)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "missing both CustomerID and RecipientName must return ErrInvalidInput")
+
+	// 2. Whitespace-only RecipientName and nil CustomerID -> ErrInvalidInput
+	reqWhitespace := uc.CreateDeliveryOrderRequest{
+		WarehouseID:   whID,
+		DONumber:      "DO-F6-02",
+		RecipientName: ptr("   "),
+		Items: []uc.CreateDeliveryOrderItemRequest{
+			{ProductID: prodID, Quantity: decimal.NewFromInt(5), LocationID: locID},
+		},
+	}
+	_, err = usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", reqWhitespace)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput, "whitespace RecipientName must return ErrInvalidInput")
+
+	// 3. Valid RecipientName provided -> Succeeds
+	reqValidRecipient := uc.CreateDeliveryOrderRequest{
+		WarehouseID:   whID,
+		DONumber:      "DO-F6-03",
+		RecipientName: ptr("Toko Sumber Rejeki"),
+		Items: []uc.CreateDeliveryOrderItemRequest{
+			{ProductID: prodID, Quantity: decimal.NewFromInt(5), LocationID: locID},
+		},
+	}
+	doRecipient, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", reqValidRecipient)
+	require.NoError(t, err)
+	assert.NotNil(t, doRecipient)
+
+	// 4. Valid CustomerID provided with nil RecipientName -> Succeeds
+	custID := uuid.New()
+	reqValidCustomer := uc.CreateDeliveryOrderRequest{
+		WarehouseID: whID,
+		DONumber:    "DO-F6-04",
+		CustomerID:  &custID,
+		Items: []uc.CreateDeliveryOrderItemRequest{
+			{ProductID: prodID, Quantity: decimal.NewFromInt(5), LocationID: locID},
+		},
+	}
+	doCustomer, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", reqValidCustomer)
+	require.NoError(t, err)
+	assert.NotNil(t, doCustomer)
+}
 

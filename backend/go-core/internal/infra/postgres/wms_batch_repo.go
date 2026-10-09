@@ -217,6 +217,11 @@ WHERE sm.tenant_id = $1 AND sm.status = 'DONE'`)
 		args = append(args, string(*f.LocationType))
 		argIdx++
 	}
+	if f.BatchStatus != nil {
+		sb.WriteString(fmt.Sprintf(" AND b.status = $%d", argIdx))
+		args = append(args, string(*f.BatchStatus))
+		argIdx++
+	}
 
 	sb.WriteString(`
 GROUP BY b.id, b.batch_number, b.expiry_date, b.status, b.created_at, loc.id, loc.code, sm.product_id, p.name, p.sku

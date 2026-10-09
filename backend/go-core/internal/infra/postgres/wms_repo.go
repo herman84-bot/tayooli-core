@@ -1346,7 +1346,9 @@ SELECT loc.type,
 FROM warehouse_locations loc
 LEFT JOIN stock_movements sm ON (sm.dest_location_id = loc.id OR sm.source_location_id = loc.id)
     AND sm.tenant_id = $1 AND sm.product_id = $3 AND sm.status = 'DONE'
+LEFT JOIN stock_batches sb ON sb.id = sm.batch_id AND sb.tenant_id = sm.tenant_id
 WHERE loc.id = $2 AND loc.tenant_id = $1
+  AND (sb.id IS NULL OR sb.status = 'RELEASED')
 GROUP BY loc.id, loc.type`, tenantID, *locationID, productID).Scan(&locType, &onHand)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -1387,7 +1389,9 @@ SELECT COALESCE(SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE
 FROM warehouse_locations loc
 JOIN stock_movements sm ON (sm.dest_location_id = loc.id OR sm.source_location_id = loc.id)
     AND sm.tenant_id = $1 AND sm.product_id = $3 AND sm.status = 'DONE'
-WHERE loc.warehouse_id = $2 AND loc.tenant_id = $1 AND loc.type = 'INTERNAL'`, tenantID, warehouseID, productID).Scan(&onHand)
+LEFT JOIN stock_batches sb ON sb.id = sm.batch_id AND sb.tenant_id = sm.tenant_id
+WHERE loc.warehouse_id = $2 AND loc.tenant_id = $1 AND loc.type = 'INTERNAL'
+  AND (sb.id IS NULL OR sb.status = 'RELEASED')`, tenantID, warehouseID, productID).Scan(&onHand)
 	if err != nil {
 		return decimal.Zero, fmt.Errorf("WMSRepo.GetAvailableStock: query wh onhand: %w", err)
 	}
@@ -1953,6 +1957,18 @@ func (r *WMSRepo) UpdateDeliveryOrderStatus(ctx context.Context, tenantID, id uu
 		return fmt.Errorf("WMSRepo.UpdateDeliveryOrderStatus: set tenant: %w", err)
 	}
 
+	var currentStatus string
+	err = tx.QueryRowContext(ctx, `SELECT status FROM delivery_orders WHERE id = $1 AND tenant_id = $2 FOR UPDATE`, id, tenantID).Scan(&currentStatus)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrDeliveryOrderNotFound
+		}
+		return fmt.Errorf("WMSRepo.UpdateDeliveryOrderStatus: lock DO: %w", err)
+	}
+	if currentStatus == string(domain.DeliveryOrderStatusShipped) || currentStatus == string(domain.DeliveryOrderStatusCancelled) {
+		return domain.ErrInvalidStatus
+	}
+
 	res, err := tx.ExecContext(ctx, updateDeliveryOrderStatusSQL, id, tenantID, status, ptrToNullTime(receivedDate))
 	if err != nil {
 		return fmt.Errorf("WMSRepo.UpdateDeliveryOrderStatus: exec: %w", err)
@@ -2336,8 +2352,8 @@ func (r *WMSRepo) UpdateStockOpnameStatus(ctx context.Context, tenantID, opnameI
 // -----------------------------------------------------------------------------
 
 const createStockScrapSQL = `
-INSERT INTO stock_scraps (id, tenant_id, scrap_number, warehouse_id, product_id, source_location_id, scrap_location_id, quantity, reason, reported_by, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+INSERT INTO stock_scraps (id, tenant_id, scrap_number, warehouse_id, product_id, source_location_id, scrap_location_id, quantity, reason, reported_by, approved_by, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 
 func (r *WMSRepo) CreateStockScrap(ctx context.Context, scrap *domain.StockScrap) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -2360,7 +2376,7 @@ func (r *WMSRepo) CreateStockScrap(ctx context.Context, scrap *domain.StockScrap
 	_, err = tx.ExecContext(ctx, createStockScrapSQL,
 		scrap.ID, scrap.TenantID, scrap.ScrapNumber, scrap.WarehouseID, scrap.ProductID,
 		scrap.SourceLocationID, scrap.ScrapLocationID, scrap.Quantity, scrap.Reason,
-		scrap.ReportedBy, scrap.CreatedAt)
+		scrap.ReportedBy, scrap.ApprovedBy, scrap.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("WMSRepo.CreateStockScrap: exec: %w", err)
 	}
@@ -2369,13 +2385,13 @@ func (r *WMSRepo) CreateStockScrap(ctx context.Context, scrap *domain.StockScrap
 }
 
 const listStockScrapsSQL = `
-SELECT id, tenant_id, scrap_number, warehouse_id, product_id, source_location_id, scrap_location_id, quantity, reason, reported_by, created_at
+SELECT id, tenant_id, scrap_number, warehouse_id, product_id, source_location_id, scrap_location_id, quantity, reason, reported_by, approved_by, created_at
 FROM stock_scraps
 WHERE tenant_id = $1
 ORDER BY created_at DESC`
 
 const listStockScrapsByWarehouseSQL = `
-SELECT id, tenant_id, scrap_number, warehouse_id, product_id, source_location_id, scrap_location_id, quantity, reason, reported_by, created_at
+SELECT id, tenant_id, scrap_number, warehouse_id, product_id, source_location_id, scrap_location_id, quantity, reason, reported_by, approved_by, created_at
 FROM stock_scraps
 WHERE tenant_id = $1 AND warehouse_id = $2
 ORDER BY created_at DESC`
@@ -2409,7 +2425,7 @@ func (r *WMSRepo) ListStockScraps(ctx context.Context, tenantID uuid.UUID, wareh
 		if err := rows.Scan(
 			&scrap.ID, &scrap.TenantID, &scrap.ScrapNumber, &scrap.WarehouseID,
 			&scrap.ProductID, &scrap.SourceLocationID, &scrap.ScrapLocationID,
-			&scrap.Quantity, &scrap.Reason, &scrap.ReportedBy, &scrap.CreatedAt,
+			&scrap.Quantity, &scrap.Reason, &scrap.ReportedBy, &scrap.ApprovedBy, &scrap.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListStockScraps: scan: %w", err)
 		}

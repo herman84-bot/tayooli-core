@@ -949,6 +949,14 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 		return nil, domain.ErrInvalidInput
 	}
 
+	recipientName := ""
+	if req.RecipientName != nil {
+		recipientName = strings.TrimSpace(*req.RecipientName)
+	}
+	if (req.CustomerID == nil || *req.CustomerID == uuid.Nil) && recipientName == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
 	type prodLocKey struct {
 		prod uuid.UUID
 		loc  uuid.UUID
@@ -1026,6 +1034,13 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 	var items []domain.DeliveryOrderItem
 	for _, itemReq := range req.Items {
 		if itemReq.BatchID != nil && *itemReq.BatchID != uuid.Nil && itemReq.LocationID != uuid.Nil {
+			batch, err := u.repo.GetBatchByID(ctx, tenantID, *itemReq.BatchID)
+			if err != nil {
+				return nil, err
+			}
+			if batch.Status != domain.StockBatchStatusReleased {
+				return nil, domain.ErrBatchOnHold
+			}
 			// Specific batch + location provided
 			items = append(items, domain.DeliveryOrderItem{
 				ID:              uuid.New(),
@@ -1043,10 +1058,12 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 
 		// Auto FEFO allocation (BE-06): query INTERNAL rack batch balances and pick earliest expiry
 		locTypeInternal := domain.LocationTypeInternal
+		statusReleased := domain.StockBatchStatusReleased
 		filter := domain.BatchBalanceFilter{
 			WarehouseID:  &req.WarehouseID,
 			ProductID:    &itemReq.ProductID,
 			LocationType: &locTypeInternal,
+			BatchStatus:  &statusReleased,
 		}
 		if itemReq.LocationID != uuid.Nil {
 			filter.LocationIDs = []uuid.UUID{itemReq.LocationID}
@@ -1130,11 +1147,34 @@ func (u *Usecase) DispatchDeliveryOrder(ctx context.Context, tenantID, userID uu
 		return nil, err
 	}
 
-	// Only allow dispatch if status is DRAFT, CONFIRMED, or PACKED
-	if do.Status != domain.DeliveryOrderStatusDraft &&
-		do.Status != domain.DeliveryOrderStatusConfirmed &&
-		do.Status != domain.DeliveryOrderStatusPacked {
-		return nil, domain.ErrInvalidStatus
+	// F2 Status check
+	settings, _ := u.repo.GetWMSSettings(ctx, tenantID)
+	requirePickPack := false
+	if settings != nil {
+		requirePickPack = settings.RequirePickPack
+	}
+	if requirePickPack {
+		if do.Status != domain.DeliveryOrderStatusPacked || do.PackedBy == nil {
+			return nil, domain.ErrDeliveryOrderNotPacked
+		}
+	} else {
+		if do.Status != domain.DeliveryOrderStatusPacked && do.Status != domain.DeliveryOrderStatusConfirmed {
+			return nil, domain.ErrDeliveryOrderNotPacked
+		}
+	}
+
+	// F2 Mandatory shipping details
+	if do.DriverName == nil || strings.TrimSpace(*do.DriverName) == "" ||
+		do.VehiclePlate == nil || strings.TrimSpace(*do.VehiclePlate) == "" ||
+		do.ExpeditionName == nil || strings.TrimSpace(*do.ExpeditionName) == "" {
+		return nil, domain.ErrDeliveryOrderIncompleteShip
+	}
+
+	// F2 Segregation of duties
+	if role != "admin" && role != "owner" {
+		if do.CreatedBy != nil && *do.CreatedBy == userID {
+			return nil, domain.ErrSelfApprovalForbidden
+		}
 	}
 
 	// Verify location warehouse scoping for each item
@@ -1338,13 +1378,46 @@ func (u *Usecase) CompleteStockOpname(ctx context.Context, tenantID, userID uuid
 		return nil, err
 	}
 
-	if op.Status != domain.StockOpnameStatusDraft && op.Status != domain.StockOpnameStatusInProgress {
+	if op.Status != domain.StockOpnameStatusDraft &&
+		op.Status != domain.StockOpnameStatusInProgress &&
+		op.Status != domain.StockOpnameStatusPendingApproval {
 		return nil, domain.ErrInvalidOpnameStatus
 	}
 
 	items, err := u.repo.ListStockOpnameItems(ctx, tenantID, opnameID)
 	if err != nil {
 		return nil, fmt.Errorf("CompleteStockOpname: list items: %w", err)
+	}
+
+	// Discrepancy reason check
+	for _, item := range items {
+		if !item.DiscrepancyQty.IsZero() {
+			itemHasNotes := item.Notes != nil && strings.TrimSpace(*item.Notes) != ""
+			opnameHasNotes := op.Notes != nil && strings.TrimSpace(*op.Notes) != ""
+			if !itemHasNotes && !opnameHasNotes {
+				return nil, domain.ErrInvalidInput
+			}
+		}
+	}
+
+	// Approver check
+	isApprover := role == "admin" || role == "owner" || role == "regional_manager"
+	if !isApprover {
+		if op.Status == domain.StockOpnameStatusDraft || op.Status == domain.StockOpnameStatusInProgress {
+			// Transition to PENDING_APPROVAL without writing ledger movements
+			if err := u.repo.UpdateStockOpnameStatus(ctx, tenantID, op.ID, domain.StockOpnameStatusPendingApproval, nil); err != nil {
+				return nil, err
+			}
+			op.Status = domain.StockOpnameStatusPendingApproval
+			return op, nil
+		}
+		return nil, domain.ErrForbidden
+	}
+
+	// Caller IS an approver:
+	// Check segregation of duties: approver cannot be the one who conducted the opname!
+	if op.ConductedBy == userID {
+		return nil, domain.ErrSelfApprovalForbidden
 	}
 
 	lossLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeLoss)
@@ -1485,8 +1558,15 @@ func (u *Usecase) CreateStockScrap(ctx context.Context, tenantID, userID uuid.UU
 		return nil, domain.ErrInvalidInput
 	}
 	reason := strings.TrimSpace(req.Reason)
-	if reason == "" {
+	if len(reason) < 10 {
 		return nil, domain.ErrInvalidInput
+	}
+
+	const scrapApprovalThreshold = 10
+	if req.Quantity.GreaterThan(decimal.NewFromInt(scrapApprovalThreshold)) {
+		if role != "admin" && role != "owner" {
+			return nil, domain.ErrScrapApprovalRequired
+		}
 	}
 
 	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.WarehouseID); err != nil {
@@ -1548,6 +1628,11 @@ func (u *Usecase) CreateStockScrap(ctx context.Context, tenantID, userID uuid.UU
 		return nil, err
 	}
 
+	var approvedBy *uuid.UUID
+	if role == "admin" || role == "owner" {
+		approvedBy = &userID
+	}
+
 	scrap := &domain.StockScrap{
 		ID:                 scrapID,
 		TenantID:           tenantID,
@@ -1559,6 +1644,7 @@ func (u *Usecase) CreateStockScrap(ctx context.Context, tenantID, userID uuid.UU
 		Quantity:           req.Quantity,
 		Reason:             reason,
 		ReportedBy:         userID,
+		ApprovedBy:         approvedBy,
 		CreatedAt:          now,
 	}
 

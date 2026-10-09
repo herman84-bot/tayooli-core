@@ -35,9 +35,13 @@ import {
 } from "@/hooks/useWMS"
 import { useProducts } from "@/hooks/useProducts"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
+import { useAuthStore } from "@/hooks/useAuth"
 import { Product, WarehouseLocation, StockScrap } from "@/lib/api"
 
 export default function StockScrapPage() {
+  const currentUser = useAuthStore((s) => s.user)
+  const currentRole = (currentUser?.role ?? "").toLowerCase()
+
   const { data: warehouses = [], isLoading: loadingWarehouses, refetch: refetchWarehouses } = useWarehouses()
   const { data: products = [], isLoading: loadingProducts } = useProducts()
 
@@ -189,6 +193,14 @@ export default function StockScrapPage() {
     const fullReason = [reasonPreset, reasonDetail.trim()].filter(Boolean).join(" - ")
     if (!fullReason) {
       setModalError("Pilih atau isi alasan kerusakan/karantina.")
+      return
+    }
+    if (fullReason.length < 10) {
+      setModalError("Alasan pemusnahan/scrap barang harus minimal 10 karakter.")
+      return
+    }
+    if (qty > 10 && currentRole !== "admin" && currentRole !== "owner") {
+      setModalError("Pemusnahan stok di atas ambang batas (10 unit) wajib dilakukan oleh pengguna dengan peran Admin atau Owner.")
       return
     }
 

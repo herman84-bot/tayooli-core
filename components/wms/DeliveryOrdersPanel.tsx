@@ -752,11 +752,8 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {filteredOrders.map((order) => {
-                    const canDispatch =
-                      order.status === "DRAFT" ||
-                      order.status === "CONFIRMED" ||
-                      order.status === "PICKED" ||
-                      order.status === "PACKED"
+                    // F2 QA: Dispatch hanya diizinkan dari status PACKED (setelah meja kemas)
+                    const canDispatch = order.status === "PACKED"
                     return (
                       <tr key={order.id} className="hover:bg-slate-50/80 transition-colors group">
                         <td className="py-3.5 px-4 font-mono font-semibold text-slate-900">
@@ -932,6 +929,13 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
             <p className="text-sm text-slate-600 leading-relaxed">
               Konfirmasi pengiriman Surat Jalan ini? Status akan diperbarui menjadi <strong>SHIPPED</strong> dan stok gudang otomatis dipotong untuk pelanggan tujuan.
             </p>
+            {(!orderToDispatch.driver_name?.trim() ||
+              !orderToDispatch.vehicle_plate?.trim() ||
+              !orderToDispatch.expedition_name?.trim()) && (
+              <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800">
+                Peringatan: Data armada pengiriman (Nama Sopir, Plat Nomor, Ekspedisi) belum lengkap pada Surat Jalan ini. Backend mewajibkan data tersebut sebelum dispatch.
+              </p>
+            )}
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
               Tindakan ini permanen: potongan stok di buku besar tidak dapat dibatalkan dari layar ini.
             </p>

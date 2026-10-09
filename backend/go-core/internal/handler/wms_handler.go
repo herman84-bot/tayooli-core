@@ -314,7 +314,13 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, domain.ErrReceiptNotOnHold):
 		RespondError(w, r, http.StatusBadRequest, "Penerimaan barang tidak memiliki lot yang berstatus ON_HOLD")
 	case errors.Is(err, domain.ErrBatchOnHold):
-		RespondError(w, r, http.StatusConflict, "Batch/Lot berstatus ON_HOLD dan belum disetujui untuk rilis")
+		RespondError(w, r, http.StatusUnprocessableEntity, "batch berstatus ON_HOLD tidak dapat dipindahkan ke rak penyimpanan internal")
+	case errors.Is(err, domain.ErrDeliveryOrderIncompleteShip):
+		RespondError(w, r, http.StatusBadRequest, "data pengiriman (nama sopir, plat nomor, ekspedisi) wajib dilengkapi sebelum dispatch")
+	case errors.Is(err, domain.ErrDeliveryOrderNotPacked):
+		RespondError(w, r, http.StatusBadRequest, "Surat Jalan harus dalam status PACKED sebelum dispatch")
+	case errors.Is(err, domain.ErrScrapApprovalRequired):
+		RespondError(w, r, http.StatusForbidden, "pemusnahan stok melebihi batas (10 unit) wajib disetujui oleh admin atau owner")
 	case errors.Is(err, domain.ErrQCAlreadyInspected):
 		RespondError(w, r, http.StatusConflict, "Penerimaan ini sudah diinspeksi QC")
 	case errors.Is(err, domain.ErrQCReceiptNotPosted):
