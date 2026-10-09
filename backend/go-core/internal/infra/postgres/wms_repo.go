@@ -1303,7 +1303,8 @@ ORDER BY p.name ASC`
 	var result []domain.StockSummary
 	for rows.Next() {
 		var s domain.StockSummary
-		var whID, locID sql.NullString
+		var whID uuid.UUID
+		var locID uuid.UUID
 		if err := rows.Scan(
 			&s.ProductID, &s.SKU, &s.ProductName,
 			&whID, &s.WarehouseName,
@@ -1312,8 +1313,8 @@ ORDER BY p.name ASC`
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListStockSummary: scan: %w", err)
 		}
-		s.WarehouseID = nullUUIDToPtr(whID)
-		s.LocationID = nullUUIDToPtr(locID)
+		s.WarehouseID = &whID
+		s.LocationID = &locID
 		result = append(result, s)
 	}
 	if err := rows.Err(); err != nil {
