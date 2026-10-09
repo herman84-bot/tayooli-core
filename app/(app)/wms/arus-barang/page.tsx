@@ -49,6 +49,7 @@ import { DockBoardSubView } from "@/components/wms/DockBoardSubView"
 import DeliveryOrdersPanel from "@/components/wms/DeliveryOrdersPanel"
 import { WavePickingSubView } from "@/components/wms/WavePickingSubView"
 import { PackingStationSubView } from "@/components/wms/PackingStationSubView"
+import { LPNManagementModal } from "@/components/wms/LPNManagementModal"
 
 // ---------------------------------------------------------------------------
 // Helpers & Badges
@@ -453,6 +454,7 @@ function InboundReceivingSubView({
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [selectedType, setSelectedType] = useState<StockReceiptType | "ALL">("ALL")
   const [exporting, setExporting] = useState(false)
+  const [showLPNModal, setShowLPNModal] = useState(false)
 
   const { data: warehouses = [] } = useWarehouses()
   const { data: receipts = [], isLoading, isError, error, refetch } = useStockReceipts(
@@ -519,6 +521,14 @@ function InboundReceivingSubView({
 
             <div className="flex items-center gap-2">
               <ExportButton onClick={() => setExporting(true)} disabled={receipts.length === 0} />
+              <button
+                onClick={() => setShowLPNModal(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg shadow-sm transition-colors"
+                title="Kelola wadah palet LPN di gudang"
+              >
+                <Boxes className="h-4 w-4 text-emerald-600" />
+                Kelola Palet (LPN)
+              </button>
               <button
                 onClick={() => openNew("PRODUCTION")}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
@@ -670,8 +680,16 @@ function InboundReceivingSubView({
           }}
           onGoToPutaway={onGoToPutaway}
           onNotice={setNotice}
+          onOpenLPN={() => setShowLPNModal(true)}
         />
       )}
+
+      {/* LPN Pallet Management Modal */}
+      <LPNManagementModal
+        isOpen={showLPNModal}
+        onClose={() => setShowLPNModal(false)}
+        warehouseId={warehouseId || null}
+      />
     </div>
   )
 }
@@ -1074,11 +1092,13 @@ function InboundReceiptDetail({
   onBack,
   onGoToPutaway,
   onNotice,
+  onOpenLPN,
 }: {
   id: string
   onBack: () => void
   onGoToPutaway: () => void
   onNotice: (n: { type: "success" | "error"; text: string } | null) => void
+  onOpenLPN?: () => void
 }) {
   const { data, isLoading, isError, error, refetch } = useStockReceipt(id)
   const postMut = usePostStockReceipt()
@@ -1194,6 +1214,17 @@ function InboundReceiptDetail({
               {isProcessing ? "Merilis..." : "Setujui Rilis (Release Approval PDF-06)"}
             </button>
           ) : null}
+
+          {onOpenLPN && (
+            <button
+              onClick={onOpenLPN}
+              className="px-3.5 py-2 text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg shadow-sm inline-flex items-center gap-1.5"
+              title="Kelola wadah palet LPN di gudang"
+            >
+              <Boxes className="h-3.5 w-3.5 text-emerald-600" />
+              Kelola Palet (LPN)
+            </button>
+          )}
 
           {r.status === "POSTED" && (
             <button
