@@ -409,7 +409,7 @@ func (r *WMSRepo) GetAppointmentByID(ctx context.Context, tenantID, id uuid.UUID
 	SELECT a.id, a.tenant_id, a.warehouse_id, w.name, a.dock_id, d.dock_code, d.dock_name,
 	       a.appointment_number, a.vendor_name, a.vehicle_plate, a.driver_name, a.driver_phone,
 	       a.po_reference, a.estimated_arrival, a.actual_arrival, a.start_unloading_at, a.completed_at,
-	       a.status, a.notes, a.created_by, u.name, a.created_at, a.updated_at
+	       a.status, a.notes, a.created_by, COALESCE(u.full_name, u.email), a.created_at, a.updated_at
 	FROM dock_appointments a
 	JOIN warehouses w ON w.id = a.warehouse_id AND w.tenant_id = $2
 	LEFT JOIN inbound_docks d ON d.id = a.dock_id AND d.tenant_id = $2
@@ -479,7 +479,7 @@ func (r *WMSRepo) ListAppointments(ctx context.Context, tenantID uuid.UUID, ware
 	SELECT a.id, a.tenant_id, a.warehouse_id, w.name, a.dock_id, d.dock_code, d.dock_name,
 	       a.appointment_number, a.vendor_name, a.vehicle_plate, a.driver_name, a.driver_phone,
 	       a.po_reference, a.estimated_arrival, a.actual_arrival, a.start_unloading_at, a.completed_at,
-	       a.status, a.notes, a.created_by, u.name, a.created_at, a.updated_at
+	       a.status, a.notes, a.created_by, COALESCE(u.full_name, u.email), a.created_at, a.updated_at
 	FROM dock_appointments a
 	JOIN warehouses w ON w.id = a.warehouse_id AND w.tenant_id = $1
 	LEFT JOIN inbound_docks d ON d.id = a.dock_id AND d.tenant_id = $1
@@ -1019,7 +1019,7 @@ func (r *WMSRepo) GetLPNByID(ctx context.Context, tenantID, id uuid.UUID) (*doma
 	queryHeader := `
 	SELECT l.id, l.tenant_id, l.warehouse_id, w.name, l.lpn_code, l.location_id,
 	       loc.code, loc.name, l.pallet_type, l.status, l.max_weight_kg, l.total_weight_kg,
-	       l.notes, l.created_by, u.name, l.created_at, l.updated_at
+	       l.notes, l.created_by, COALESCE(u.full_name, u.email), l.created_at, l.updated_at
 	FROM stock_lpns l
 	JOIN warehouses w ON w.id = l.warehouse_id AND w.tenant_id = $2
 	JOIN warehouse_locations loc ON loc.id = l.location_id AND loc.tenant_id = $2
@@ -1118,7 +1118,7 @@ func (r *WMSRepo) ListLPNs(ctx context.Context, tenantID uuid.UUID, warehouseID 
 	query := `
 	SELECT l.id, l.tenant_id, l.warehouse_id, w.name, l.lpn_code, l.location_id,
 	       loc.code, loc.name, l.pallet_type, l.status, l.max_weight_kg, l.total_weight_kg,
-	       l.notes, l.created_by, u.name, l.created_at, l.updated_at
+	       l.notes, l.created_by, COALESCE(u.full_name, u.email), l.created_at, l.updated_at
 	FROM stock_lpns l
 	JOIN warehouses w ON w.id = l.warehouse_id AND w.tenant_id = $1
 	JOIN warehouse_locations loc ON loc.id = l.location_id AND loc.tenant_id = $1

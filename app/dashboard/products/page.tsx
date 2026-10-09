@@ -27,7 +27,7 @@ const productSchema = z.object({
   name: z.string().min(2, "Nama minimal 2 karakter"),
   sku: z.string().min(1, "SKU wajib diisi"),
   description: z.string().optional(),
-  price: z.coerce.number().min(0, "Harga tidak boleh negatif"),
+  price: z.coerce.number().gt(0, "Harga harus lebih dari 0"),
 })
 
 const columns: ColumnDef<Product>[] = [

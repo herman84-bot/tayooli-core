@@ -49,7 +49,7 @@ const productSchema = z.object({
   name: z.string().trim().min(2, "Nama produk minimal 2 karakter").max(255, "Nama produk maksimal 255 karakter"),
   sku: z.string().trim().min(1, "SKU wajib diisi").max(100, "SKU maksimal 100 karakter"),
   description: z.string().trim().max(2000, "Deskripsi maksimal 2000 karakter").optional(),
-  price: z.coerce.number().min(0, "Harga tidak boleh negatif"),
+  price: z.coerce.number().gt(0, "Harga harus lebih dari 0"),
   cost_price: z.coerce.number().min(0, "Harga pokok tidak boleh negatif"),
 })
 
