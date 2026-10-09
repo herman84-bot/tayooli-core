@@ -891,6 +891,10 @@ func (r *WMSRepo) CreateStockMovement(ctx context.Context, m *domain.StockMoveme
 	if m.BatchID == nil || *m.BatchID == uuid.Nil {
 		return domain.ErrBatchRequired
 	}
+	// W2: Block self-loop movements (source==dest fraud/bypass)
+	if m.SourceLocationID == m.DestLocationID {
+		return domain.ErrInvalidInput // "source and dest location cannot be same"
+	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
