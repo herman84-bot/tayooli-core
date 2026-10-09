@@ -1895,7 +1895,7 @@ UPDATE delivery_orders
 SET status = $3,
     received_date = COALESCE($4, received_date),
     updated_at = NOW()
-WHERE id = $1 AND tenant_id = $2`
+WHERE id = $1 AND tenant_id = $2 AND status != $3`
 
 func (r *WMSRepo) ConfirmDeliveryOrder(ctx context.Context, tenantID, id, userID uuid.UUID) (*domain.DeliveryOrder, error) {
 	tx, err := r.db.BeginTx(ctx, nil)

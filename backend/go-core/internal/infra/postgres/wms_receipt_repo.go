@@ -482,8 +482,12 @@ func (r *WMSRepo) PostStockReceipt(ctx context.Context, p domain.PostReceiptPara
 		} else {
 			batchNum = domain.AutoBatchNumber(rc.ReceiptNumber, i+1)
 		}
-		batchStatus := domain.StockBatchStatusReleased
-		if p.HoldForRelease || (it.ExpiryDate != nil && isDateBeforeToday(it.ExpiryDate, now)) {
+		// F1: Post GR default ON_HOLD (batch belum QC/release, tidak bisa dipakai DO).
+		// Hanya QC yang bisa ubah ON_HOLD -> RELEASED via ReleaseQC.
+		// Jika expired (sudah terdeteksi), tetap ON_HOLD tapi flag untuk scrap.
+		batchStatus := domain.StockBatchStatusOnHold
+		if it.ExpiryDate != nil && isDateBeforeToday(it.ExpiryDate, now) {
+			// Expired batch tetap ON_HOLD, tidak langsung REJECTED.
 			batchStatus = domain.StockBatchStatusOnHold
 		}
 

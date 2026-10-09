@@ -1147,7 +1147,8 @@ func (u *Usecase) DispatchDeliveryOrder(ctx context.Context, tenantID, userID uu
 		return nil, err
 	}
 
-	// F2 Status check
+	// F3 Status check: Dispatch hanya dari PACKED (atau CONFIRMED jika RequirePickPack disabled).
+	// DRAFT tidak boleh langsung dispatch (exfiltration blocker).
 	settings, _ := u.repo.GetWMSSettings(ctx, tenantID)
 	requirePickPack := false
 	if settings != nil {
@@ -1158,6 +1159,10 @@ func (u *Usecase) DispatchDeliveryOrder(ctx context.Context, tenantID, userID uu
 			return nil, domain.ErrDeliveryOrderNotPacked
 		}
 	} else {
+		// jika picking/packing optional, izinkan CONFIRMED atau PACKED, TAPI BLOCK DRAFT
+		if do.Status == domain.DeliveryOrderStatusDraft {
+			return nil, domain.ErrDeliveryOrderNotPacked
+		}
 		if do.Status != domain.DeliveryOrderStatusPacked && do.Status != domain.DeliveryOrderStatusConfirmed {
 			return nil, domain.ErrDeliveryOrderNotPacked
 		}
