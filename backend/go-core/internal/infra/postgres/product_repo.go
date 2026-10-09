@@ -45,6 +45,9 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 	}
 
 	if _, err := tx.ExecContext(ctx, createProduct, p.ID, p.TenantID, p.Name, p.Description, p.SKU, p.Price, p.CostPrice, p.CreatedAt, p.UpdatedAt); err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrConflict
+		}
 		return fmt.Errorf("ProductRepo.Create: exec: %w", err)
 	}
 
@@ -221,7 +224,7 @@ func (r *ProductRepo) GetBySKU(ctx context.Context, tenantID uuid.UUID, sku stri
 const updateProduct = `
 UPDATE products
 SET name = $1, description = $2, sku = $3, price = $4, updated_at = $5, cost_price = $8
-WHERE id = $6 AND tenant_id = $7`
+WHERE id = $6 AND tenant_id = $7 AND deleted_at IS NULL`
 
 func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -236,6 +239,9 @@ func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) error {
 
 	res, err := tx.ExecContext(ctx, updateProduct, p.Name, p.Description, p.SKU, p.Price, p.UpdatedAt, p.ID, p.TenantID, p.CostPrice)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrConflict
+		}
 		return fmt.Errorf("ProductRepo.Update: exec: %w", err)
 	}
 	rowsAffected, err := res.RowsAffected()

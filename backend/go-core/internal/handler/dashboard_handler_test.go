@@ -222,8 +222,9 @@ func TestGetSummary_ExposesCrossModuleSections(t *testing.T) {
 	s.POS.AverageBasketSize = decimal.NewFromInt(43_540)
 	s.SalesOrders = domain.SalesOrderDashStats{Total: 3, Confirmed: 2, Pending: 1}
 	s.Outbound = domain.OutboundDashStats{
-		QtyToday: decimal.NewFromInt(150),
-		QtyMonth: decimal.NewFromInt(4500),
+		QtyToday:         decimal.NewFromInt(150),
+		QtyMonth:         decimal.NewFromInt(4500),
+		ConfirmedDOCount: 7,
 		TopProducts: []domain.TopOutboundProduct{
 			{ProductID: uuid.New(), ProductName: "Beras Premium", ProductSKU: "BRS-01", Quantity: decimal.NewFromInt(120)},
 		},
@@ -271,6 +272,10 @@ func TestGetSummary_ExposesCrossModuleSections(t *testing.T) {
 	}
 	if body.OutboundQtyToday != "150" || body.OutboundQtyMonth != "4500" {
 		t.Errorf("outbound qty aliases wrong: today=%s, month=%s", body.OutboundQtyToday, body.OutboundQtyMonth)
+	}
+	// A4 regression: confirmed_do_count must be exposed, not silently dropped.
+	if v, ok := body.Outbound["confirmed_do_count"].(float64); !ok || v != 7 {
+		t.Errorf("outbound.confirmed_do_count wrong: %v", body.Outbound["confirmed_do_count"])
 	}
 	if len(body.TopOutboundProducts) != 1 || body.TopOutboundProducts[0]["product_sku"] != "BRS-01" {
 		t.Errorf("top_outbound_products wrong: %v", body.TopOutboundProducts)

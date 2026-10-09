@@ -819,7 +819,7 @@ func (r *WMSRepo) ResolveBarcode(ctx context.Context, tenantID uuid.UUID, code s
 	const skuSQL = `
 SELECT id, sku, name
 FROM products
-WHERE tenant_id = $1 AND sku = $2
+WHERE tenant_id = $1 AND UPPER(TRIM(sku)) = UPPER(TRIM($2)) AND deleted_at IS NULL
 LIMIT 1`
 	var prodID uuid.UUID
 	var prodSKU, prodName string
@@ -843,7 +843,7 @@ LIMIT 1`
 	const barcodeSQL = `
 SELECT p.id, p.sku, p.name, b.barcode, b.multiplier
 FROM product_barcodes b
-JOIN products p ON p.id = b.product_id AND p.tenant_id = b.tenant_id
+JOIN products p ON p.id = b.product_id AND p.tenant_id = b.tenant_id AND p.deleted_at IS NULL
 WHERE b.tenant_id = $1 AND b.barcode = $2
 LIMIT 1`
 	var barcode string
@@ -868,7 +868,7 @@ LIMIT 1`
 	const mappingSQL = `
 SELECT p.id, p.sku, p.name, m.external_sku, m.multiplier
 FROM product_sku_mappings m
-JOIN products p ON p.id = m.product_id AND p.tenant_id = m.tenant_id
+JOIN products p ON p.id = m.product_id AND p.tenant_id = m.tenant_id AND p.deleted_at IS NULL
 WHERE m.tenant_id = $1 AND m.external_sku = $2
 LIMIT 1`
 	var extSKU string
@@ -3237,7 +3237,7 @@ func (r *WMSRepo) GetPendingUnmappedOrdersBySKU(ctx context.Context, tenantID uu
 const getProductBySKUSQL = `
 SELECT id, tenant_id, name, description, sku, price, created_at, updated_at
 FROM products
-WHERE tenant_id = $1 AND sku = $2
+WHERE tenant_id = $1 AND UPPER(TRIM(sku)) = UPPER(TRIM($2)) AND deleted_at IS NULL
 LIMIT 1`
 
 func (r *WMSRepo) GetProductBySKU(ctx context.Context, tenantID uuid.UUID, sku string) (*domain.Product, error) {

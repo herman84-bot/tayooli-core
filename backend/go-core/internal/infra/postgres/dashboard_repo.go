@@ -105,7 +105,7 @@ LIMIT 5`
 
 const dashboardWMSCounts = `
 SELECT
-  (SELECT COUNT(DISTINCT p.id) FROM products p WHERE p.tenant_id = $1)                   AS total_skus,
+  (SELECT COUNT(DISTINCT p.id) FROM products p WHERE p.tenant_id = $1 AND p.deleted_at IS NULL) AS total_skus,
   (SELECT COALESCE(SUM(sm.qty_total), 0)
      FROM (
        SELECT sm.product_id, 
@@ -151,7 +151,7 @@ LEFT JOIN (
   WHERE tenant_id = $1
   GROUP BY product_id
 ) s ON p.id = s.product_id
-WHERE p.tenant_id = $1 AND COALESCE(s.quantity, 0) <= 5
+WHERE p.tenant_id = $1 AND p.deleted_at IS NULL AND COALESCE(s.quantity, 0) <= 5
 ORDER BY current_stock ASC
 LIMIT 5`
 

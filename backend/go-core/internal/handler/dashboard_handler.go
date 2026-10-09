@@ -30,19 +30,19 @@ func NewDashboardHandler(uc dashboardUsecase) *DashboardHandler {
 // Amount fields are strings to preserve NUMERIC(20,4) precision in JSON.
 
 type invoiceStatsView struct {
-	Total         int    `json:"total"`
-	Pending       int    `json:"pending"`
-	Approved      int    `json:"approved"`
-	Rejected      int    `json:"rejected"`
-	PendingReview int    `json:"pending_review"`
-	TotalAmount   string `json:"total_amount"`
+	Total          int    `json:"total"`
+	Pending        int    `json:"pending"`
+	Approved       int    `json:"approved"`
+	Rejected       int    `json:"rejected"`
+	PendingReview  int    `json:"pending_review"`
+	TotalAmount    string `json:"total_amount"`
 	ApprovedAmount string `json:"approved_amount"`
 }
 
 type paymentStatsView struct {
-	Total        int    `json:"total"`
-	Paid         int    `json:"paid"`
-	PaidAmount   string `json:"paid_amount"`
+	Total         int    `json:"total"`
+	Paid          int    `json:"paid"`
+	PaidAmount    string `json:"paid_amount"`
 	PendingAmount string `json:"pending_amount"`
 }
 
@@ -127,10 +127,12 @@ type customerStatsView struct {
 }
 
 type outboundStatsView struct {
-	QtyToday     string                   `json:"qty_today"`
-	QtyMonth     string                   `json:"qty_month"`
-	TopProducts  []topOutboundProductView `json:"top_products"`
-	TopCustomers []topCustomerView        `json:"top_customers"`
+	QtyToday string `json:"qty_today"`
+	QtyMonth string `json:"qty_month"`
+	// A4: confirmed delivery orders within the selected period (?days=).
+	ConfirmedDOCount int                      `json:"confirmed_do_count"`
+	TopProducts      []topOutboundProductView `json:"top_products"`
+	TopCustomers     []topCustomerView        `json:"top_customers"`
 }
 
 type topOutboundProductView struct {
@@ -278,10 +280,11 @@ func toDashboardSummaryView(s *domain.DashboardSummary) dashboardSummaryView {
 	}
 
 	v.Outbound = outboundStatsView{
-		QtyToday:     s.Outbound.QtyToday.String(),
-		QtyMonth:     s.Outbound.QtyMonth.String(),
-		TopProducts:  make([]topOutboundProductView, len(s.Outbound.TopProducts)),
-		TopCustomers: make([]topCustomerView, len(s.Outbound.TopCustomers)),
+		QtyToday:         s.Outbound.QtyToday.String(),
+		QtyMonth:         s.Outbound.QtyMonth.String(),
+		ConfirmedDOCount: s.Outbound.ConfirmedDOCount,
+		TopProducts:      make([]topOutboundProductView, len(s.Outbound.TopProducts)),
+		TopCustomers:     make([]topCustomerView, len(s.Outbound.TopCustomers)),
 	}
 	for i, tp := range s.Outbound.TopProducts {
 		v.Outbound.TopProducts[i] = topOutboundProductView{
@@ -355,4 +358,3 @@ func (h *DashboardHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, toDashboardSummaryView(summary))
 }
-
