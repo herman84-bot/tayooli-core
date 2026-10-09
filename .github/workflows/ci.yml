@@ -51,11 +51,16 @@ jobs:
         working-directory: backend/go-core
 
       - name: Run database migrations
-        run: |
-          for f in backend/go-core/migrations/*.sql; do
-            echo "Applying: $(basename $f)"
-            PGPASSWORD=testpass psql -h localhost -U tayooli -d tayooli_test -f "$f" || true
-          done
+        run: go run ./cmd/migrate
+        working-directory: backend/go-core
+        env:
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          DB_USER: tayooli
+          DB_PASSWORD: testpass
+          DB_NAME: tayooli_test
+          DB_SSLMODE: disable
+          JWT_SECRET: test-secret-32-chars-long-for-ci-only!!!
 
       - name: Run Go tests
         run: go test -v ./...
