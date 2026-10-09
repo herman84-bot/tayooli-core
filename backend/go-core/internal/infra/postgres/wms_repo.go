@@ -1271,9 +1271,9 @@ allocated_stock AS (
         doi.location_id,
         SUM(doi.quantity) AS allocated_qty
     FROM delivery_order_items doi
-    JOIN delivery_orders do ON do.id = doi.delivery_order_id AND do.tenant_id = doi.tenant_id
+    JOIN delivery_orders dord ON dord.id = doi.delivery_order_id AND dord.tenant_id = doi.tenant_id
     WHERE doi.tenant_id = $1
-      AND do.status NOT IN ('SHIPPED', 'CANCELLED', 'RETURNED')
+      AND dord.status NOT IN ('SHIPPED', 'CANCELLED', 'RETURNED')
     GROUP BY doi.product_id, doi.location_id
 )
 SELECT 
@@ -1307,8 +1307,9 @@ ORDER BY p.name ASC`
 	var result []domain.StockSummary
 	for rows.Next() {
 		var s domain.StockSummary
-		var whID uuid.UUID
-		var locID uuid.UUID
+		// System locations (@CUSTOMER, @SUPPLIER, ...) have warehouse_id NULL,
+		// so these must stay nullable.
+		var whID, locID sql.NullString
 		if err := rows.Scan(
 			&s.ProductID, &s.SKU, &s.ProductName,
 			&whID, &s.WarehouseName,
@@ -1317,8 +1318,8 @@ ORDER BY p.name ASC`
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListStockSummary: scan: %w", err)
 		}
-		s.WarehouseID = &whID
-		s.LocationID = &locID
+		s.WarehouseID = nullUUIDToPtr(whID)
+		s.LocationID = nullUUIDToPtr(locID)
 		result = append(result, s)
 	}
 	if err := rows.Err(); err != nil {
@@ -1370,9 +1371,9 @@ GROUP BY loc.id, loc.type`, tenantID, *locationID, productID).Scan(&locType, &on
 		err = tx.QueryRowContext(ctx, `
 SELECT COALESCE(SUM(doi.quantity), 0)
 FROM delivery_order_items doi
-JOIN delivery_orders do ON do.id = doi.delivery_order_id AND do.tenant_id = doi.tenant_id
+JOIN delivery_orders dord ON dord.id = doi.delivery_order_id AND dord.tenant_id = doi.tenant_id
 WHERE doi.tenant_id = $1 AND doi.location_id = $2 AND doi.product_id = $3
-  AND do.status NOT IN ('SHIPPED', 'CANCELLED', 'RETURNED')`, tenantID, *locationID, productID).Scan(&allocated)
+  AND dord.status NOT IN ('SHIPPED', 'CANCELLED', 'RETURNED')`, tenantID, *locationID, productID).Scan(&allocated)
 		if err != nil {
 			return decimal.Zero, fmt.Errorf("WMSRepo.GetAvailableStock: query loc allocated: %w", err)
 		}
@@ -1405,9 +1406,9 @@ WHERE loc.warehouse_id = $2 AND loc.tenant_id = $1 AND loc.type = 'INTERNAL'
 	err = tx.QueryRowContext(ctx, `
 SELECT COALESCE(SUM(doi.quantity), 0)
 FROM delivery_order_items doi
-JOIN delivery_orders do ON do.id = doi.delivery_order_id AND do.tenant_id = doi.tenant_id
-WHERE doi.tenant_id = $1 AND do.warehouse_id = $2 AND doi.product_id = $3
-  AND do.status NOT IN ('SHIPPED', 'CANCELLED', 'RETURNED')`, tenantID, warehouseID, productID).Scan(&allocated)
+JOIN delivery_orders dord ON dord.id = doi.delivery_order_id AND dord.tenant_id = doi.tenant_id
+WHERE doi.tenant_id = $1 AND dord.warehouse_id = $2 AND doi.product_id = $3
+  AND dord.status NOT IN ('SHIPPED', 'CANCELLED', 'RETURNED')`, tenantID, warehouseID, productID).Scan(&allocated)
 	if err != nil {
 		return decimal.Zero, fmt.Errorf("WMSRepo.GetAvailableStock: query wh allocated: %w", err)
 	}

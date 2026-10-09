@@ -258,18 +258,18 @@ func (r *WMSRepo) getShippingManifestDetailTx(ctx context.Context, tx *sql.Tx, t
 
 	// Fetch items
 	rows, err := tx.QueryContext(ctx, `
-		SELECT do.id, do.do_number,
-		       COALESCE(c.name, do.recipient_name, ''),
+		SELECT dord.id, dord.do_number,
+		       COALESCE(c.name, dord.recipient_name, ''),
 		       COALESCE(c.address, ''),
-		       do.package_weight_kg, do.packaging_type,
-		       (do.loading_scanned_at IS NOT NULL) AS scanned,
-		       do.loading_scanned_at,
+		       dord.package_weight_kg, dord.packaging_type,
+		       (dord.loading_scanned_at IS NOT NULL) AS scanned,
+		       dord.loading_scanned_at,
 		       COALESCE(u_scan.full_name, u_scan.email, '')
-		FROM delivery_orders do
-		LEFT JOIN customers c ON c.id = do.customer_id AND c.tenant_id = do.tenant_id
-		LEFT JOIN users u_scan ON u_scan.id = do.loading_scanned_by AND u_scan.tenant_id = do.tenant_id
-		WHERE do.manifest_id = $1 AND do.tenant_id = $2
-		ORDER BY do.created_at ASC, do.id ASC`, id, tenantID)
+		FROM delivery_orders dord
+		LEFT JOIN customers c ON c.id = dord.customer_id AND c.tenant_id = dord.tenant_id
+		LEFT JOIN users u_scan ON u_scan.id = dord.loading_scanned_by AND u_scan.tenant_id = dord.tenant_id
+		WHERE dord.manifest_id = $1 AND dord.tenant_id = $2
+		ORDER BY dord.created_at ASC, dord.id ASC`, id, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.getShippingManifestDetailTx: query items: %w", err)
 	}
@@ -915,11 +915,11 @@ func (r *WMSRepo) GetWMSOutboundKPIs(ctx context.Context, tenantID uuid.UUID, wa
 	q6 := `SELECT COALESCE(SUM(CASE WHEN pti.damaged_qty = 0 THEN 1.0 ELSE 0.0 END) / NULLIF(COUNT(*), 0) * 100.0, 100.0)
 	       FROM picking_task_items pti
 	       JOIN picking_tasks pt ON pt.id = pti.task_id AND pt.tenant_id = pti.tenant_id
-	       JOIN delivery_orders do ON do.id = pt.delivery_order_id AND do.tenant_id = pt.tenant_id
+	       JOIN delivery_orders dord ON dord.id = pt.delivery_order_id AND dord.tenant_id = pt.tenant_id
 	       WHERE pti.tenant_id = $1`
 	args6 := []any{tenantID}
 	if warehouseID != nil {
-		q6 += ` AND do.warehouse_id = $2`
+		q6 += ` AND dord.warehouse_id = $2`
 		args6 = append(args6, *warehouseID)
 	}
 	if err := tx.QueryRowContext(ctx, q6, args6...).Scan(&summary.PickingAccuracyPct); err != nil {
