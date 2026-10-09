@@ -1287,7 +1287,7 @@ SELECT
     COALESCE(ms.qty, 0) AS quantity,
     COALESCE(als.allocated_qty, 0) AS allocated_qty,
     CASE 
-        WHEN ms.location_type IN ('QUARANTINE', 'STAGING_INBOUND', 'STAGING') THEN 0
+        WHEN ms.location_type IN ('QUARANTINE', 'STAGING_INBOUND', 'STAGING_OUTBOUND') THEN 0
         ELSE GREATEST(0, COALESCE(ms.qty, 0) - COALESCE(als.allocated_qty, 0))
     END AS available_qty
 FROM movement_stock ms
