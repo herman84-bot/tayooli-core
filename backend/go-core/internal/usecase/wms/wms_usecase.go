@@ -424,7 +424,10 @@ func (u *Usecase) CreateSKUMapping(ctx context.Context, tenantID uuid.UUID, req 
 		return nil, domain.ErrInvalidInput
 	}
 	mult := decimal.NewFromInt(1)
-	if req.Multiplier != nil && req.Multiplier.GreaterThan(decimal.Zero) {
+	if req.Multiplier != nil {
+		if !req.Multiplier.IsPositive() || req.Multiplier.GreaterThan(decimal.NewFromInt(domain.MaxSKUMultiplier)) {
+			return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf("Multiplier wajib lebih dari 0 dan maksimal %d", domain.MaxSKUMultiplier)}
+		}
 		mult = *req.Multiplier
 	}
 	m := &domain.ProductSKUMapping{
@@ -1816,6 +1819,25 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 		ch = domain.MarketplaceChannelOther
 	}
 
+	// M1: validate every line before anything is written, so a bad file
+	// creates no batch, no orders and no movements.
+	maxItem := decimal.NewFromInt(domain.MaxMarketplaceItemQty)
+	batchQty := decimal.Zero
+	for _, o := range req.Orders {
+		for _, it := range o.Items {
+			if !it.Quantity.IsPositive() || it.Quantity.GreaterThan(maxItem) {
+				return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf(
+					"Pesanan %s SKU %s: jumlah %s tidak valid (wajib 1-%d)",
+					strings.TrimSpace(o.ExternalOrderID), strings.TrimSpace(it.ExternalSKU), it.Quantity.String(), domain.MaxMarketplaceItemQty)}
+			}
+			batchQty = batchQty.Add(it.Quantity)
+		}
+	}
+	if batchQty.GreaterThan(decimal.NewFromInt(domain.MaxMarketplaceBatchQty)) {
+		return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf(
+			"Total jumlah %s melebihi batas %d per import", batchQty.String(), domain.MaxMarketplaceBatchQty)}
+	}
+
 	batchNum := fmt.Sprintf("BATCH-MKT-%s-%d", ch, time.Now().UTC().UnixNano())
 	fileName := strings.TrimSpace(req.FileName)
 	if fileName == "" {
@@ -2010,6 +2032,12 @@ func (u *Usecase) ResolveSKUMapping(ctx context.Context, tenantID, userID uuid.U
 
 	if req.ProductID == uuid.Nil || strings.TrimSpace(req.ExternalSKU) == "" || strings.TrimSpace(req.ChannelName) == "" {
 		return nil, domain.ErrInvalidInput
+	}
+	// M2: a multiplier > 1 multiplies every future deduction, so only
+	// owner/admin may set it. Warehouse staff can only map 1:1.
+	if req.Multiplier != nil && req.Multiplier.GreaterThan(decimal.NewFromInt(1)) &&
+		normalizedRole != "admin" && normalizedRole != "owner" {
+		return nil, domain.ErrForbidden
 	}
 
 	// 1. Create / update mapping

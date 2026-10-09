@@ -2299,6 +2299,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 	whID := uuid.New()
 	staffID := uuid.New()
 	auditorID := uuid.New()
+	adminID := uuid.New()
 
 	// Setup warehouse & user
 	require.NoError(t, repo.CreateWarehouse(ctx, &domain.Warehouse{
@@ -2616,6 +2617,62 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		mappingA, err := repo.GetSKUMapping(ctx, tenantID, "TOKOPEDIA", "KOPISUSU-DUS")
 		require.NoError(t, err)
 		assert.True(t, mappingA.Multiplier.Equal(decimal.NewFromInt(24)), "Tenant A multiplier remains unaffected by Tenant B")
+	})
+
+	t.Run("M1: qty bomb rejected before any write, valid qty passes", func(t *testing.T) {
+		before, err := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod2ID)
+		require.NoError(t, err)
+		batchesBefore, err := usecase.ListMarketplaceBatches(ctx, tenantID, adminID, "admin", nil)
+		require.NoError(t, err)
+
+		mk := func(id string, qty int64) uc.ImportMarketplaceOrdersRequest {
+			return uc.ImportMarketplaceOrdersRequest{
+				WarehouseID: whID, Channel: domain.MarketplaceChannelShopee,
+				Orders: []uc.ImportOrderRequest{{ExternalOrderID: id, Items: []uc.ImportOrderItemRequest{
+					{ExternalSKU: "DIRECT-SKU-001", ItemName: "x", Quantity: decimal.NewFromInt(qty), UnitPrice: decimal.NewFromInt(1)},
+				}}},
+			}
+		}
+		for _, q := range []int64{999999, domain.MaxMarketplaceItemQty + 1, 0, -3} {
+			_, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", mk(fmt.Sprintf("BOMB-%d", q), q))
+			assert.ErrorIs(t, err, domain.ErrInvalidInput, "qty %d must be rejected", q)
+		}
+		batchesAfter, err := usecase.ListMarketplaceBatches(ctx, tenantID, adminID, "admin", nil)
+		require.NoError(t, err)
+		assert.Len(t, batchesAfter, len(batchesBefore), "rejected import must not create a batch")
+		after, err := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod2ID)
+		require.NoError(t, err)
+		assert.True(t, after.Equal(before), "rejected import must not move stock")
+
+		_, err = usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", mk("OK-QTY-2", 2))
+		require.NoError(t, err)
+
+		// Batch total cap: 11 lines x 1000 = 11000 > 10000.
+		big := uc.ImportMarketplaceOrdersRequest{WarehouseID: whID, Channel: domain.MarketplaceChannelShopee}
+		for i := 0; i < 11; i++ {
+			big.Orders = append(big.Orders, uc.ImportOrderRequest{ExternalOrderID: fmt.Sprintf("BIG-%d", i),
+				Items: []uc.ImportOrderItemRequest{{ExternalSKU: "DIRECT-SKU-001", ItemName: "x", Quantity: decimal.NewFromInt(domain.MaxMarketplaceItemQty)}}})
+		}
+		_, err = usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", big)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	})
+
+	t.Run("M2: multiplier ceiling and role gate", func(t *testing.T) {
+		m1000 := decimal.NewFromInt(1000)
+		m6 := decimal.NewFromInt(6)
+		m0 := decimal.Zero
+		req := func(sku string, m *decimal.Decimal) uc.CreateSKUMappingRequest {
+			return uc.CreateSKUMappingRequest{ProductID: prod1ID, MappingType: domain.SKUMappingTypeMarketplace, ChannelName: "SHOPEE", ExternalSKU: sku, Multiplier: m}
+		}
+		_, err := usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", req("DRAIN-1000", &m1000))
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "multiplier above ceiling rejected even for admin")
+		_, err = usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", req("ZERO-MULT", &m0))
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "multiplier 0 rejected")
+		_, err = usecase.ResolveSKUMapping(ctx, tenantID, staffID, "warehouse", req("PACK-6", &m6))
+		assert.ErrorIs(t, err, domain.ErrForbidden, "warehouse cannot set multiplier > 1")
+		got, err := usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", req("PACK-6", &m6))
+		require.NoError(t, err)
+		assert.True(t, got.Multiplier.Equal(m6))
 	})
 }
 

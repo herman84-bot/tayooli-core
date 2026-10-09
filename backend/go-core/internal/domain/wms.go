@@ -110,6 +110,14 @@ type StockReceiptValidationError struct {
 func (e *StockReceiptValidationError) Error() string { return e.Msg }
 func (e *StockReceiptValidationError) Unwrap() error { return ErrInvalidInput }
 
+// Marketplace import limits (M1/M2). A single CSV row or SKU mapping must not
+// be able to drain a whole rack.
+const (
+	MaxMarketplaceItemQty  = 1000  // max quantity per order line
+	MaxMarketplaceBatchQty = 10000 // max sum of line quantities per import
+	MaxSKUMultiplier       = 50    // max units deducted per marketplace unit
+)
+
 // StockReceiptStatus represents inbound goods receipt lifecycle.
 type StockReceiptStatus string
 
