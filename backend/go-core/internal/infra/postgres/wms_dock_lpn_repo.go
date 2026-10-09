@@ -297,7 +297,7 @@ func (r *WMSRepo) CreateAppointment(ctx context.Context, tenantID, userID uuid.U
 		return nil, fmt.Errorf("WMSRepo.CreateAppointment: check warehouse: %w", err)
 	}
 
-	// 2. If dock_id provided, verify dock belongs to warehouse
+	// 2. If dock_id provided, verify dock belongs to warehouse and is not occupied/maintenance
 	if req.DockID != nil && *req.DockID != uuid.Nil {
 		var dockWhID uuid.UUID
 		var dockStatus string
@@ -310,6 +310,22 @@ func (r *WMSRepo) CreateAppointment(ctx context.Context, tenantID, userID uuid.U
 		}
 		if dockWhID != req.WarehouseID {
 			return nil, domain.ErrInvalidInput
+		}
+		if domain.DockStatus(dockStatus) == domain.DockStatusMaintenance || domain.DockStatus(dockStatus) == domain.DockStatusOccupied {
+			return nil, domain.ErrDockOccupied
+		}
+		var hasCollision bool
+		err = tx.QueryRowContext(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM dock_appointments
+				WHERE tenant_id = $1 AND dock_id = $2
+				  AND status IN ('ARRIVED', 'UNLOADING')
+			)`, tenantID, *req.DockID).Scan(&hasCollision)
+		if err != nil {
+			return nil, fmt.Errorf("WMSRepo.CreateAppointment: check dock collision: %w", err)
+		}
+		if hasCollision {
+			return nil, domain.ErrDockOccupied
 		}
 	}
 
@@ -574,6 +590,9 @@ func (r *WMSRepo) AssignDockToAppointment(ctx context.Context, tenantID, appoint
 		}
 		return nil, fmt.Errorf("WMSRepo.AssignDockToAppointment: get appointment: %w", err)
 	}
+	if appStatus == string(domain.AppointmentStatusCompleted) || appStatus == string(domain.AppointmentStatusCancelled) {
+		return nil, domain.ErrInvalidInput
+	}
 
 	// 2. Lock target dock
 	var dockWhID uuid.UUID
@@ -696,6 +715,9 @@ func (r *WMSRepo) UpdateAppointmentStatus(ctx context.Context, tenantID, appoint
 		}
 		return nil, fmt.Errorf("WMSRepo.UpdateAppointmentStatus: lock appointment: %w", err)
 	}
+	if currentStatus == string(domain.AppointmentStatusCompleted) || currentStatus == string(domain.AppointmentStatusCancelled) {
+		return nil, domain.ErrInvalidInput
+	}
 
 	now := time.Now().UTC()
 	actArr := actualArrival
@@ -703,7 +725,51 @@ func (r *WMSRepo) UpdateAppointmentStatus(ctx context.Context, tenantID, appoint
 	compAt := completedAt
 
 	switch req.Status {
-	case domain.AppointmentStatusArrived, domain.AppointmentStatusUnloading:
+	case domain.AppointmentStatusArrived:
+		if !actArr.Valid {
+			actArr = sql.NullTime{Time: now, Valid: true}
+		}
+		if dockID.Valid && strings.TrimSpace(dockID.String) != "" {
+			dUUID, err := uuid.Parse(dockID.String)
+			if err == nil && dUUID != uuid.Nil {
+				var dockStatus string
+				err = tx.QueryRowContext(ctx, `
+					SELECT status FROM inbound_docks
+					WHERE id = $1 AND tenant_id = $2
+					FOR UPDATE`, dUUID, tenantID).Scan(&dockStatus)
+				if err != nil {
+					if errors.Is(err, sql.ErrNoRows) {
+						return nil, domain.ErrDockNotFound
+					}
+					return nil, fmt.Errorf("WMSRepo.UpdateAppointmentStatus: check dock status: %w", err)
+				}
+				if domain.DockStatus(dockStatus) == domain.DockStatusMaintenance {
+					return nil, domain.ErrDockOccupied
+				}
+
+				var collisionCount int
+				err = tx.QueryRowContext(ctx, `
+					SELECT COUNT(*) FROM dock_appointments
+					WHERE tenant_id = $1 AND dock_id = $2 AND id != $3
+					  AND status IN ('ARRIVED', 'UNLOADING')`,
+					tenantID, dUUID, appointmentID).Scan(&collisionCount)
+				if err != nil {
+					return nil, fmt.Errorf("WMSRepo.UpdateAppointmentStatus: check collision: %w", err)
+				}
+				if collisionCount > 0 {
+					return nil, domain.ErrDockOccupied
+				}
+
+				_, err = tx.ExecContext(ctx, `
+					UPDATE inbound_docks SET status = 'OCCUPIED', updated_at = NOW()
+					WHERE id = $1 AND tenant_id = $2`, dUUID, tenantID)
+				if err != nil {
+					return nil, fmt.Errorf("WMSRepo.UpdateAppointmentStatus: set dock occupied: %w", err)
+				}
+			}
+		}
+
+	case domain.AppointmentStatusUnloading:
 		if !dockID.Valid || strings.TrimSpace(dockID.String) == "" {
 			return nil, domain.ErrInvalidInput
 		}
@@ -743,7 +809,7 @@ func (r *WMSRepo) UpdateAppointmentStatus(ctx context.Context, tenantID, appoint
 		if !actArr.Valid {
 			actArr = sql.NullTime{Time: now, Valid: true}
 		}
-		if req.Status == domain.AppointmentStatusUnloading && !startUnl.Valid {
+		if !startUnl.Valid {
 			startUnl = sql.NullTime{Time: now, Valid: true}
 		}
 
@@ -1148,6 +1214,9 @@ func (r *WMSRepo) AddLPNItem(ctx context.Context, tenantID, lpnID uuid.UUID, req
 		}
 		return nil, fmt.Errorf("WMSRepo.AddLPNItem: lock lpn: %w", err)
 	}
+	if domain.LPNStatus(lpnStatus) == domain.LPNStatusShipped || domain.LPNStatus(lpnStatus) == domain.LPNStatusDecommissioned {
+		return nil, domain.ErrInvalidInput
+	}
 
 	// 2. Verify product
 	var prodName, prodSKU string
@@ -1269,6 +1338,9 @@ func (r *WMSRepo) MoveLPN(ctx context.Context, tenantID, userID, lpnID uuid.UUID
 		return nil, fmt.Errorf("WMSRepo.MoveLPN: lock lpn: %w", err)
 	}
 	if lpn.Status == domain.LPNStatusShipped || lpn.Status == domain.LPNStatusDecommissioned {
+		return nil, domain.ErrInvalidInput
+	}
+	if req.TargetLocationID == lpn.LocationID {
 		return nil, domain.ErrInvalidInput
 	}
 	lpn.TenantID = tenantID

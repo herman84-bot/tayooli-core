@@ -238,7 +238,8 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
       } else {
         setPrintDetail({ lpn, items: [] })
       }
-    } catch {
+    } catch (err: unknown) {
+      console.error("Gagal memuat detail LPN untuk cetak label:", err)
       setPrintDetail({ lpn, items: [] })
     }
   }

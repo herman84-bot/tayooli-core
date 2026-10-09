@@ -124,17 +124,19 @@ export default function BarcodeScannerPage() {
               l.id.toUpperCase() === trimmedCode.toUpperCase()
           )
 
-          if (foundLPN || trimmedCode.toUpperCase().startsWith("LPN-")) {
-            const lpnCode = foundLPN ? foundLPN.lpn_code : trimmedCode.toUpperCase()
-            const lpnId = foundLPN ? foundLPN.id : trimmedCode
-            setScannedLPNCode(lpnCode)
-            setMatchedLPNId(lpnId)
+          if (foundLPN) {
+            setScannedLPNCode(foundLPN.lpn_code)
+            setMatchedLPNId(foundLPN.id)
             setLpnPutawayErrorMessage(null)
-            setLpnPutawaySuccessMessage(`Palet [${lpnCode}] terpilih! Silakan scan barcode Rak Tujuan.`)
+            setLpnPutawaySuccessMessage(`Palet [${foundLPN.lpn_code}] terpilih! Silakan scan barcode Rak Tujuan.`)
             playTone("success")
           } else {
             playTone("error")
-            setLpnPutawayErrorMessage(`Barcode [${trimmedCode}] bukan palet LPN valid! (Gunakan format LPN-XXXX)`)
+            setLpnPutawayErrorMessage(
+              trimmedCode.toUpperCase().startsWith("LPN-")
+                ? `Palet [${trimmedCode.toUpperCase()}] tidak ditemukan di gudang ini atau belum terdaftar!`
+                : `Barcode [${trimmedCode}] bukan palet LPN valid! (Gunakan format LPN-XXXX)`
+            )
             setLpnPutawaySuccessMessage(null)
           }
           return
