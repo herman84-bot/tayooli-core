@@ -1979,8 +1979,17 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 		if order.TotalAmount.IsZero() && !calcSubtotal.IsZero() {
 			order.TotalAmount = calcSubtotal
 		}
+		// M8: amounts must be non-negative and a supplied net must reconcile
+		// with total + shipping - marketplace fee (1 rupiah rounding tolerance).
+		expectedNet := order.TotalAmount.Add(order.ShippingFee).Sub(order.MarketplaceFee)
+		if order.TotalAmount.IsNegative() || order.ShippingFee.IsNegative() || order.MarketplaceFee.IsNegative() || expectedNet.IsNegative() {
+			return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf("Pesanan %s: nominal tidak boleh negatif", extOrderID)}
+		}
 		if order.NetAmount.IsZero() {
-			order.NetAmount = order.TotalAmount.Add(order.ShippingFee).Sub(order.MarketplaceFee)
+			order.NetAmount = expectedNet
+		} else if order.NetAmount.Sub(expectedNet).Abs().GreaterThan(decimal.NewFromInt(1)) {
+			return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf(
+				"Pesanan %s: net_amount %s tidak sesuai total + ongkir - biaya marketplace (%s)", extOrderID, order.NetAmount.String(), expectedNet.String())}
 		}
 
 		if hasUnmapped {
@@ -2130,6 +2139,10 @@ func (u *Usecase) ApproveMarketplaceBatch(ctx context.Context, tenantID, userID 
 		next := domain.MarketplaceOrderStatusCompleted
 		if errStock := u.deductOrderStock(ctx, tenantID, userID, &order); errStock != nil {
 			next = domain.MarketplaceOrderStatusStockInsufficient
+		} else if _, errSO := u.repo.EnsureMarketplaceSalesOrder(ctx, tenantID, &order); errSO != nil {
+			// M8: stock already left; surface the error so the batch stays
+			// APPROVED (visible) instead of silently missing its sales order.
+			return nil, fmt.Errorf("ApproveMarketplaceBatch: sales order: %w", errSO)
 		}
 		if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, next); errUpd != nil {
 			return nil, fmt.Errorf("ApproveMarketplaceBatch: update order: %w", errUpd)

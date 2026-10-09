@@ -27,6 +27,7 @@ type mockWMSRepo struct {
 	barcodes        map[string]domain.ProductBarcode
 	skuMappings     map[string]domain.ProductSKUMapping
 	products        map[string]domain.Product // key: "tenantID:sku"
+	salesOrdersCreated int // M8: EnsureMarketplaceSalesOrder inserts
 	stockMovements  []domain.StockMovement
 	stockLevels     map[string]decimal.Decimal // key: "tenantID:locID:prodID"
 	transfers       map[uuid.UUID]*domain.StockTransfer
@@ -654,6 +655,20 @@ func (m *mockWMSRepo) UpdateMarketplaceOrderStatus(ctx context.Context, tenantID
 	}
 	o.Status = status
 	return nil
+}
+
+func (m *mockWMSRepo) EnsureMarketplaceSalesOrder(ctx context.Context, tenantID uuid.UUID, order *domain.MarketplaceOrder) (uuid.UUID, error) {
+	o, ok := m.marketplaceOrders[order.ID]
+	if !ok || o.TenantID != tenantID {
+		return uuid.Nil, domain.ErrMarketplaceOrderNotFound
+	}
+	if o.SalesOrderID != nil {
+		return *o.SalesOrderID, nil
+	}
+	id := uuid.New()
+	o.SalesOrderID = &id
+	m.salesOrdersCreated++
+	return id, nil
 }
 
 func (m *mockWMSRepo) ClaimMarketplaceOrder(ctx context.Context, tenantID, id uuid.UUID, from, to domain.MarketplaceOrderStatus) (bool, error) {
@@ -2898,6 +2913,41 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		_, err = usecase.ApproveMarketplaceBatch(ctx, tenantID, adminID, "admin", r2.Batch.ID)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput, "rejected batch cannot be approved")
 		assert.True(t, stock().Equal(mid), "rejected batch moves no stock")
+	})
+
+	t.Run("M8: net amount reconciles and approval links one sales order", func(t *testing.T) {
+		mk := func(id string, total, ship, fee, net int64) uc.ImportMarketplaceOrdersRequest {
+			return uc.ImportMarketplaceOrdersRequest{WarehouseID: whID, SourceLocationID: srcLocID, Channel: domain.MarketplaceChannelLazada,
+				Orders: []uc.ImportOrderRequest{{ExternalOrderID: id, TotalAmount: decimal.NewFromInt(total), ShippingFee: decimal.NewFromInt(ship),
+					MarketplaceFee: decimal.NewFromInt(fee), NetAmount: decimal.NewFromInt(net),
+					Items: []uc.ImportOrderItemRequest{{ExternalSKU: "MAS000123", ItemName: "x", Quantity: decimal.NewFromInt(1)}}}}}
+		}
+		_, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", mk("LZ-NET-BAD", 100000, 10000, 5000, 999999))
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "net not matching total+ship-fee rejected")
+		_, err = usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", mk("LZ-NEG", -1, 0, 0, 0))
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "negative total rejected")
+		_, err = usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", mk("LZ-FEE", 1000, 0, 5000, 0))
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "fee above total+ship (negative net) rejected")
+
+		resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", mk("LZ-NET-OK", 100000, 10000, 5000, 105000))
+		require.NoError(t, err)
+		before := repo.salesOrdersCreated
+		approve(t, resp.Batch.ID)
+		o, err := repo.GetMarketplaceOrderByID(ctx, tenantID, resp.Orders[0].ID)
+		require.NoError(t, err)
+		require.Equal(t, domain.MarketplaceOrderStatusCompleted, o.Status)
+		require.NotNil(t, o.SalesOrderID, "deducted order must link a sales order")
+		assert.Equal(t, before+1, repo.salesOrdersCreated)
+
+		// Insufficient stock: no sales order.
+		r2, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", uc.ImportMarketplaceOrdersRequest{WarehouseID: whID, SourceLocationID: srcLocID, Channel: domain.MarketplaceChannelLazada,
+			Orders: []uc.ImportOrderRequest{{ExternalOrderID: "LZ-NOSTOCK", Items: []uc.ImportOrderItemRequest{{ExternalSKU: "DIRECT-SKU-001", ItemName: "x", Quantity: decimal.NewFromInt(999)}}}}})
+		require.NoError(t, err)
+		approve(t, r2.Batch.ID)
+		o2, err := repo.GetMarketplaceOrderByID(ctx, tenantID, r2.Orders[0].ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.MarketplaceOrderStatusStockInsufficient, o2.Status)
+		assert.Nil(t, o2.SalesOrderID, "no sales order without deduction")
 	})
 
 	t.Run("M2: multiplier ceiling and role gate", func(t *testing.T) {

@@ -755,6 +755,10 @@ type WMSRepository interface {
 	ListMarketplaceOrders(ctx context.Context, tenantID uuid.UUID, warehouseID, batchID *uuid.UUID, status *MarketplaceOrderStatus) ([]MarketplaceOrder, error)
 	GetMarketplaceOrderByID(ctx context.Context, tenantID, id uuid.UUID) (*MarketplaceOrder, error)
 	UpdateMarketplaceOrderStatus(ctx context.Context, tenantID, id uuid.UUID, status MarketplaceOrderStatus) error
+	// EnsureMarketplaceSalesOrder (M8) creates the sales_order for a deducted
+	// marketplace order (customer "Marketplace <channel>", number
+	// SO-MKT-<order id>) and links it. Idempotent: returns the existing link.
+	EnsureMarketplaceSalesOrder(ctx context.Context, tenantID uuid.UUID, order *MarketplaceOrder) (uuid.UUID, error)
 	// ClaimMarketplaceOrder atomically moves an order from -> to. It returns
 	// false when the order is no longer in `from` (another request won).
 	ClaimMarketplaceOrder(ctx context.Context, tenantID, id uuid.UUID, from, to MarketplaceOrderStatus) (bool, error)

@@ -3265,3 +3265,70 @@ func (r *WMSRepo) GetProductCostPrice(ctx context.Context, tenantID, productID u
 	}
 	return cost, nil
 }
+
+// EnsureMarketplaceSalesOrder implements domain.WMSRepository (M8). One tx:
+// lock the marketplace order, reuse its sales_order if linked, otherwise
+// get-or-create the channel customer, insert the sales order and link it.
+func (r *WMSRepo) EnsureMarketplaceSalesOrder(ctx context.Context, tenantID uuid.UUID, order *domain.MarketplaceOrder) (uuid.UUID, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("WMSRepo.EnsureMarketplaceSalesOrder: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return uuid.Nil, fmt.Errorf("WMSRepo.EnsureMarketplaceSalesOrder: set tenant: %w", err)
+	}
+
+	var linked sql.NullString
+	err = tx.QueryRowContext(ctx, `SELECT sales_order_id FROM marketplace_orders WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+		tenantID, order.ID).Scan(&linked)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return uuid.Nil, domain.ErrMarketplaceOrderNotFound
+		}
+		return uuid.Nil, fmt.Errorf("WMSRepo.EnsureMarketplaceSalesOrder: lock order: %w", err)
+	}
+	if linked.Valid {
+		id, perr := uuid.Parse(linked.String)
+		if perr != nil {
+			return uuid.Nil, fmt.Errorf("WMSRepo.EnsureMarketplaceSalesOrder: parse link: %w", perr)
+		}
+		return id, tx.Commit()
+	}
+
+	// Serialize customer creation per tenant+channel so concurrent approvals
+	// do not create duplicate channel customers.
+	custName := "Marketplace " + string(order.Channel)
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1 || ':' || $2))`, tenantID.String(), custName); err != nil {
+		return uuid.Nil, fmt.Errorf("WMSRepo.EnsureMarketplaceSalesOrder: lock customer: %w", err)
+	}
+	var custID uuid.UUID
+	err = tx.QueryRowContext(ctx, `SELECT id FROM customers WHERE tenant_id = $1 AND name = $2 ORDER BY created_at LIMIT 1`,
+		tenantID, custName).Scan(&custID)
+	if errors.Is(err, sql.ErrNoRows) {
+		custID = uuid.New()
+		_, err = tx.ExecContext(ctx, `INSERT INTO customers (id, tenant_id, name, status) VALUES ($1, $2, $3, 'active')`,
+			custID, tenantID, custName)
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("WMSRepo.EnsureMarketplaceSalesOrder: customer: %w", err)
+	}
+
+	soID := uuid.New()
+	now := time.Now().UTC()
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO sales_orders (id, tenant_id, customer_id, order_number, total_amount, status, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, 'CONFIRMED', $6, $6)`,
+		soID, tenantID, custID, "SO-MKT-"+order.ID.String(), order.TotalAmount, now); err != nil {
+		return uuid.Nil, fmt.Errorf("WMSRepo.EnsureMarketplaceSalesOrder: insert sales order: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE marketplace_orders SET sales_order_id = $1 WHERE tenant_id = $2 AND id = $3`,
+		soID, tenantID, order.ID); err != nil {
+		return uuid.Nil, fmt.Errorf("WMSRepo.EnsureMarketplaceSalesOrder: link: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return uuid.Nil, fmt.Errorf("WMSRepo.EnsureMarketplaceSalesOrder: commit: %w", err)
+	}
+	return soID, nil
+}
