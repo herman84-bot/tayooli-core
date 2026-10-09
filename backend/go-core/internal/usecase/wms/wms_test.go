@@ -651,13 +651,15 @@ func (m *mockWMSRepo) ClaimMarketplaceOrder(ctx context.Context, tenantID, id uu
 	return true, nil
 }
 
-func (m *mockWMSRepo) UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UUID, channel domain.MarketplaceChannel, externalSKU string, productID uuid.UUID) error {
+func (m *mockWMSRepo) UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UUID, channel domain.MarketplaceChannel, externalSKU string, productID uuid.UUID, multiplier decimal.Decimal) error {
 	for _, o := range m.marketplaceOrders {
 		if o.TenantID == tenantID && o.Channel == channel {
 			for i := range o.Items {
 				if o.Items[i].ExternalSKU == externalSKU && !o.Items[i].IsMapped {
 					o.Items[i].ProductID = &productID
 					o.Items[i].IsMapped = true
+					mcp := multiplier
+					o.Items[i].Multiplier = &mcp
 				}
 			}
 		}
@@ -2369,7 +2371,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 
 	t.Run("AC-1: Idempotent import ignores duplicate orders", func(t *testing.T) {
 		req := uc.ImportMarketplaceOrdersRequest{
-			WarehouseID: whID,
+			WarehouseID: whID, SourceLocationID: srcLocID,
 			Channel:     domain.MarketplaceChannelShopee,
 			FileName:    "shopee_orders.csv",
 			Orders: []uc.ImportOrderRequest{
@@ -2426,7 +2428,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		require.NoError(t, err)
 
 		req := uc.ImportMarketplaceOrdersRequest{
-			WarehouseID: whID,
+			WarehouseID: whID, SourceLocationID: srcLocID,
 			Channel:     domain.MarketplaceChannelTokopedia,
 			FileName:    "tokopedia_export.csv",
 			Orders: []uc.ImportOrderRequest{
@@ -2460,7 +2462,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 
 	t.Run("AC-3: Unmapped SKU handling and in-place resolution", func(t *testing.T) {
 		req := uc.ImportMarketplaceOrdersRequest{
-			WarehouseID: whID,
+			WarehouseID: whID, SourceLocationID: srcLocID,
 			Channel:     domain.MarketplaceChannelTikTok,
 			FileName:    "tiktok_orders.csv",
 			Orders: []uc.ImportOrderRequest{
@@ -2541,7 +2543,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 	t.Run("Guardrail 3: Insufficient stock flags order as STOCK_INSUFFICIENT without failing batch", func(t *testing.T) {
 		// prod2 currently has 4 in stock. Order requests 10.
 		req := uc.ImportMarketplaceOrdersRequest{
-			WarehouseID: whID,
+			WarehouseID: whID, SourceLocationID: srcLocID,
 			Channel:     domain.MarketplaceChannelLazada,
 			FileName:    "lazada_export.csv",
 			Orders: []uc.ImportOrderRequest{
@@ -2575,7 +2577,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 
 	t.Run("Security: Auditor cannot import orders or resolve mappings", func(t *testing.T) {
 		_, err := usecase.ImportMarketplaceOrders(ctx, tenantID, auditorID, "auditor", uc.ImportMarketplaceOrdersRequest{
-			WarehouseID: whID,
+			WarehouseID: whID, SourceLocationID: srcLocID,
 			Channel:     domain.MarketplaceChannelShopee,
 			Orders:      []uc.ImportOrderRequest{},
 		})
@@ -2595,7 +2597,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 
 		// Tenant B cannot import to Tenant A's warehouse
 		_, err := usecase.ImportMarketplaceOrders(ctx, tenantB, userB, "admin", uc.ImportMarketplaceOrdersRequest{
-			WarehouseID: whID, // Belongs to Tenant A
+			WarehouseID: whID, SourceLocationID: srcLocID, // Belongs to Tenant A
 			Channel:     domain.MarketplaceChannelShopee,
 		})
 		assert.ErrorIs(t, err, domain.ErrWarehouseNotFound)
@@ -2642,7 +2644,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 
 		mk := func(id string, qty int64) uc.ImportMarketplaceOrdersRequest {
 			return uc.ImportMarketplaceOrdersRequest{
-				WarehouseID: whID, Channel: domain.MarketplaceChannelShopee,
+				WarehouseID: whID, SourceLocationID: srcLocID, Channel: domain.MarketplaceChannelShopee,
 				Orders: []uc.ImportOrderRequest{{ExternalOrderID: id, Items: []uc.ImportOrderItemRequest{
 					{ExternalSKU: "DIRECT-SKU-001", ItemName: "x", Quantity: decimal.NewFromInt(qty), UnitPrice: decimal.NewFromInt(1)},
 				}}},
@@ -2663,7 +2665,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		require.NoError(t, err)
 
 		// Batch total cap: 11 lines x 1000 = 11000 > 10000.
-		big := uc.ImportMarketplaceOrdersRequest{WarehouseID: whID, Channel: domain.MarketplaceChannelShopee}
+		big := uc.ImportMarketplaceOrdersRequest{WarehouseID: whID, SourceLocationID: srcLocID, Channel: domain.MarketplaceChannelShopee}
 		for i := 0; i < 11; i++ {
 			big.Orders = append(big.Orders, uc.ImportOrderRequest{ExternalOrderID: fmt.Sprintf("BIG-%d", i),
 				Items: []uc.ImportOrderItemRequest{{ExternalSKU: "DIRECT-SKU-001", ItemName: "x", Quantity: decimal.NewFromInt(domain.MaxMarketplaceItemQty)}}})
@@ -2673,7 +2675,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 	})
 
 	t.Run("M4: resolve deducts an unmapped order only once", func(t *testing.T) {
-		imp := uc.ImportMarketplaceOrdersRequest{WarehouseID: whID, Channel: domain.MarketplaceChannelLazada,
+		imp := uc.ImportMarketplaceOrdersRequest{WarehouseID: whID, SourceLocationID: srcLocID, Channel: domain.MarketplaceChannelLazada,
 			Orders: []uc.ImportOrderRequest{{ExternalOrderID: "LZ-RACE-1", Items: []uc.ImportOrderItemRequest{
 				{ExternalSKU: "LZ-RACE-SKU", ItemName: "race", Quantity: decimal.NewFromInt(3)},
 			}}}}
@@ -2717,6 +2719,61 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		claimed, err := repo.ClaimMarketplaceOrder(ctx, tenantID, resp.Orders[0].ID, domain.MarketplaceOrderStatusUnmappedSKU, domain.MarketplaceOrderStatusProcessing)
 		require.NoError(t, err)
 		assert.False(t, claimed, "claim from a stale status must fail")
+	})
+
+	t.Run("M5: import requires an internal rack of the import warehouse", func(t *testing.T) {
+		otherWh := uuid.New()
+		otherRack := uuid.New()
+		require.NoError(t, repo.CreateLocation(ctx, &domain.WarehouseLocation{ID: otherRack, TenantID: tenantID, WarehouseID: &otherWh, Code: "OTHER-R1", Name: "x", Type: domain.LocationTypeInternal}))
+		base := func(loc uuid.UUID) uc.ImportMarketplaceOrdersRequest {
+			return uc.ImportMarketplaceOrdersRequest{WarehouseID: whID, SourceLocationID: loc, Channel: domain.MarketplaceChannelBlibli,
+				Orders: []uc.ImportOrderRequest{{ExternalOrderID: "BL-LOC-" + loc.String()[:6], Items: []uc.ImportOrderItemRequest{{ExternalSKU: "DIRECT-SKU-001", ItemName: "x", Quantity: decimal.NewFromInt(1)}}}}}
+		}
+		for name, loc := range map[string]uuid.UUID{"missing": uuid.Nil, "unknown": uuid.New(), "other warehouse": otherRack, "@CUSTOMER": custLoc.ID} {
+			_, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", base(loc))
+			assert.ErrorIs(t, err, domain.ErrInvalidInput, name)
+		}
+		before, _ := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod2ID)
+		resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", base(srcLocID))
+		require.NoError(t, err)
+		require.Equal(t, domain.MarketplaceOrderStatusCompleted, resp.Orders[0].Status)
+		after, _ := repo.GetStockByLocation(ctx, tenantID, srcLocID, prod2ID)
+		assert.True(t, before.Sub(after).Equal(decimal.NewFromInt(1)), "deducted from the chosen rack")
+	})
+
+	t.Run("M3: editing a mapping does not change how much a pending order deducts", func(t *testing.T) {
+		// Order with two unmapped SKUs stays UNMAPPED until both are resolved.
+		resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", uc.ImportMarketplaceOrdersRequest{
+			WarehouseID: whID, SourceLocationID: srcLocID, Channel: domain.MarketplaceChannelBlibli,
+			Orders: []uc.ImportOrderRequest{{ExternalOrderID: "BL-SNAP-1", Items: []uc.ImportOrderItemRequest{
+				{ExternalSKU: "BL-SNAP-A", ItemName: "a", Quantity: decimal.NewFromInt(3)},
+				{ExternalSKU: "BL-SNAP-B", ItemName: "b", Quantity: decimal.NewFromInt(1)},
+			}}}})
+		require.NoError(t, err)
+		orderID := resp.Orders[0].ID
+		mreq := func(sku string, m decimal.Decimal) uc.CreateSKUMappingRequest {
+			return uc.CreateSKUMappingRequest{ProductID: prod1ID, MappingType: domain.SKUMappingTypeMarketplace, ChannelName: "BLIBLI", ExternalSKU: sku, Multiplier: &m}
+		}
+		// A resolved at x2 (snapshot), then the A mapping is raised to x40.
+		_, err = usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", mreq("BL-SNAP-A", decimal.NewFromInt(2)))
+		require.NoError(t, err)
+		_, err = usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", mreq("BL-SNAP-A", decimal.NewFromInt(40)))
+		require.NoError(t, err)
+		// Resolving B completes the order and deducts.
+		_, err = usecase.ResolveSKUMapping(ctx, tenantID, adminID, "admin", mreq("BL-SNAP-B", decimal.NewFromInt(1)))
+		require.NoError(t, err)
+
+		stored, err := repo.GetMarketplaceOrderByID(ctx, tenantID, orderID)
+		require.NoError(t, err)
+		require.Equal(t, domain.MarketplaceOrderStatusCompleted, stored.Status)
+		var qty decimal.Decimal
+		for _, mv := range repo.stockMovements {
+			if mv.ReferenceID == orderID {
+				qty = qty.Add(mv.Quantity)
+			}
+		}
+		// 3 x 2 (snapshot, not 40) + 1 x 1 = 7.
+		assert.True(t, qty.Equal(decimal.NewFromInt(7)), "expected 7 deducted, got %s", qty)
 	})
 
 	t.Run("M2: multiplier ceiling and role gate", func(t *testing.T) {

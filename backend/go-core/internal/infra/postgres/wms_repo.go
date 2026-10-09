@@ -2625,7 +2625,7 @@ func (r *WMSRepo) UpdateMarketplaceBatch(ctx context.Context, batch *domain.Mark
 
 func scanMarketplaceOrderRow(scanner interface{ Scan(dest ...any) error }) (*domain.MarketplaceOrder, error) {
 	var o domain.MarketplaceOrder
-	var batchID, soID sql.NullString
+	var batchID, soID, srcLocID sql.NullString
 	var custName, custPhone, shipAddr, courier, trkNum sql.NullString
 	var channel, status string
 
@@ -2633,13 +2633,14 @@ func scanMarketplaceOrderRow(scanner interface{ Scan(dest ...any) error }) (*dom
 		&o.ID, &o.TenantID, &batchID, &o.WarehouseID, &channel, &o.ExternalOrderID,
 		&o.OrderDate, &custName, &custPhone, &shipAddr, &courier,
 		&trkNum, &o.TotalAmount, &o.ShippingFee, &o.MarketplaceFee, &o.NetAmount,
-		&status, &soID, &o.CreatedAt,
+		&status, &soID, &o.CreatedAt, &srcLocID,
 	)
 	if err != nil {
 		return nil, err
 	}
 	o.BatchID = nullUUIDToPtr(batchID)
 	o.SalesOrderID = nullUUIDToPtr(soID)
+	o.SourceLocationID = nullUUIDToPtr(srcLocID)
 	o.CustomerName = nullStringToPtr(custName)
 	o.CustomerPhone = nullStringToPtr(custPhone)
 	o.ShippingAddress = nullStringToPtr(shipAddr)
@@ -2653,7 +2654,7 @@ func scanMarketplaceOrderRow(scanner interface{ Scan(dest ...any) error }) (*dom
 
 func fetchMarketplaceOrderItems(ctx context.Context, tx *sql.Tx, tenantID, orderID uuid.UUID) ([]domain.MarketplaceOrderItem, error) {
 	const itemsSQL = `
-SELECT id, tenant_id, order_id, external_sku, product_id, item_name, quantity, unit_price, subtotal, is_mapped
+SELECT id, tenant_id, order_id, external_sku, product_id, item_name, quantity, unit_price, subtotal, is_mapped, multiplier
 FROM marketplace_order_items
 WHERE tenant_id = $1 AND order_id = $2
 ORDER BY id ASC`
@@ -2668,14 +2669,19 @@ ORDER BY id ASC`
 	for rows.Next() {
 		var item domain.MarketplaceOrderItem
 		var prodID sql.NullString
+		var mult decimal.NullDecimal
 		if err := rows.Scan(
 			&item.ID, &item.TenantID, &item.OrderID, &item.ExternalSKU,
 			&prodID, &item.ItemName, &item.Quantity, &item.UnitPrice,
-			&item.Subtotal, &item.IsMapped,
+			&item.Subtotal, &item.IsMapped, &mult,
 		); err != nil {
 			return nil, err
 		}
 		item.ProductID = nullUUIDToPtr(prodID)
+		if mult.Valid {
+			m := mult.Decimal
+			item.Multiplier = &m
+		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -2689,14 +2695,14 @@ INSERT INTO marketplace_orders (
     id, tenant_id, batch_id, warehouse_id, channel, external_order_id,
     order_date, customer_name, customer_phone, shipping_address, courier,
     tracking_number, total_amount, shipping_fee, marketplace_fee, net_amount,
-    status, sales_order_id, created_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`
+    status, sales_order_id, created_at, source_location_id
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`
 
 const createMarketplaceOrderItemSQL = `
 INSERT INTO marketplace_order_items (
     id, tenant_id, order_id, external_sku, product_id, item_name,
-    quantity, unit_price, subtotal, is_mapped
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+    quantity, unit_price, subtotal, is_mapped, multiplier
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
 func (r *WMSRepo) CreateMarketplaceOrder(ctx context.Context, order *domain.MarketplaceOrder) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -2729,7 +2735,7 @@ func (r *WMSRepo) CreateMarketplaceOrder(ctx context.Context, order *domain.Mark
 		ptrToNullString(order.ShippingAddress), ptrToNullString(order.Courier),
 		ptrToNullString(order.TrackingNumber), order.TotalAmount, order.ShippingFee,
 		order.MarketplaceFee, order.NetAmount, string(order.Status),
-		ptrToNullUUID(order.SalesOrderID), order.CreatedAt,
+		ptrToNullUUID(order.SalesOrderID), order.CreatedAt, ptrToNullUUID(order.SourceLocationID),
 	)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -2749,7 +2755,7 @@ func (r *WMSRepo) CreateMarketplaceOrder(ctx context.Context, order *domain.Mark
 		_, err = tx.ExecContext(ctx, createMarketplaceOrderItemSQL,
 			item.ID, item.TenantID, item.OrderID, item.ExternalSKU,
 			ptrToNullUUID(item.ProductID), item.ItemName, item.Quantity,
-			item.UnitPrice, item.Subtotal, item.IsMapped,
+			item.UnitPrice, item.Subtotal, item.IsMapped, ptrToNullDecimal(item.Multiplier),
 		)
 		if err != nil {
 			return fmt.Errorf("WMSRepo.CreateMarketplaceOrder: exec item: %w", err)
@@ -2763,7 +2769,7 @@ const getMarketplaceOrderByExternalIDSQL = `
 SELECT id, tenant_id, batch_id, warehouse_id, channel, external_order_id,
        order_date, customer_name, customer_phone, shipping_address, courier,
        tracking_number, total_amount, shipping_fee, marketplace_fee, net_amount,
-       status, sales_order_id, created_at
+       status, sales_order_id, created_at, source_location_id
 FROM marketplace_orders
 WHERE tenant_id = $1 AND channel = $2 AND external_order_id = $3`
 
@@ -2803,7 +2809,7 @@ const getMarketplaceOrderByIDSQL = `
 SELECT id, tenant_id, batch_id, warehouse_id, channel, external_order_id,
        order_date, customer_name, customer_phone, shipping_address, courier,
        tracking_number, total_amount, shipping_fee, marketplace_fee, net_amount,
-       status, sales_order_id, created_at
+       status, sales_order_id, created_at, source_location_id
 FROM marketplace_orders
 WHERE tenant_id = $1 AND id = $2`
 
@@ -2854,7 +2860,7 @@ func (r *WMSRepo) ListMarketplaceOrders(ctx context.Context, tenantID uuid.UUID,
 SELECT id, tenant_id, batch_id, warehouse_id, channel, external_order_id,
        order_date, customer_name, customer_phone, shipping_address, courier,
        tracking_number, total_amount, shipping_fee, marketplace_fee, net_amount,
-       status, sales_order_id, created_at
+       status, sales_order_id, created_at, source_location_id
 FROM marketplace_orders
 WHERE tenant_id = $1`
 
@@ -3068,7 +3074,7 @@ func (r *WMSRepo) ListSKUMappings(ctx context.Context, tenantID uuid.UUID, chann
 
 const updateUnmappedOrderItemsSQL = `
 UPDATE marketplace_order_items oi
-SET product_id = $1, is_mapped = true
+SET product_id = $1, is_mapped = true, multiplier = $5
 FROM marketplace_orders o
 WHERE oi.order_id = o.id
   AND oi.tenant_id = $2
@@ -3077,7 +3083,7 @@ WHERE oi.order_id = o.id
   AND oi.external_sku = $4
   AND oi.is_mapped = false`
 
-func (r *WMSRepo) UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UUID, channel domain.MarketplaceChannel, externalSKU string, productID uuid.UUID) error {
+func (r *WMSRepo) UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UUID, channel domain.MarketplaceChannel, externalSKU string, productID uuid.UUID, multiplier decimal.Decimal) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("WMSRepo.UpdateUnmappedOrderItems: begin tx: %w", err)
@@ -3088,7 +3094,7 @@ func (r *WMSRepo) UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UU
 		return fmt.Errorf("WMSRepo.UpdateUnmappedOrderItems: set tenant: %w", err)
 	}
 
-	_, err = tx.ExecContext(ctx, updateUnmappedOrderItemsSQL, productID, tenantID, string(channel), externalSKU)
+	_, err = tx.ExecContext(ctx, updateUnmappedOrderItemsSQL, productID, tenantID, string(channel), externalSKU, multiplier)
 	if err != nil {
 		return fmt.Errorf("WMSRepo.UpdateUnmappedOrderItems: exec: %w", err)
 	}
@@ -3100,7 +3106,7 @@ const getPendingUnmappedOrdersBySKUSQL = `
 SELECT DISTINCT o.id, o.tenant_id, o.batch_id, o.warehouse_id, o.channel, o.external_order_id,
        o.order_date, o.customer_name, o.customer_phone, o.shipping_address, o.courier,
        o.tracking_number, o.total_amount, o.shipping_fee, o.marketplace_fee, o.net_amount,
-       o.status, o.sales_order_id, o.created_at
+       o.status, o.sales_order_id, o.created_at, o.source_location_id
 FROM marketplace_orders o
 JOIN marketplace_order_items oi ON oi.order_id = o.id AND oi.tenant_id = o.tenant_id
 WHERE o.tenant_id = $1

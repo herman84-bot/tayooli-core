@@ -1229,6 +1229,8 @@ export interface ImportMarketplaceOrderInput {
 
 export interface ImportMarketplaceOrdersPayload {
   warehouse_id: string
+  /** INTERNAL rack of warehouse_id that stock is deducted from (required). */
+  source_location_id: string
   channel: MarketplaceChannel
   file_name?: string
   orders?: ImportMarketplaceOrderInput[]

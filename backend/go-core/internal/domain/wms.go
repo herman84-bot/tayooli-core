@@ -628,6 +628,9 @@ type MarketplaceOrder struct {
 	NetAmount       decimal.Decimal        `json:"net_amount"`
 	Status          MarketplaceOrderStatus `json:"status"`
 	SalesOrderID    *uuid.UUID             `json:"sales_order_id,omitempty"`
+	// SourceLocationID is the rack stock is deducted from (M5). Nil only on
+	// orders imported before migration 040.
+	SourceLocationID *uuid.UUID            `json:"source_location_id,omitempty"`
 	CreatedAt       time.Time              `json:"created_at"`
 	Items           []MarketplaceOrderItem `json:"items,omitempty"`
 }
@@ -644,6 +647,9 @@ type MarketplaceOrderItem struct {
 	UnitPrice   decimal.Decimal `json:"unit_price"`
 	Subtotal    decimal.Decimal `json:"subtotal"`
 	IsMapped    bool            `json:"is_mapped"`
+	// Multiplier is snapshotted when the line is mapped (M3). Nil only on
+	// unmapped lines and on lines written before migration 040.
+	Multiplier *decimal.Decimal `json:"multiplier,omitempty"`
 }
 
 // WMSRepository defines database operations for WMS entities.
@@ -739,7 +745,7 @@ type WMSRepository interface {
 	ClaimMarketplaceOrder(ctx context.Context, tenantID, id uuid.UUID, from, to MarketplaceOrderStatus) (bool, error)
 	GetSKUMapping(ctx context.Context, tenantID uuid.UUID, channelName, externalSKU string) (*ProductSKUMapping, error)
 	ListSKUMappings(ctx context.Context, tenantID uuid.UUID, channelName string) ([]ProductSKUMapping, error)
-	UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UUID, channel MarketplaceChannel, externalSKU string, productID uuid.UUID) error
+	UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UUID, channel MarketplaceChannel, externalSKU string, productID uuid.UUID, multiplier decimal.Decimal) error
 	GetPendingUnmappedOrdersBySKU(ctx context.Context, tenantID uuid.UUID, channel MarketplaceChannel, externalSKU string) ([]MarketplaceOrder, error)
 	GetProductBySKU(ctx context.Context, tenantID uuid.UUID, sku string) (*Product, error)
 }

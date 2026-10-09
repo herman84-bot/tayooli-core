@@ -1724,10 +1724,11 @@ type ImportOrderRequest struct {
 }
 
 type ImportMarketplaceOrdersRequest struct {
-	WarehouseID uuid.UUID                 `json:"warehouse_id"`
-	Channel     domain.MarketplaceChannel `json:"channel"`
-	FileName    string                    `json:"file_name"`
-	Orders      []ImportOrderRequest      `json:"orders"`
+	WarehouseID      uuid.UUID                 `json:"warehouse_id"`
+	SourceLocationID uuid.UUID                 `json:"source_location_id"`
+	Channel          domain.MarketplaceChannel `json:"channel"`
+	FileName         string                    `json:"file_name"`
+	Orders           []ImportOrderRequest      `json:"orders"`
 }
 
 type ImportMarketplaceOrdersResponse struct {
@@ -1735,31 +1736,22 @@ type ImportMarketplaceOrdersResponse struct {
 	Orders []domain.MarketplaceOrder      `json:"orders"`
 }
 
-func (u *Usecase) deductOrderStock(ctx context.Context, tenantID, userID uuid.UUID, order *domain.MarketplaceOrder, channel domain.MarketplaceChannel, multipliers map[string]decimal.Decimal) error {
+// deductOrderStock moves every line of a fully mapped order from the order's
+// explicit source rack to @CUSTOMER. Quantity per line is
+// item.Quantity * item.Multiplier, where Multiplier is the snapshot taken
+// when the line was mapped (M3), never the mapping's current value.
+func (u *Usecase) deductOrderStock(ctx context.Context, tenantID, userID uuid.UUID, order *domain.MarketplaceOrder) error {
 	if len(order.Items) == 0 {
 		return nil
 	}
-
-	locs, err := u.repo.ListLocations(ctx, tenantID, &order.WarehouseID)
-	var primaryLoc *domain.WarehouseLocation
-	if err == nil {
-		for i := range locs {
-			if locs[i].Type == domain.LocationTypeInternal {
-				primaryLoc = &locs[i]
-				break
-			}
-		}
+	// M5: no implicit rack. Orders without a source rack (legacy rows from
+	// before migration 040) must not guess one.
+	if order.SourceLocationID == nil || *order.SourceLocationID == uuid.Nil {
+		return &domain.StockReceiptValidationError{Msg: "Pesanan marketplace belum memiliki rak sumber pemotongan stok"}
 	}
-	if primaryLoc == nil {
-		defLoc, err := u.repo.GetLocationByCode(ctx, tenantID, &order.WarehouseID, "@DEFAULT")
-		if err == nil {
-			primaryLoc = defLoc
-		} else {
-			primaryLoc, err = u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeInternal)
-			if err != nil {
-				return fmt.Errorf("deductOrderStock: get primary location: %w", err)
-			}
-		}
+	srcLoc, err := u.repo.GetLocationByID(ctx, tenantID, *order.SourceLocationID)
+	if err != nil {
+		return fmt.Errorf("deductOrderStock: source location: %w", err)
 	}
 
 	custLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeCustomer)
@@ -1771,17 +1763,9 @@ func (u *Usecase) deductOrderStock(ctx context.Context, tenantID, userID uuid.UU
 		if item.ProductID == nil {
 			return fmt.Errorf("deductOrderStock: product id is nil")
 		}
-
-		mult := decimal.Zero
-		if multipliers != nil {
-			mult = multipliers[item.ExternalSKU]
-		}
-		if mult.LessThanOrEqual(decimal.Zero) {
-			if mapping, err := u.repo.GetSKUMapping(ctx, tenantID, string(channel), item.ExternalSKU); err == nil && mapping != nil && mapping.Multiplier.GreaterThan(decimal.Zero) {
-				mult = mapping.Multiplier
-			} else {
-				mult = decimal.NewFromInt(1)
-			}
+		mult := decimal.NewFromInt(1)
+		if item.Multiplier != nil && item.Multiplier.IsPositive() {
+			mult = *item.Multiplier
 		}
 
 		deductQty := item.Quantity.Mul(mult)
@@ -1790,7 +1774,7 @@ func (u *Usecase) deductOrderStock(ctx context.Context, tenantID, userID uuid.UU
 			TenantID:         tenantID,
 			MovementNumber:   fmt.Sprintf("MKT-MOV-%s", uuid.New().String()[:8]),
 			ProductID:        *item.ProductID,
-			SourceLocationID: primaryLoc.ID,
+			SourceLocationID: srcLoc.ID,
 			DestLocationID:   custLoc.ID,
 			Quantity:         deductQty,
 			UnitCost:         decimal.Zero,
@@ -1801,7 +1785,7 @@ func (u *Usecase) deductOrderStock(ctx context.Context, tenantID, userID uuid.UU
 			CreatedAt:        time.Now().UTC(),
 		}
 
-		if err := u.repo.DeductLocationStock(ctx, tenantID, primaryLoc.ID, *item.ProductID, deductQty, mov); err != nil {
+		if err := u.repo.DeductLocationStock(ctx, tenantID, srcLoc.ID, *item.ProductID, deductQty, mov); err != nil {
 			return err
 		}
 	}
@@ -1809,6 +1793,24 @@ func (u *Usecase) deductOrderStock(ctx context.Context, tenantID, userID uuid.UU
 	return nil
 }
 
+// resolveMarketplaceSourceLocation validates the rack chosen at import (M5):
+// it must exist, belong to the import warehouse and be an INTERNAL rack.
+func (u *Usecase) resolveMarketplaceSourceLocation(ctx context.Context, tenantID, warehouseID, locationID uuid.UUID) (*domain.WarehouseLocation, error) {
+	if locationID == uuid.Nil {
+		return nil, &domain.StockReceiptValidationError{Msg: "Rak sumber pemotongan stok wajib dipilih"}
+	}
+	loc, err := u.repo.GetLocationByID(ctx, tenantID, locationID)
+	if err != nil {
+		if errors.Is(err, domain.ErrLocationNotFound) {
+			return nil, &domain.StockReceiptValidationError{Msg: "Rak sumber tidak ditemukan"}
+		}
+		return nil, fmt.Errorf("resolveMarketplaceSourceLocation: %w", err)
+	}
+	if loc.WarehouseID == nil || *loc.WarehouseID != warehouseID || loc.Type != domain.LocationTypeInternal {
+		return nil, &domain.StockReceiptValidationError{Msg: "Rak sumber harus rak internal di gudang yang dipilih"}
+	}
+	return loc, nil
+}
 func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID uuid.UUID, role string, req ImportMarketplaceOrdersRequest) (*ImportMarketplaceOrdersResponse, error) {
 	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.WarehouseID); err != nil {
 		return nil, err
@@ -1836,6 +1838,11 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 	if batchQty.GreaterThan(decimal.NewFromInt(domain.MaxMarketplaceBatchQty)) {
 		return nil, &domain.StockReceiptValidationError{Msg: fmt.Sprintf(
 			"Total jumlah %s melebihi batas %d per import", batchQty.String(), domain.MaxMarketplaceBatchQty)}
+	}
+
+	srcLoc, err := u.resolveMarketplaceSourceLocation(ctx, tenantID, req.WarehouseID, req.SourceLocationID)
+	if err != nil {
+		return nil, err
 	}
 
 	batchNum := fmt.Sprintf("BATCH-MKT-%s-%d", ch, time.Now().UTC().UnixNano())
@@ -1891,9 +1898,10 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 			ID:              orderID,
 			TenantID:        tenantID,
 			BatchID:         &batch.ID,
-			WarehouseID:     req.WarehouseID,
-			Channel:         ch,
-			ExternalOrderID: extOrderID,
+			WarehouseID:      req.WarehouseID,
+			SourceLocationID: &srcLoc.ID,
+			Channel:          ch,
+			ExternalOrderID:  extOrderID,
 			OrderDate:       orderDate,
 			CustomerName:    orderReq.CustomerName,
 			CustomerPhone:   orderReq.CustomerPhone,
@@ -1910,7 +1918,6 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 		}
 
 		hasUnmapped := false
-		multipliers := make(map[string]decimal.Decimal)
 		calcSubtotal := decimal.Zero
 
 		for _, itmReq := range orderReq.Items {
@@ -1943,14 +1950,15 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 				if mult.LessThanOrEqual(decimal.Zero) {
 					mult = decimal.NewFromInt(1)
 				}
-				multipliers[extSKU] = mult
+				item.Multiplier = &mult
 			} else {
 				// 2. Lookup master product by SKU matching external_sku
 				prod, err := u.repo.GetProductBySKU(ctx, tenantID, extSKU)
 				if err == nil && prod != nil {
 					item.ProductID = &prod.ID
 					item.IsMapped = true
-					multipliers[extSKU] = decimal.NewFromInt(1)
+					one := decimal.NewFromInt(1)
+					item.Multiplier = &one
 				} else {
 					// 3. Unmapped SKU
 					item.IsMapped = false
@@ -1988,7 +1996,7 @@ func (u *Usecase) ImportMarketplaceOrders(ctx context.Context, tenantID, userID 
 				return nil, fmt.Errorf("ImportMarketplaceOrders: create order: %w", err)
 			}
 
-			if err := u.deductOrderStock(ctx, tenantID, userID, &order, ch, multipliers); err != nil {
+			if err := u.deductOrderStock(ctx, tenantID, userID, &order); err != nil {
 				order.Status = domain.MarketplaceOrderStatusStockInsufficient
 				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusStockInsufficient); errUpd != nil {
 					return nil, fmt.Errorf("ImportMarketplaceOrders: update order stock insufficient: %w", errUpd)
@@ -2050,7 +2058,7 @@ func (u *Usecase) ResolveSKUMapping(ctx context.Context, tenantID, userID uuid.U
 	extSKU := strings.TrimSpace(req.ExternalSKU)
 
 	// 2. Update unmapped order items in DB
-	if err := u.repo.UpdateUnmappedOrderItems(ctx, tenantID, channel, extSKU, req.ProductID); err != nil {
+	if err := u.repo.UpdateUnmappedOrderItems(ctx, tenantID, channel, extSKU, req.ProductID, mapping.Multiplier); err != nil {
 		return nil, fmt.Errorf("ResolveSKUMapping: update items: %w", err)
 	}
 
@@ -2080,7 +2088,7 @@ func (u *Usecase) ResolveSKUMapping(ctx context.Context, tenantID, userID uuid.U
 			if !claimed {
 				continue
 			}
-			errStock := u.deductOrderStock(ctx, tenantID, userID, &order, channel, nil)
+			errStock := u.deductOrderStock(ctx, tenantID, userID, &order)
 			if errStock == nil {
 				if errUpd := u.repo.UpdateMarketplaceOrderStatus(ctx, tenantID, order.ID, domain.MarketplaceOrderStatusCompleted); errUpd != nil {
 					return nil, fmt.Errorf("ResolveSKUMapping: update order status completed: %w", errUpd)

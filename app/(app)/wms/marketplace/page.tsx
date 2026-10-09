@@ -35,6 +35,7 @@ import {
 } from "lucide-react"
 import {
   useWarehouses,
+  useWarehouseLocations,
   useMarketplaceBatches,
   useMarketplaceOrders,
   useMarketplaceOrder,
@@ -181,6 +182,17 @@ export default function MarketplacePage() {
   // Target warehouse state for import
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("")
   const targetWarehouseId = selectedWarehouseId || warehouses[0]?.id || ""
+
+  // M5: stock is deducted from an explicit INTERNAL rack of the chosen warehouse.
+  const { data: warehouseLocations = [] } = useWarehouseLocations(targetWarehouseId || null)
+  const sourceRacks = useMemo(
+    () => warehouseLocations.filter((l) => l.type === "INTERNAL" && l.warehouse_id === targetWarehouseId),
+    [warehouseLocations, targetWarehouseId]
+  )
+  const [selectedSourceLocationId, setSelectedSourceLocationId] = useState<string>("")
+  const sourceLocationId = sourceRacks.some((l) => l.id === selectedSourceLocationId)
+    ? selectedSourceLocationId
+    : ""
 
   // Toast / notification state
   const [notification, setNotification] = useState<{
@@ -347,6 +359,10 @@ export default function MarketplacePage() {
       showNotification("error", "Pilih Gudang Tujuan", "Pilih gudang tujuan sebelum impor.")
       return
     }
+    if (!sourceLocationId) {
+      showNotification("error", "Pilih Rak Sumber", "Pilih rak sumber pemotongan stok sebelum impor.")
+      return
+    }
     if (!parsedPreview || parsedPreview.orders.length === 0) {
       showNotification("error", "Data Pesanan Kosong", "Unggah file CSV dengan data pesanan valid.")
       return
@@ -361,6 +377,7 @@ export default function MarketplacePage() {
         const formData = new FormData()
         formData.append("file", fileToImport)
         formData.append("warehouse_id", targetWarehouseId)
+        formData.append("source_location_id", sourceLocationId)
         formData.append("channel", channelToUse)
 
         const res = await importOrdersMutation.mutateAsync(formData)
@@ -377,6 +394,7 @@ export default function MarketplacePage() {
         // Use Structured JSON payload
         const payload = {
           warehouse_id: targetWarehouseId,
+          source_location_id: sourceLocationId,
           channel: channelToUse,
           file_name: fileName || "manual_csv_import.csv",
           orders: parsedPreview.orders.filter((o) => o.isValid),
@@ -913,6 +931,34 @@ export default function MarketplacePage() {
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
                     Stok barang yang terpetakan akan otomatis dipotong dari gudang ini untuk pesanan pelanggan.
+                  </p>
+                </div>
+
+                {/* Source Rack Selector (M5) */}
+                <div>
+                  <label
+                    htmlFor="source-rack-select"
+                    className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
+                  >
+                    Rak Sumber <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    id="source-rack-select"
+                    value={sourceLocationId}
+                    onChange={(e) => setSelectedSourceLocationId(e.target.value)}
+                    className="w-full min-h-[48px] px-3.5 py-2.5 rounded-lg bg-white border border-slate-300 text-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  >
+                    <option value="">Pilih rak...</option>
+                    {sourceRacks.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} ({l.code})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {sourceRacks.length === 0
+                      ? "Gudang ini belum punya rak internal."
+                      : "Stok pesanan dipotong dari rak ini."}
                   </p>
                 </div>
 

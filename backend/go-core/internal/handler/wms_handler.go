@@ -1213,7 +1213,8 @@ func (h *WMSHandler) CreateStockScrap(w http.ResponseWriter, r *http.Request) {
 
 // ImportMarketplaceRequest represents the payload for importing orders via JSON or raw CSV string.
 type ImportMarketplaceRequest struct {
-	WarehouseID uuid.UUID                 `json:"warehouse_id"`
+	WarehouseID      uuid.UUID                 `json:"warehouse_id"`
+	SourceLocationID uuid.UUID                 `json:"source_location_id"`
 	Channel     domain.MarketplaceChannel `json:"channel"`
 	FileName    string                    `json:"file_name"`
 	CSVData     string                    `json:"csv_data,omitempty"`
@@ -1450,10 +1451,12 @@ func (h *WMSHandler) ImportMarketplaceOrders(w http.ResponseWriter, r *http.Requ
 			RespondError(w, r, http.StatusBadRequest, fmt.Sprintf("failed to parse csv: %v", err))
 			return
 		}
+		srcLocID, _ := uuid.Parse(r.FormValue("source_location_id"))
 		importReq = uc.ImportMarketplaceOrdersRequest{
-			WarehouseID: whID,
-			Channel:     channel,
-			FileName:    header.Filename,
+			WarehouseID:      whID,
+			SourceLocationID: srcLocID,
+			Channel:          channel,
+			FileName:         header.Filename,
 			Orders:      orders,
 		}
 
@@ -1479,10 +1482,12 @@ func (h *WMSHandler) ImportMarketplaceOrders(w http.ResponseWriter, r *http.Requ
 			RespondError(w, r, http.StatusBadRequest, fmt.Sprintf("failed to parse csv: %v", err))
 			return
 		}
+		srcLocID, _ := uuid.Parse(r.URL.Query().Get("source_location_id"))
 		importReq = uc.ImportMarketplaceOrdersRequest{
-			WarehouseID: whID,
-			Channel:     channel,
-			FileName:    fileName,
+			WarehouseID:      whID,
+			SourceLocationID: srcLocID,
+			Channel:          channel,
+			FileName:         fileName,
 			Orders:      orders,
 		}
 
@@ -1518,8 +1523,9 @@ func (h *WMSHandler) ImportMarketplaceOrders(w http.ResponseWriter, r *http.Requ
 		}
 
 		importReq = uc.ImportMarketplaceOrdersRequest{
-			WarehouseID: jsonReq.WarehouseID,
-			Channel:     jsonReq.Channel,
+			WarehouseID:      jsonReq.WarehouseID,
+			SourceLocationID: jsonReq.SourceLocationID,
+			Channel:          jsonReq.Channel,
 			FileName:    fileName,
 			Orders:      jsonReq.Orders,
 		}
