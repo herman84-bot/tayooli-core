@@ -2,6 +2,7 @@ package product_test
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"github.com/google/uuid"
@@ -171,5 +172,36 @@ func TestProductCRUD(t *testing.T) {
 	_, err = uc.GetProduct(ctx, tenantID, created.ID)
 	if err != domain.ErrNotFound {
 		t.Errorf("expected ErrNotFound after deletion, got %v", err)
+	}
+}
+
+func TestProductCostPrice(t *testing.T) {
+	ctx := context.Background()
+	tenantID := uuid.New()
+	uc := product.New(newMockProductRepo(), &mockInventoryRepo{})
+
+	for _, bad := range []float64{-1, math.NaN(), math.Inf(1)} {
+		if _, err := uc.CreateProduct(ctx, tenantID, product.CreateProductRequest{Name: "Teh", SKU: "TEH", Price: 1, CostPrice: bad}); err != domain.ErrInvalidInput {
+			t.Errorf("cost %v: expected ErrInvalidInput, got %v", bad, err)
+		}
+	}
+
+	p, err := uc.CreateProduct(ctx, tenantID, product.CreateProductRequest{Name: "Teh Manis", SKU: "TEH-1", Price: 5000, CostPrice: 3000})
+	if err != nil || p.CostPrice != 3000 {
+		t.Fatalf("create: err=%v cost=%v", err, p)
+	}
+	// Omitting cost_price on update keeps the stored value.
+	u, err := uc.UpdateProduct(ctx, tenantID, p.ID, product.UpdateProductRequest{Name: "Teh Manis", SKU: "TEH-1", Price: 5500})
+	if err != nil || u.CostPrice != 3000 {
+		t.Fatalf("update without cost: err=%v cost=%v", err, u.CostPrice)
+	}
+	c := 3200.0
+	u, err = uc.UpdateProduct(ctx, tenantID, p.ID, product.UpdateProductRequest{Name: "Teh Manis", SKU: "TEH-1", Price: 5500, CostPrice: &c})
+	if err != nil || u.CostPrice != 3200 {
+		t.Fatalf("update cost: err=%v cost=%v", err, u.CostPrice)
+	}
+	neg := -5.0
+	if _, err := uc.UpdateProduct(ctx, tenantID, p.ID, product.UpdateProductRequest{Name: "Teh Manis", SKU: "TEH-1", Price: 5500, CostPrice: &neg}); err != domain.ErrInvalidInput {
+		t.Errorf("negative cost on update: expected ErrInvalidInput, got %v", err)
 	}
 }

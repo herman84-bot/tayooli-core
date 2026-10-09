@@ -703,6 +703,15 @@ func (m *mockWMSRepo) GetProductBySKU(ctx context.Context, tenantID uuid.UUID, s
 	return &p, nil
 }
 
+func (m *mockWMSRepo) GetProductCostPrice(ctx context.Context, tenantID, productID uuid.UUID) (decimal.Decimal, error) {
+	for _, p := range m.products {
+		if p.TenantID == tenantID && p.ID == productID {
+			return decimal.NewFromFloat(p.CostPrice), nil
+		}
+	}
+	return decimal.Zero, domain.ErrNotFound
+}
+
 // -----------------------------------------------------------------------------
 // Test Suite
 // -----------------------------------------------------------------------------
@@ -2354,6 +2363,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		TenantID: tenantID,
 		SKU:      prod1SKU,
 		Name:     "Kopi Susu Internal",
+		CostPrice: 2500,
 	}
 
 	prod2ID := uuid.New()
@@ -2774,6 +2784,22 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		}
 		// 3 x 2 (snapshot, not 40) + 1 x 1 = 7.
 		assert.True(t, qty.Equal(decimal.NewFromInt(7)), "expected 7 deducted, got %s", qty)
+	})
+
+	t.Run("M6: marketplace movement carries product cost_price as unit_cost", func(t *testing.T) {
+		resp, err := usecase.ImportMarketplaceOrders(ctx, tenantID, staffID, "warehouse", uc.ImportMarketplaceOrdersRequest{
+			WarehouseID: whID, SourceLocationID: srcLocID, Channel: domain.MarketplaceChannelBlibli,
+			Orders: []uc.ImportOrderRequest{{ExternalOrderID: "BL-COST-1", Items: []uc.ImportOrderItemRequest{{ExternalSKU: "MAS000123", ItemName: "x", Quantity: decimal.NewFromInt(2)}}}}})
+		require.NoError(t, err)
+		require.Equal(t, domain.MarketplaceOrderStatusCompleted, resp.Orders[0].Status)
+		found := false
+		for _, mv := range repo.stockMovements {
+			if mv.ReferenceID == resp.Orders[0].ID {
+				found = true
+				assert.True(t, mv.UnitCost.Equal(decimal.NewFromInt(2500)), "unit_cost = cost_price, got %s", mv.UnitCost)
+			}
+		}
+		require.True(t, found, "movement written")
 	})
 
 	t.Run("M2: multiplier ceiling and role gate", func(t *testing.T) {

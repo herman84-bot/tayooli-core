@@ -168,6 +168,8 @@ export interface Product {
   description?: string
   sku: string
   price: number
+  /** Cost of goods (HPP); used as unit_cost on stock movements. */
+  cost_price?: number
   created_at: string
   updated_at: string
 }
@@ -177,6 +179,7 @@ export interface CreateProductInput {
   sku: string
   description?: string
   price: number
+  cost_price?: number
 }
 
 export interface InventoryItem {

@@ -1769,6 +1769,12 @@ func (u *Usecase) deductOrderStock(ctx context.Context, tenantID, userID uuid.UU
 		}
 
 		deductQty := item.Quantity.Mul(mult)
+		// M6: record the real cost of goods leaving stock. The movement is
+		// per base unit (deductQty), so unit_cost is the base unit cost.
+		unitCost, err := u.repo.GetProductCostPrice(ctx, tenantID, *item.ProductID)
+		if err != nil {
+			return fmt.Errorf("deductOrderStock: cost price: %w", err)
+		}
 		mov := &domain.StockMovement{
 			ID:               uuid.New(),
 			TenantID:         tenantID,
@@ -1777,7 +1783,7 @@ func (u *Usecase) deductOrderStock(ctx context.Context, tenantID, userID uuid.UU
 			SourceLocationID: srcLoc.ID,
 			DestLocationID:   custLoc.ID,
 			Quantity:         deductQty,
-			UnitCost:         decimal.Zero,
+			UnitCost:         unitCost,
 			Status:           domain.StockMovementStatusDone,
 			ReferenceType:    domain.StockRefMarketplace,
 			ReferenceID:      order.ID,

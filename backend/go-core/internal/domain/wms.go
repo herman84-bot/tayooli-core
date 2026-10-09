@@ -748,4 +748,6 @@ type WMSRepository interface {
 	UpdateUnmappedOrderItems(ctx context.Context, tenantID uuid.UUID, channel MarketplaceChannel, externalSKU string, productID uuid.UUID, multiplier decimal.Decimal) error
 	GetPendingUnmappedOrdersBySKU(ctx context.Context, tenantID uuid.UUID, channel MarketplaceChannel, externalSKU string) ([]MarketplaceOrder, error)
 	GetProductBySKU(ctx context.Context, tenantID uuid.UUID, sku string) (*Product, error)
+	// GetProductCostPrice returns products.cost_price (M6); ErrNotFound if absent.
+	GetProductCostPrice(ctx context.Context, tenantID, productID uuid.UUID) (decimal.Decimal, error)
 }

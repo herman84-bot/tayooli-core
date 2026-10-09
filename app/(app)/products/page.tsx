@@ -50,6 +50,7 @@ const productSchema = z.object({
   sku: z.string().trim().min(1, "SKU wajib diisi").max(100, "SKU maksimal 100 karakter"),
   description: z.string().trim().max(2000, "Deskripsi maksimal 2000 karakter").optional(),
   price: z.coerce.number().min(0, "Harga tidak boleh negatif"),
+  cost_price: z.coerce.number().min(0, "Harga pokok tidak boleh negatif"),
 })
 
 export default function ProductsPage() {
@@ -69,6 +70,7 @@ export default function ProductsPage() {
     sku: "",
     description: "",
     price: "",
+    cost_price: "",
   })
   const [editFormError, setEditFormError] = useState<string | null>(null)
 
@@ -82,6 +84,7 @@ export default function ProductsPage() {
     sku: "",
     description: "",
     price: "",
+    cost_price: "",
   })
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -92,7 +95,7 @@ export default function ProductsPage() {
   const adjustInventory = useAdjustInventory(selectedProduct?.id ?? null)
 
   const resetForm = () => {
-    setFormData({ name: "", sku: "", description: "", price: "" })
+    setFormData({ name: "", sku: "", description: "", price: "", cost_price: "" })
     setFormError(null)
   }
 
@@ -104,6 +107,7 @@ export default function ProductsPage() {
       sku: p.sku,
       description: p.description || "",
       price: String(p.price),
+      cost_price: String(p.cost_price ?? 0),
     })
     setEditFormError(null)
   }
@@ -127,6 +131,7 @@ export default function ProductsPage() {
           sku: parsed.data.sku,
           description: parsed.data.description || undefined,
           price: parsed.data.price,
+          cost_price: parsed.data.cost_price,
         },
       },
       {
@@ -139,6 +144,7 @@ export default function ProductsPage() {
               sku: parsed.data.sku,
               description: parsed.data.description || "",
               price: parsed.data.price,
+              cost_price: parsed.data.cost_price,
             })
           }
         },
@@ -248,6 +254,7 @@ export default function ProductsPage() {
         sku: parsed.data.sku,
         description: parsed.data.description || undefined,
         price: parsed.data.price,
+        cost_price: parsed.data.cost_price,
       },
       {
         onSuccess: () => {
@@ -558,6 +565,20 @@ export default function ProductsPage() {
               </div>
 
               <div className="space-y-1.5">
+                <label htmlFor="create-cost-price" className="text-xs font-semibold text-slate-700">Harga Pokok / HPP (IDR)</label>
+                <Input
+                  id="create-cost-price"
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={formData.cost_price}
+                  onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                  placeholder="Contoh: 42000"
+                  className="min-h-[42px] font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">Deskripsi Produk (Opsional)</label>
                 <Input
                   value={formData.description}
@@ -639,6 +660,19 @@ export default function ProductsPage() {
                   min="0"
                   value={editFormData.price}
                   onChange={(e) => setEditFormData({ ...editFormData, price: e.target.value })}
+                  placeholder="0"
+                  className="min-h-[42px] font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="edit-cost-price" className="text-xs font-semibold text-slate-700">Harga Pokok / HPP (Rp)</label>
+                <Input
+                  id="edit-cost-price"
+                  type="number"
+                  min="0"
+                  value={editFormData.cost_price}
+                  onChange={(e) => setEditFormData({ ...editFormData, cost_price: e.target.value })}
                   placeholder="0"
                   className="min-h-[42px] font-mono"
                 />

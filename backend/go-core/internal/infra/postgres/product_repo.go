@@ -30,8 +30,8 @@ func NewProductRepo(db *sql.DB) *ProductRepo {
 }
 
 const createProduct = `
-INSERT INTO products (id, tenant_id, name, description, sku, price, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+INSERT INTO products (id, tenant_id, name, description, sku, price, cost_price, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
 func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -44,7 +44,7 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 		return fmt.Errorf("ProductRepo.Create: set tenant: %w", err)
 	}
 
-	if _, err := tx.ExecContext(ctx, createProduct, p.ID, p.TenantID, p.Name, p.Description, p.SKU, p.Price, p.CreatedAt, p.UpdatedAt); err != nil {
+	if _, err := tx.ExecContext(ctx, createProduct, p.ID, p.TenantID, p.Name, p.Description, p.SKU, p.Price, p.CostPrice, p.CreatedAt, p.UpdatedAt); err != nil {
 		return fmt.Errorf("ProductRepo.Create: exec: %w", err)
 	}
 
@@ -55,7 +55,7 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 }
 
 const getProductByID = `
-SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, created_at, updated_at
+SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
 FROM products WHERE id = $1 AND tenant_id = $2`
 
 func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.Product, error) {
@@ -72,7 +72,7 @@ func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dom
 	row := tx.QueryRowContext(ctx, getProductByID, id, tenantID)
 
 	var p domain.Product
-	if err := row.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CreatedAt, &p.UpdatedAt); err != nil {
+	if err := row.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
@@ -86,7 +86,7 @@ func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dom
 }
 
 const listProductsByTenantPaged = `
-SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, created_at, updated_at
+SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
 FROM products WHERE tenant_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3`
@@ -111,7 +111,7 @@ func (r *ProductRepo) List(ctx context.Context, tenantID uuid.UUID) ([]domain.Pr
 	var products []domain.Product
 	for rows.Next() {
 		var p domain.Product
-		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("ProductRepo.List: scan row: %w", err)
 		}
 		products = append(products, p)
@@ -147,7 +147,7 @@ func (r *ProductRepo) ListByIDs(ctx context.Context, tenantID uuid.UUID, ids []u
 	}
 
 	query := fmt.Sprintf(`
-SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, created_at, updated_at
+SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
 FROM products WHERE tenant_id = $1 AND id IN (%s)`, strings.Join(placeholders, ", "))
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -169,7 +169,7 @@ FROM products WHERE tenant_id = $1 AND id IN (%s)`, strings.Join(placeholders, "
 	var products []domain.Product
 	for rows.Next() {
 		var p domain.Product
-		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("ProductRepo.ListByIDs: scan row: %w", err)
 		}
 		products = append(products, p)
@@ -189,7 +189,7 @@ FROM products WHERE tenant_id = $1 AND id IN (%s)`, strings.Join(placeholders, "
 }
 
 const getProductBySKU = `
-SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, created_at, updated_at
+SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
 FROM products WHERE tenant_id = $1 AND LOWER(TRIM(sku)) = LOWER(TRIM($2))`
 
 func (r *ProductRepo) GetBySKU(ctx context.Context, tenantID uuid.UUID, sku string) (*domain.Product, error) {
@@ -205,7 +205,7 @@ func (r *ProductRepo) GetBySKU(ctx context.Context, tenantID uuid.UUID, sku stri
 
 	row := tx.QueryRowContext(ctx, getProductBySKU, tenantID, sku)
 	var p domain.Product
-	if err := row.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CreatedAt, &p.UpdatedAt); err != nil {
+	if err := row.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
@@ -220,7 +220,7 @@ func (r *ProductRepo) GetBySKU(ctx context.Context, tenantID uuid.UUID, sku stri
 
 const updateProduct = `
 UPDATE products
-SET name = $1, description = $2, sku = $3, price = $4, updated_at = $5
+SET name = $1, description = $2, sku = $3, price = $4, updated_at = $5, cost_price = $8
 WHERE id = $6 AND tenant_id = $7`
 
 func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) error {
@@ -234,7 +234,7 @@ func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) error {
 		return fmt.Errorf("ProductRepo.Update: set tenant: %w", err)
 	}
 
-	res, err := tx.ExecContext(ctx, updateProduct, p.Name, p.Description, p.SKU, p.Price, p.UpdatedAt, p.ID, p.TenantID)
+	res, err := tx.ExecContext(ctx, updateProduct, p.Name, p.Description, p.SKU, p.Price, p.UpdatedAt, p.ID, p.TenantID, p.CostPrice)
 	if err != nil {
 		return fmt.Errorf("ProductRepo.Update: exec: %w", err)
 	}

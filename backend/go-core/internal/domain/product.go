@@ -14,6 +14,9 @@ type Product struct {
 	Description string    `json:"description,omitempty"`
 	SKU         string    `json:"sku"`
 	Price       float64   `json:"price"`
+	// CostPrice is the purchase/standard cost used as unit_cost on stock
+	// movements (M6). 0 means not set.
+	CostPrice float64 `json:"cost_price"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

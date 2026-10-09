@@ -26,13 +26,14 @@ type CreateProductRequest struct {
 	Description string  `json:"description"`
 	SKU         string  `json:"sku"`
 	Price       float64 `json:"price"`
+	CostPrice   float64 `json:"cost_price"`
 }
 
 func (u *Usecase) CreateProduct(ctx context.Context, tenantID uuid.UUID, req CreateProductRequest) (*domain.Product, error) {
 	if req.Name == "" || req.SKU == "" {
 		return nil, domain.ErrInvalidInput
 	}
-	if req.Price < 0 {
+	if req.Price < 0 || !validCost(req.CostPrice) {
 		return nil, domain.ErrInvalidInput
 	}
 	p := &domain.Product{
@@ -42,6 +43,7 @@ func (u *Usecase) CreateProduct(ctx context.Context, tenantID uuid.UUID, req Cre
 		Description: req.Description,
 		SKU:         req.SKU,
 		Price:       req.Price,
+		CostPrice:   req.CostPrice,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
@@ -64,6 +66,13 @@ type UpdateProductRequest struct {
 	Description string  `json:"description"`
 	SKU         string  `json:"sku"`
 	Price       float64 `json:"price"`
+	// CostPrice is optional on update: nil keeps the stored value.
+	CostPrice *float64 `json:"cost_price,omitempty"`
+}
+
+// validCost rejects negative, NaN and infinite costs.
+func validCost(c float64) bool {
+	return c >= 0 && c == c && c < 1e15
 }
 
 func (u *Usecase) UpdateProduct(ctx context.Context, tenantID, id uuid.UUID, req UpdateProductRequest) (*domain.Product, error) {
@@ -73,6 +82,9 @@ func (u *Usecase) UpdateProduct(ctx context.Context, tenantID, id uuid.UUID, req
 		return nil, domain.ErrInvalidInput
 	}
 	if req.Price < 0 || req.Price != req.Price {
+		return nil, domain.ErrInvalidInput
+	}
+	if req.CostPrice != nil && !validCost(*req.CostPrice) {
 		return nil, domain.ErrInvalidInput
 	}
 
@@ -93,6 +105,9 @@ func (u *Usecase) UpdateProduct(ctx context.Context, tenantID, id uuid.UUID, req
 	existing.Description = req.Description
 	existing.SKU = sku
 	existing.Price = req.Price
+	if req.CostPrice != nil {
+		existing.CostPrice = *req.CostPrice
+	}
 	existing.UpdatedAt = time.Now().UTC()
 
 	if err := u.productRepo.Update(ctx, existing); err != nil {

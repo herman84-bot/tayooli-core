@@ -3193,3 +3193,28 @@ func (r *WMSRepo) GetProductBySKU(ctx context.Context, tenantID uuid.UUID, sku s
 	}
 	return &p, nil
 }
+
+func (r *WMSRepo) GetProductCostPrice(ctx context.Context, tenantID, productID uuid.UUID) (decimal.Decimal, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return decimal.Zero, fmt.Errorf("WMSRepo.GetProductCostPrice: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return decimal.Zero, fmt.Errorf("WMSRepo.GetProductCostPrice: set tenant: %w", err)
+	}
+
+	var cost decimal.Decimal
+	err = tx.QueryRowContext(ctx, `SELECT cost_price FROM products WHERE tenant_id = $1 AND id = $2`, tenantID, productID).Scan(&cost)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return decimal.Zero, domain.ErrNotFound
+		}
+		return decimal.Zero, fmt.Errorf("WMSRepo.GetProductCostPrice: query: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return decimal.Zero, fmt.Errorf("WMSRepo.GetProductCostPrice: commit: %w", err)
+	}
+	return cost, nil
+}
