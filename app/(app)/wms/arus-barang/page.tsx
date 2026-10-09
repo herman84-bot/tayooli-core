@@ -685,11 +685,13 @@ function InboundReceivingSubView({
       )}
 
       {/* LPN Pallet Management Modal */}
-      <LPNManagementModal
-        isOpen={showLPNModal}
-        onClose={() => setShowLPNModal(false)}
-        warehouseId={warehouseId || null}
-      />
+      {showLPNModal && (
+        <LPNManagementModal
+          isOpen={showLPNModal}
+          onClose={() => setShowLPNModal(false)}
+          warehouseId={warehouseId || null}
+        />
+      )}
     </div>
   )
 }
