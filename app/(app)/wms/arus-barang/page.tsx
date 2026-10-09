@@ -45,6 +45,7 @@ import { PutawayView } from "@/components/wms/PutawayView"
 import { TraceBatchView } from "@/components/wms/TraceBatchView"
 import { WMSSettingsModal } from "@/components/wms/WMSSettingsModal"
 import { QCQuarantineView } from "@/components/wms/QCQuarantineView"
+import { DockBoardSubView } from "@/components/wms/DockBoardSubView"
 import DeliveryOrdersPanel from "@/components/wms/DeliveryOrdersPanel"
 import { WavePickingSubView } from "@/components/wms/WavePickingSubView"
 import { PackingStationSubView } from "@/components/wms/PackingStationSubView"
@@ -140,7 +141,7 @@ function TypeBadge({ type }: { type?: StockReceiptType }) {
 // ---------------------------------------------------------------------------
 
 type Mode = "masuk" | "keluar"
-type MasukTab = "penerimaan" | "putaway" | "trace" | "qc"
+type MasukTab = "penerimaan" | "putaway" | "trace" | "qc" | "dock"
 type KeluarTab = "surat_jalan" | "picking" | "packing" | "manifest"
 
 export default function ArusBarangPage() {
@@ -263,6 +264,16 @@ export default function ArusBarangPage() {
               Penerimaan (GR)
             </button>
             <button
+              onClick={() => setMasukTab("dock")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                masukTab === "dock"
+                  ? "bg-emerald-50 text-emerald-800 font-semibold"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              Antrean Dermaga (Dock)
+            </button>
+            <button
               onClick={() => setMasukTab("putaway")}
               className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 masukTab === "putaway"
@@ -347,6 +358,9 @@ export default function ArusBarangPage() {
               warehouseId={selectedWarehouseId}
               onGoToPutaway={() => setMasukTab("putaway")}
             />
+          )}
+          {masukTab === "dock" && (
+            <DockBoardSubView warehouseId={selectedWarehouseId} />
           )}
           {masukTab === "putaway" && (
             <PutawayView warehouseId={selectedWarehouseId} />
