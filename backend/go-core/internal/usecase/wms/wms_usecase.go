@@ -1440,8 +1440,21 @@ func (u *Usecase) CompleteStockOpname(ctx context.Context, tenantID, userID uuid
 			continue
 		}
 		if item.DiscrepancyQty.GreaterThan(decimal.Zero) {
-			// Surplus recovery: movement from @LOSS to item.LocationID
+			// Surplus recovery: movement from @LOSS to item.LocationID.
+			// Found stock has no inbound lot, so it gets an opname lot
+			// (ADR-014 Invariant 1: every movement carries a batch).
+			batch, err := u.repo.GetOrCreateBatch(ctx, &domain.StockBatch{
+				TenantID:    tenantID,
+				ProductID:   item.ProductID,
+				BatchNumber: fmt.Sprintf("OPN-%s", op.OpnameNumber),
+				Status:      domain.StockBatchStatusReleased,
+				CreatedBy:   &userID,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("CompleteStockOpname: surplus batch: %w", err)
+			}
 			mov := &domain.StockMovement{
+				BatchID:          &batch.ID,
 				ID:               uuid.New(),
 				TenantID:         tenantID,
 				MovementNumber:   fmt.Sprintf("OPN-SURPLUS-%s-%d", op.OpnameNumber, i+1),
@@ -1477,7 +1490,9 @@ func (u *Usecase) CompleteStockOpname(ctx context.Context, tenantID, userID uuid
 				ExecutedBy:       &userID,
 				CreatedAt:        now,
 			}
-			if err := u.repo.CreateStockMovement(ctx, mov); err != nil {
+			// DeductLocationStock allocates the loss across on-hand batches
+			// (FEFO, ON_HOLD included for opname) so each movement has batch_id.
+			if err := u.repo.DeductLocationStock(ctx, tenantID, item.LocationID, item.ProductID, absQty, mov); err != nil {
 				return nil, fmt.Errorf("CompleteStockOpname: create loss movement: %w", err)
 			}
 		}

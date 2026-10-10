@@ -2133,6 +2133,15 @@ func TestStockOpnameDiscrepancyAndLedgerPosting(t *testing.T) {
 		assert.Equal(t, prod2, deficitMov.ProductID)
 		assert.True(t, deficitMov.Quantity.Equal(decimal.NewFromInt(6)))
 
+		// Regression (audit 2026-10-10): opname movements must carry a real
+		// batch. The usecase must supply it itself (prod repo rejects nil with
+		// ErrBatchRequired); the surplus lot must be a persisted opname batch.
+		require.NotNil(t, surplusMov.BatchID, "surplus movement must carry batch_id")
+		surplusBatch, err := repo.GetBatchByID(ctx, tenantID, *surplusMov.BatchID)
+		require.NoError(t, err, "surplus batch must be a real stock_batches row")
+		assert.Equal(t, prod1, surplusBatch.ProductID)
+		assert.Equal(t, "OPN-"+op.OpnameNumber, surplusBatch.BatchNumber)
+
 		// Ledger stock levels should now equal physical counts:
 		// loc1: 10 + 5 = 15
 		// loc2: 20 - 6 = 14
