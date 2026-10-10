@@ -477,6 +477,9 @@ func (u *Usecase) CreateTransfer(ctx context.Context, tenantID, userID uuid.UUID
 	if _, err := u.repo.GetWarehouseByID(ctx, tenantID, req.ToWarehouseID); err != nil {
 		return nil, err
 	}
+	if req.FromWarehouseID == req.ToWarehouseID {
+		return nil, domain.ErrInvalidInput
+	}
 	if len(req.Items) == 0 {
 		return nil, domain.ErrInvalidInput
 	}

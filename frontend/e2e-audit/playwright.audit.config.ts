@@ -11,8 +11,8 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     baseURL: process.env.AUDIT_BASE_URL || 'https://tayooli.my.id',
-    screenshot: 'on',
-    trace: 'retain-on-failure',
+    screenshot: 'off',
+    trace: 'off',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });

@@ -1115,6 +1115,23 @@ func TestStockTransferLifecycleAndNegativeStockRejection(t *testing.T) {
 		_, err = usecase.CreateTransfer(ctx, tenantID, adminID, "admin", reqSpoofedDest)
 		assert.ErrorIs(t, err, domain.ErrUnauthorizedWarehouse, "dest location not in dest warehouse must be rejected")
 
+		// Regression (audit 2026-10-10): Transfer to the same warehouse must be rejected
+		reqSelfLoop := uc.CreateTransferRequest{
+			FromWarehouseID: whSource,
+			ToWarehouseID:   whSource,
+			TransferNumber:  "TR-SELFLOOP",
+			Items: []uc.CreateTransferItemRequest{
+				{
+					ProductID:        productID,
+					RequestedQty:     decimal.NewFromInt(1),
+					SourceLocationID: &locSourceID,
+					DestLocationID:   &locSourceID,
+				},
+			},
+		}
+		_, err = usecase.CreateTransfer(ctx, tenantID, adminID, "admin", reqSelfLoop)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "transfer to the same warehouse must be rejected")
+
 		// Transfer created normally, but item modified/spoofed before dispatch
 		legitReq := uc.CreateTransferRequest{
 			FromWarehouseID: whSource,
