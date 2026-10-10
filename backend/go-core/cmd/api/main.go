@@ -258,7 +258,9 @@ func main() {
 		appURL,
 	)
 	authUsecase := authUC.New(userRepo, cfg.JWTSecret, time.Hour, nil, emailMailer)
-	authHandler := handler.NewAuthHandler(authUsecase)
+	revokedTokenRepo := postgres.NewRevokedTokenRepo(db)
+	tenantMiddleware.SetRevocationChecker(revokedTokenRepo)
+	authHandler := handler.NewAuthHandler(authUsecase).WithTokenRevoker(revokedTokenRepo)
 
 	// Team Management
 	teamUsecase := teamUC.New(userRepo)

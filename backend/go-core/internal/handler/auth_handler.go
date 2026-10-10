@@ -31,9 +31,21 @@ type authUsecase interface {
 	ResetPassword(ctx context.Context, token, newPassword string) error
 }
 
+// tokenRevoker persists a logged-out token so it is rejected server-side.
+type tokenRevoker interface {
+	Revoke(ctx context.Context, tokenHash string, userID *uuid.UUID, expiresAt time.Time) error
+}
+
 // AuthHandler handles HTTP requests for authentication.
 type AuthHandler struct {
-	uc authUsecase
+	uc      authUsecase
+	revoker tokenRevoker
+}
+
+// WithTokenRevoker enables server-side revocation on logout.
+func (h *AuthHandler) WithTokenRevoker(rv tokenRevoker) *AuthHandler {
+	h.revoker = rv
+	return h
 }
 
 // NewAuthHandler returns a new AuthHandler.
@@ -162,8 +174,27 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 // Logout handles POST /api/v1/auth/logout.
-// Clears the auth cookie.
-func (h *AuthHandler) Logout(w http.ResponseWriter, _ *http.Request) {
+// Revokes the presented JWT server-side (when a revoker is wired) and clears
+// the auth cookie. If revocation fails the request fails with 500, so the
+// client never believes a still-valid token was invalidated.
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	if h.revoker != nil {
+		if tok := appMiddleware.ExtractToken(r); tok != "" {
+			exp, ok := appMiddleware.GetTokenExpiry(r.Context())
+			if !ok {
+				exp = time.Now().Add(24 * time.Hour) // conservative upper bound
+			}
+			var uidPtr *uuid.UUID
+			if uid, ok := appMiddleware.GetUserID(r.Context()); ok {
+				uidPtr = &uid
+			}
+			if err := h.revoker.Revoke(r.Context(), appMiddleware.TokenHash(tok), uidPtr, exp); err != nil {
+				log.Error().Err(err).Msg("logout: revoke token failed")
+				respondError(w, r, http.StatusInternalServerError, "logout failed")
+				return
+			}
+		}
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "tayooli_auth",
 		Value:    "",

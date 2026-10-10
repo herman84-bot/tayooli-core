@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -380,6 +382,56 @@ func TestAuthHandler_Logout_Success(t *testing.T) {
 	}
 	if respBody["message"] != "logged out" {
 		t.Errorf("expected message 'logged out', got %v", respBody["message"])
+	}
+}
+
+type fakeRevoker struct {
+	hash   string
+	userID *uuid.UUID
+	exp    time.Time
+	err    error
+}
+
+func (f *fakeRevoker) Revoke(_ context.Context, h string, uid *uuid.UUID, exp time.Time) error {
+	f.hash, f.userID, f.exp = h, uid, exp
+	return f.err
+}
+
+func TestAuthHandler_Logout_RevokesTokenServerSide(t *testing.T) {
+	rv := &fakeRevoker{}
+	h := handler.NewAuthHandler(&mockAuthUsecase{}).WithTokenRevoker(rv)
+	userID := uuid.New()
+	exp := time.Now().Add(30 * time.Minute).Truncate(time.Second)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+	req.AddCookie(&http.Cookie{Name: "tayooli_auth", Value: "jwt-abc"})
+	req = withAuthContext(req, uuid.New(), userID)
+	req = req.WithContext(context.WithValue(req.Context(), appMiddleware.TokenExpKey, exp))
+	rr := httptest.NewRecorder()
+	h.Logout(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if rv.hash != appMiddleware.TokenHash("jwt-abc") {
+		t.Errorf("revoked wrong hash: %q", rv.hash)
+	}
+	if rv.userID == nil || *rv.userID != userID {
+		t.Errorf("expected user id %s, got %v", userID, rv.userID)
+	}
+	if !rv.exp.Equal(exp) {
+		t.Errorf("expected exp %v, got %v", exp, rv.exp)
+	}
+}
+
+func TestAuthHandler_Logout_RevokeFailureReturns500(t *testing.T) {
+	h := handler.NewAuthHandler(&mockAuthUsecase{}).WithTokenRevoker(&fakeRevoker{err: errors.New("db down")})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+	req.Header.Set("Authorization", "Bearer jwt-xyz")
+	rr := httptest.NewRecorder()
+	h.Logout(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 when revocation fails, got %d", rr.Code)
 	}
 }
 

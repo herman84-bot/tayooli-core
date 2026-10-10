@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -45,6 +47,49 @@ func extractToken(r *http.Request) string {
 		return strings.TrimPrefix(auth, "Bearer ")
 	}
 	return ""
+}
+
+// RevocationChecker reports whether a token (identified by TokenHash) was
+// revoked by logout. Errors must fail closed.
+type RevocationChecker interface {
+	IsRevoked(ctx context.Context, tokenHash string) (bool, error)
+}
+
+var (
+	revocationMu      sync.RWMutex
+	revocationChecker RevocationChecker
+)
+
+// SetRevocationChecker installs the server-side session revocation store.
+// When nil (unit tests, legacy wiring) no revocation check is performed.
+func SetRevocationChecker(c RevocationChecker) {
+	revocationMu.Lock()
+	defer revocationMu.Unlock()
+	revocationChecker = c
+}
+
+func currentRevocationChecker() RevocationChecker {
+	revocationMu.RLock()
+	defer revocationMu.RUnlock()
+	return revocationChecker
+}
+
+// TokenHash returns the hex SHA-256 of a raw JWT. Only this hash is stored.
+func TokenHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+// ExtractToken exposes the cookie/Bearer token lookup to the logout handler.
+func ExtractToken(r *http.Request) string { return extractToken(r) }
+
+// TokenExpiry returns the `exp` of an already-validated token in context.
+const TokenExpKey contextKey = "token_exp"
+
+// GetTokenExpiry returns the validated token's expiry stored by TenantMiddleware.
+func GetTokenExpiry(ctx context.Context) (time.Time, bool) {
+	t, ok := ctx.Value(TokenExpKey).(time.Time)
+	return t, ok
 }
 
 // TenantMiddleware validates JWT (strict HS256), extracts tenant_id and role,
@@ -91,6 +136,20 @@ func TenantMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Server-side logout: a revoked token is rejected even though its
+		// signature and exp are still valid. Store errors fail closed.
+		if rc := currentRevocationChecker(); rc != nil {
+			revoked, rerr := rc.IsRevoked(r.Context(), TokenHash(tokenStr))
+			if rerr != nil {
+				writeJSONError(w, http.StatusServiceUnavailable, "session check unavailable")
+				return
+			}
+			if revoked {
+				writeJSONError(w, http.StatusUnauthorized, "session revoked")
+				return
+			}
+		}
+
 		tenantIDStr, ok := claims["tenant_id"].(string)
 		if !ok {
 			writeJSONError(w, http.StatusUnauthorized, "missing tenant_id in token")
@@ -107,6 +166,9 @@ func TenantMiddleware(next http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), TenantIDKey, tenantID)
 		ctx = context.WithValue(ctx, RoleKey, role)
+		if exp, err := claims.GetExpirationTime(); err == nil && exp != nil {
+			ctx = context.WithValue(ctx, TokenExpKey, exp.Time)
+		}
 
 		// Extract user_id from "sub" claim (set by auth service on login).
 		if userIDStr, ok := claims["sub"].(string); ok {

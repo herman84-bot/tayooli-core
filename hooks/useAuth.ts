@@ -106,8 +106,13 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        await fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" })
-        set({ user: null, isAuthenticated: false })
+        // Local session is ALWAYS cleared, even if the network call fails —
+        // otherwise a failed logout leaves the UI authenticated.
+        try {
+          await fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" })
+        } finally {
+          set({ user: null, isAuthenticated: false, isLoading: false })
+        }
       },
 
       hydrate: async () => {
