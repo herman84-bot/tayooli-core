@@ -1278,7 +1278,7 @@ WITH movement_stock AS (
         SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) AS qty
     FROM stock_movements sm
     JOIN warehouse_locations loc ON (loc.id = sm.dest_location_id OR loc.id = sm.source_location_id) AND loc.tenant_id = sm.tenant_id
-    WHERE sm.tenant_id = $1 AND sm.status = 'DONE'
+    WHERE sm.tenant_id = $1 AND sm.status = 'DONE' AND loc.warehouse_id IS NOT NULL
     GROUP BY sm.product_id, loc.warehouse_id, loc.id, loc.code, loc.type
 ),
 allocated_stock AS (

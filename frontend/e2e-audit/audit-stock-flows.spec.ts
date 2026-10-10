@@ -214,10 +214,10 @@ test('e. surat jalan: over-alokasi ditolak, DRAFT tidak bisa dispatch, confirm -
   const [, pend] = await call(A, 'GET', `/wms/stock?warehouse_id=${wh1}`);
   void pend;
   const [sOver, over] = await call(A, 'POST', '/wms/delivery-orders', {
-    warehouse_id: wh1, do_number: `DOX-${TS}`, items: [{ product_id: productId, quantity: String(r1.avail + 1), location_id: rack1 }],
+    warehouse_id: wh1, do_number: `DOX-${TS}`, recipient_name: 'Penerima Audit', items: [{ product_id: productId, quantity: String(r1.avail + 1), location_id: rack1 }],
   });
   const [sZero] = await call(A, 'POST', '/wms/delivery-orders', {
-    warehouse_id: wh1, do_number: `DOZ-${TS}`, items: [{ product_id: productId, quantity: '0', location_id: rack1 }],
+    warehouse_id: wh1, do_number: `DOZ-${TS}`, recipient_name: 'Penerima Audit', items: [{ product_id: productId, quantity: '0', location_id: rack1 }],
   });
   let [s, d] = await call(A, 'POST', '/wms/delivery-orders', {
     warehouse_id: wh1, do_number: `DO-${TS}`, expedition_name: 'Audit Ekspedisi', driver_name: 'Sopir Audit', vehicle_plate: 'B 1234 AUD',
