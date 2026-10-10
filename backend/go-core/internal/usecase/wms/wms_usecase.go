@@ -536,10 +536,33 @@ func (u *Usecase) CreateTransfer(ctx context.Context, tenantID, userID uuid.UUID
 		})
 	}
 
-	if err := u.repo.CreateTransfer(ctx, t, items); err != nil {
+	isCustom := strings.TrimSpace(req.TransferNumber) != ""
+	maxAttempts := 1
+	if !isCustom {
+		maxAttempts = 3
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			t.TransferNumber = fmt.Sprintf("TR-%d-%s", time.Now().UnixNano()/1e6, uuid.NewString()[:4])
+		}
+		err := u.repo.CreateTransfer(ctx, t, items)
+		if err == nil {
+			return t, nil
+		}
+		lastErr = err
+		if errors.Is(err, domain.ErrDuplicateTransferNumber) && !isCustom {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(2 * time.Millisecond):
+			}
+			continue
+		}
 		return nil, err
 	}
-	return t, nil
+	return nil, lastErr
 }
 
 // isTransferApproverRole reports whether role is allowed to approve/reject
@@ -632,6 +655,7 @@ func (u *Usecase) RejectTransfer(ctx context.Context, tenantID, userID uuid.UUID
 	if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, t.FromWarehouseID); err != nil {
 		return nil, err
 	}
+	// Requester withdrawal goes through CancelTransfer (T11), never via reject.
 	if t.RequestedBy == userID {
 		return nil, domain.ErrSelfApprovalForbidden
 	}
@@ -651,9 +675,8 @@ func (u *Usecase) RejectTransfer(ctx context.Context, tenantID, userID uuid.UUID
 	return t, nil
 }
 
-// CancelTransfer discards a DRAFT transfer. Only the requester (or another user
-// with write access to the source warehouse) may cancel, mirroring
-// SubmitTransfer's access rule. Cancelling never moves stock, so no ledger entry
+// CancelTransfer discards a DRAFT transfer, or allows the requester to withdraw
+// their own PENDING_APPROVAL transfer. Cancelling never moves stock, so no ledger entry
 // is written — the transfer stays on record as CANCELLED for audit instead of
 // being hard-deleted.
 func (u *Usecase) CancelTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {
@@ -666,7 +689,12 @@ func (u *Usecase) CancelTransfer(ctx context.Context, tenantID, userID uuid.UUID
 		return nil, err
 	}
 
-	if t.Status != domain.TransferStatusDraft {
+	// T11: Allow cancelling DRAFT, or withdrawing PENDING_APPROVAL by the requester
+	if t.Status == domain.TransferStatusDraft {
+		// ok
+	} else if t.Status == domain.TransferStatusPendingApproval && t.RequestedBy == userID {
+		// ok: requester withdrawing their own pending request
+	} else {
 		return nil, domain.ErrTransferNotDraft
 	}
 
@@ -679,7 +707,7 @@ func (u *Usecase) CancelTransfer(ctx context.Context, tenantID, userID uuid.UUID
 }
 
 // DispatchTransfer validates source stock and dispatches goods to transit location.
-// Moves stock: Source Location -> @TRANSIT.
+// Moves stock: Source Location -> @TRANSIT atomically in a single transaction.
 func (u *Usecase) DispatchTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {
 	t, items, err := u.repo.GetTransferByID(ctx, tenantID, transferID)
 	if err != nil {
@@ -716,42 +744,25 @@ func (u *Usecase) DispatchTransfer(ctx context.Context, tenantID, userID uuid.UU
 		}
 	}
 
-	// 2. Execute atomic stock deduction using advisory lock and movement creation
+	// T7: Transport validation — driver name or vehicle plate required before IN_TRANSIT.
+	if (t.DriverName == nil || strings.TrimSpace(*t.DriverName) == "") &&
+		(t.VehiclePlate == nil || strings.TrimSpace(*t.VehiclePlate) == "") {
+		return nil, fmt.Errorf("%w: data transportasi (supir / nomor kendaraan) wajib diisi sebelum dispatch", domain.ErrInvalidInput)
+	}
+
 	now := time.Now().UTC()
-	for i, item := range items {
-		mov := &domain.StockMovement{
-			ID:               uuid.New(),
-			TenantID:         tenantID,
-			MovementNumber:   fmt.Sprintf("TR-DISP-%s-%d", t.TransferNumber, i+1),
-			ProductID:        item.ProductID,
-			SourceLocationID: *item.SourceLocationID,
-			DestLocationID:   transitLoc.ID,
-			Quantity:         item.RequestedQty,
-			UnitCost:         decimal.Zero,
-			Status:           domain.StockMovementStatusDone,
-			ReferenceType:    domain.StockRefTransfer,
-			ReferenceID:      t.ID,
-			ExecutedBy:       &userID,
-			CreatedAt:        now,
-		}
-		if err := u.repo.DeductLocationStock(ctx, tenantID, *item.SourceLocationID, item.ProductID, item.RequestedQty, mov); err != nil {
-			return nil, err
-		}
+	// T2: Atomic dispatch in a single database transaction
+	if err := u.repo.DispatchTransfer(ctx, tenantID, userID, t.ID, transitLoc.ID, now); err != nil {
+		return nil, err
 	}
 
-	// 3. Update transfer status
-	newStatus := domain.TransferStatusInTransit
-	if err := u.repo.UpdateTransferStatus(ctx, tenantID, t.ID, newStatus, &now, nil, nil, nil); err != nil {
-		return nil, fmt.Errorf("DispatchTransfer: update status: %w", err)
-	}
-
-	t.Status = newStatus
+	t.Status = domain.TransferStatusInTransit
 	t.DispatchedAt = &now
 	return t, nil
 }
 
 // ReceiveTransfer confirms receipt at destination warehouse.
-// Moves stock: @TRANSIT -> Target Location.
+// Moves stock: @TRANSIT -> Target Location atomically in a single transaction.
 func (u *Usecase) ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUID, role string, transferID uuid.UUID) (*domain.StockTransfer, error) {
 	t, items, err := u.repo.GetTransferByID(ctx, tenantID, transferID)
 	if err != nil {
@@ -764,6 +775,13 @@ func (u *Usecase) ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUI
 
 	if t.Status != domain.TransferStatusInTransit && t.Status != domain.TransferStatusDispatched {
 		return nil, domain.ErrInvalidTransferStatus
+	}
+
+	// T6 Segregation of duties: sender != receiver unless admin/owner
+	normalizedRole := strings.ToLower(strings.TrimSpace(role))
+	isAdminOrOwner := normalizedRole == "admin" || normalizedRole == "owner"
+	if !isAdminOrOwner && t.RequestedBy == userID {
+		return nil, fmt.Errorf("%w: pembuat transfer tidak boleh menerima transfer di gudang tujuan", domain.ErrSelfApprovalForbidden)
 	}
 
 	transitLoc, err := u.repo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeTransit)
@@ -787,90 +805,13 @@ func (u *Usecase) ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUI
 		}
 	}
 
-	dispMovs, _ := u.repo.ListMovementsByReference(ctx, tenantID, domain.StockRefTransfer, t.ID)
-	prodDispatches := make(map[uuid.UUID][]domain.StockMovement)
-	for _, dm := range dispMovs {
-		if dm.DestLocationID == transitLoc.ID && dm.BatchID != nil {
-			prodDispatches[dm.ProductID] = append(prodDispatches[dm.ProductID], dm)
-		}
-	}
-
 	now := time.Now().UTC()
-	movIdx := 0
-	for _, item := range items {
-		targetLocID := item.DestLocationID
-		if targetLocID == nil {
-			targetLocID = defaultTargetLocID
-		}
-
-		dispatched := prodDispatches[item.ProductID]
-		if len(dispatched) > 0 {
-			for _, dm := range dispatched {
-				movIdx++
-				mov := &domain.StockMovement{
-					ID:               uuid.New(),
-					TenantID:         tenantID,
-					MovementNumber:   fmt.Sprintf("TR-RECV-%s-%d", t.TransferNumber, movIdx),
-					ProductID:        item.ProductID,
-					BatchID:          dm.BatchID,
-					SourceLocationID: transitLoc.ID,
-					DestLocationID:   *targetLocID,
-					Quantity:         dm.Quantity,
-					UnitCost:         decimal.Zero,
-					Status:           domain.StockMovementStatusDone,
-					ReferenceType:    domain.StockRefTransfer,
-					ReferenceID:      t.ID,
-					ExecutedBy:       &userID,
-					CreatedAt:        now,
-				}
-				if err := u.repo.CreateStockMovement(ctx, mov); err != nil {
-					return nil, fmt.Errorf("ReceiveTransfer: create stock movement: %w", err)
-				}
-			}
-		} else {
-			movIdx++
-			qty := item.SentQty
-			if qty.IsZero() {
-				qty = item.RequestedQty
-			}
-			batch, err := u.repo.GetOrCreateBatch(ctx, &domain.StockBatch{
-				TenantID:    tenantID,
-				ProductID:   item.ProductID,
-				BatchNumber: fmt.Sprintf("TR-%s", t.TransferNumber),
-				Status:      domain.StockBatchStatusReleased,
-				CreatedBy:   &userID,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("ReceiveTransfer: get batch: %w", err)
-			}
-			mov := &domain.StockMovement{
-				ID:               uuid.New(),
-				TenantID:         tenantID,
-				MovementNumber:   fmt.Sprintf("TR-RECV-%s-%d", t.TransferNumber, movIdx),
-				ProductID:        item.ProductID,
-				BatchID:          &batch.ID,
-				SourceLocationID: transitLoc.ID,
-				DestLocationID:   *targetLocID,
-				Quantity:         qty,
-				UnitCost:         decimal.Zero,
-				Status:           domain.StockMovementStatusDone,
-				ReferenceType:    domain.StockRefTransfer,
-				ReferenceID:      t.ID,
-				ExecutedBy:       &userID,
-				CreatedAt:        now,
-			}
-			if err := u.repo.CreateStockMovement(ctx, mov); err != nil {
-				return nil, fmt.Errorf("ReceiveTransfer: create stock movement: %w", err)
-			}
-		}
+	// T4 & T5: Atomic receive in a single transaction using exact dispatched movements
+	if err := u.repo.ReceiveTransfer(ctx, tenantID, userID, t.ID, transitLoc.ID, defaultTargetLocID, now); err != nil {
+		return nil, err
 	}
 
-	newStatus := domain.TransferStatusReceived
-	if err := u.repo.UpdateTransferStatus(ctx, tenantID, t.ID, newStatus, nil, &now, nil, nil); err != nil {
-		return nil, fmt.Errorf("ReceiveTransfer: update status: %w", err)
-	}
-
-	t.Status = newStatus
+	t.Status = domain.TransferStatusReceived
 	t.ReceivedAt = &now
 	return t, nil
 }

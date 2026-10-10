@@ -30,6 +30,7 @@ var (
 	// a DRAFT. Once submitted/approved/dispatched it must go through reject or
 	// receive so the ledger stays consistent.
 	ErrTransferNotDraft = errors.New("only draft stock transfer can be cancelled")
+	ErrDuplicateTransferNumber = errors.New("nomor transfer sudah digunakan")
 	ErrDeliveryOrderNotFound = errors.New("delivery order not found")
 	ErrDeliveryOrderNotDraft = errors.New("only draft delivery order can be cancelled")
 	ErrTransferNotFound      = errors.New("stock transfer not found")
@@ -734,6 +735,8 @@ type WMSRepository interface {
 	CreateTransfer(ctx context.Context, t *StockTransfer, items []StockTransferItem) error
 	GetTransferByID(ctx context.Context, tenantID, id uuid.UUID) (*StockTransfer, []StockTransferItem, error)
 	UpdateTransferStatus(ctx context.Context, tenantID, id uuid.UUID, status TransferStatus, dispatchedAt, receivedAt *time.Time, approvedBy *uuid.UUID, rejectionReason *string) error
+	DispatchTransfer(ctx context.Context, tenantID, userID uuid.UUID, transferID uuid.UUID, transitLocID uuid.UUID, now time.Time) error
+	ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUID, transferID uuid.UUID, transitLocID uuid.UUID, defaultTargetLocID *uuid.UUID, now time.Time) error
 	ListTransfers(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID) ([]StockTransfer, error)
 
 	// Delivery Orders

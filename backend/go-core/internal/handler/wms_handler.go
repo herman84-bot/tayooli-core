@@ -389,7 +389,7 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, domain.ErrTransferNotFound):
 		RespondError(w, r, http.StatusNotFound, "stock transfer not found")
 	case errors.Is(err, domain.ErrTransferNotDraft):
-		RespondError(w, r, http.StatusConflict, "Hanya transfer berstatus DRAFT yang bisa dibatalkan. Transfer yang sudah diajukan atau diproses harus menunggu penolakan atau penerimaan.")
+		RespondError(w, r, http.StatusConflict, "Hanya transfer DRAFT, atau transfer MENUNGGU PERSETUJUAN milik pembuatnya sendiri, yang bisa dibatalkan.")
 	case errors.Is(err, domain.ErrDeliveryOrderNotFound):
 		RespondError(w, r, http.StatusNotFound, "delivery order not found")
 	case errors.Is(err, domain.ErrDeliveryOrderNotDraft):
@@ -415,7 +415,9 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, domain.ErrInsufficientStock):
 		RespondError(w, r, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, domain.ErrInvalidTransferStatus):
-		RespondError(w, r, http.StatusBadRequest, "invalid transfer status transition")
+		RespondError(w, r, http.StatusConflict, "invalid transfer status transition")
+	case errors.Is(err, domain.ErrDuplicateTransferNumber):
+		RespondError(w, r, http.StatusConflict, "nomor transfer sudah digunakan")
 	case errors.Is(err, domain.ErrMarketplaceSelfApproval):
 		RespondError(w, r, http.StatusForbidden, "uploader cannot approve or reject their own marketplace batch")
 	case errors.Is(err, domain.ErrSelfApprovalForbidden):

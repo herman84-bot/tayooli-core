@@ -1030,18 +1030,9 @@ WHERE tenant_id = $1
 
 // DeductLocationStock atomically checks stock and inserts movement under an advisory transaction lock.
 // If mov.BatchID is nil, it allocates stock via FEFO (OCA §1.3) from on-hand batches at locationID.
-func (r *WMSRepo) DeductLocationStock(ctx context.Context, tenantID, locationID, productID uuid.UUID, qty decimal.Decimal, mov *domain.StockMovement) error {
+func (r *WMSRepo) deductLocationStockTx(ctx context.Context, tx *sql.Tx, tenantID, locationID, productID uuid.UUID, qty decimal.Decimal, mov *domain.StockMovement) error {
 	if !qty.IsPositive() {
 		return domain.ErrInvalidInput
-	}
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("WMSRepo.DeductLocationStock: begin tx: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
-		return fmt.Errorf("WMSRepo.DeductLocationStock: set tenant: %w", err)
 	}
 
 	// 1) Advisory transaction lock
@@ -1058,6 +1049,16 @@ func (r *WMSRepo) DeductLocationStock(ctx context.Context, tenantID, locationID,
 	}
 	if domain.LocationType(srcType) == domain.LocationTypeQuarantine {
 		return domain.ErrQuarantineStockBlocked
+	}
+
+	// T7: populate UnitCost from product's cost_price if zero
+	if mov.UnitCost.IsZero() {
+		var costPrice decimal.Decimal
+		err := tx.QueryRowContext(ctx, `SELECT COALESCE(cost_price, 0) FROM products WHERE id = $1 AND tenant_id = $2`, productID, tenantID).Scan(&costPrice)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("WMSRepo.DeductLocationStock: cost price: %w", err)
+		}
+		mov.UnitCost = costPrice
 	}
 
 	// 2) If specific BatchID is requested: check that batch's balance directly
@@ -1088,7 +1089,7 @@ WHERE tenant_id = $1 AND product_id = $3 AND batch_id = $4
 		if mov.Status == "" {
 			mov.Status = domain.StockMovementStatusDone
 		}
-		_, err = tx.ExecContext(ctx, createStockMovementSQL,
+		_, err := tx.ExecContext(ctx, createStockMovementSQL,
 			mov.ID, mov.TenantID, mov.MovementNumber, mov.ProductID,
 			mov.SourceLocationID, mov.DestLocationID, mov.Quantity,
 			mov.UnitCost, mov.Status, mov.ReferenceType, mov.ReferenceID,
@@ -1110,7 +1111,7 @@ WHERE tenant_id = $1 AND product_id = $3 AND batch_id = $4
 		if err := r.WriteAuditTx(ctx, tx, tenantID, mov.ExecutedBy, "stock_movement", mov.ID, "created", auditDetails); err != nil {
 			return fmt.Errorf("WMSRepo.DeductLocationStock: audit: %w", err)
 		}
-		return tx.Commit()
+		return nil
 	}
 
 	// 3) BatchID is nil: query all on-hand batches at this location and allocate via FEFO
@@ -1146,6 +1147,9 @@ ORDER BY b.expiry_date ASC NULLS LAST, b.created_at ASC, b.id ASC`
 		}
 		bal.ExpiryDate = nullTimeToPtr(exp)
 		balances = append(balances, bal)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("WMSRepo.DeductLocationStock: rows: %w", err)
 	}
 	_ = rows.Close()
 
@@ -1193,6 +1197,27 @@ ORDER BY b.expiry_date ASC NULLS LAST, b.created_at ASC, b.id ASC`
 		if err := r.WriteAuditTx(ctx, tx, tenantID, m.ExecutedBy, "stock_movement", m.ID, "created", auditDetails); err != nil {
 			return fmt.Errorf("WMSRepo.DeductLocationStock: audit movement %d: %w", i, err)
 		}
+	}
+
+	return nil
+}
+
+func (r *WMSRepo) DeductLocationStock(ctx context.Context, tenantID, locationID, productID uuid.UUID, qty decimal.Decimal, mov *domain.StockMovement) error {
+	if !qty.IsPositive() {
+		return domain.ErrInvalidInput
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.DeductLocationStock: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return fmt.Errorf("WMSRepo.DeductLocationStock: set tenant: %w", err)
+	}
+
+	if err := r.deductLocationStockTx(ctx, tx, tenantID, locationID, productID, qty, mov); err != nil {
+		return err
 	}
 
 	return tx.Commit()
@@ -1497,6 +1522,9 @@ func (r *WMSRepo) CreateTransfer(ctx context.Context, t *domain.StockTransfer, i
 		ptrToNullTime(t.DispatchedAt), ptrToNullTime(t.ReceivedAt),
 		ptrToNullString(t.Notes), t.CreatedAt, t.UpdatedAt)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrDuplicateTransferNumber
+		}
 		return fmt.Errorf("WMSRepo.CreateTransfer: exec header: %w", err)
 	}
 
@@ -1621,6 +1649,44 @@ func (r *WMSRepo) UpdateTransferStatus(ctx context.Context, tenantID, id uuid.UU
 		return fmt.Errorf("WMSRepo.UpdateTransferStatus: set tenant: %w", err)
 	}
 
+	var currentStatus string
+	err = tx.QueryRowContext(ctx, `SELECT status FROM stock_transfers WHERE id = $1 AND tenant_id = $2 FOR UPDATE`, id, tenantID).Scan(&currentStatus)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrTransferNotFound
+		}
+		return fmt.Errorf("WMSRepo.UpdateTransferStatus: query transfer: %w", err)
+	}
+
+	// T3 state transition guards
+	cur := domain.TransferStatus(currentStatus)
+	switch status {
+	case domain.TransferStatusPendingApproval:
+		if cur != domain.TransferStatusDraft {
+			return domain.ErrInvalidTransferStatus
+		}
+	case domain.TransferStatusApproved:
+		if cur != domain.TransferStatusPendingApproval {
+			return domain.ErrInvalidTransferStatus
+		}
+	case domain.TransferStatusRejected:
+		if cur != domain.TransferStatusPendingApproval {
+			return domain.ErrInvalidTransferStatus
+		}
+	case domain.TransferStatusInTransit:
+		if cur != domain.TransferStatusApproved {
+			return domain.ErrInvalidTransferStatus
+		}
+	case domain.TransferStatusReceived:
+		if cur != domain.TransferStatusInTransit && cur != domain.TransferStatusDispatched {
+			return domain.ErrInvalidTransferStatus
+		}
+	case domain.TransferStatusCancelled:
+		if cur != domain.TransferStatusDraft && cur != domain.TransferStatusPendingApproval {
+			return domain.ErrInvalidTransferStatus
+		}
+	}
+
 	res, err := tx.ExecContext(ctx, updateTransferStatusSQL,
 		id, tenantID, status, ptrToNullTime(dispatchedAt), ptrToNullTime(receivedAt), ptrToNullUUID(approvedBy), ptrToNullString(rejectionReason))
 	if err != nil {
@@ -1632,6 +1698,300 @@ func (r *WMSRepo) UpdateTransferStatus(ctx context.Context, tenantID, id uuid.UU
 	}
 	if rowsAff == 0 {
 		return domain.ErrTransferNotFound
+	}
+
+	return tx.Commit()
+}
+
+func (r *WMSRepo) DispatchTransfer(ctx context.Context, tenantID, userID uuid.UUID, transferID uuid.UUID, transitLocID uuid.UUID, now time.Time) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.DispatchTransfer: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return fmt.Errorf("WMSRepo.DispatchTransfer: set tenant: %w", err)
+	}
+
+	var status, transferNumber string
+	err = tx.QueryRowContext(ctx, `SELECT status, transfer_number FROM stock_transfers WHERE id = $1 AND tenant_id = $2 FOR UPDATE`, transferID, tenantID).Scan(&status, &transferNumber)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrTransferNotFound
+		}
+		return fmt.Errorf("WMSRepo.DispatchTransfer: lock transfer: %w", err)
+	}
+
+	if domain.TransferStatus(status) != domain.TransferStatusApproved {
+		return domain.ErrInvalidTransferStatus
+	}
+
+	rows, err := tx.QueryContext(ctx, `
+SELECT id, product_id, requested_qty, source_location_id, dest_location_id
+FROM stock_transfer_items
+WHERE transfer_id = $1 AND tenant_id = $2
+ORDER BY created_at ASC`, transferID, tenantID)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.DispatchTransfer: query items: %w", err)
+	}
+	defer rows.Close()
+
+	type tItem struct {
+		id        uuid.UUID
+		productID uuid.UUID
+		qty       decimal.Decimal
+		srcLocID  *uuid.UUID
+		dstLocID  *uuid.UUID
+	}
+	var items []tItem
+	for rows.Next() {
+		var it tItem
+		var src, dst sql.NullString
+		if err := rows.Scan(&it.id, &it.productID, &it.qty, &src, &dst); err != nil {
+			return fmt.Errorf("WMSRepo.DispatchTransfer: scan item: %w", err)
+		}
+		it.srcLocID = nullUUIDToPtr(src)
+		it.dstLocID = nullUUIDToPtr(dst)
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("WMSRepo.DispatchTransfer: rows: %w", err)
+	}
+	_ = rows.Close()
+
+	if len(items) == 0 {
+		return domain.ErrInvalidInput
+	}
+
+	for i, item := range items {
+		if item.srcLocID == nil {
+			return domain.ErrSourceLocationRequired
+		}
+		mov := &domain.StockMovement{
+			ID:               uuid.New(),
+			TenantID:         tenantID,
+			MovementNumber:   fmt.Sprintf("TR-DISP-%s-%d", transferNumber, i+1),
+			ProductID:        item.productID,
+			SourceLocationID: *item.srcLocID,
+			DestLocationID:   transitLocID,
+			Quantity:         item.qty,
+			Status:           domain.StockMovementStatusDone,
+			ReferenceType:    domain.StockRefTransfer,
+			ReferenceID:      transferID,
+			ExecutedBy:       &userID,
+			CreatedAt:        now,
+		}
+		if err := r.deductLocationStockTx(ctx, tx, tenantID, *item.srcLocID, item.productID, item.qty, mov); err != nil {
+			return err
+		}
+
+		// T5: Update sent_qty = requested_qty
+		_, err = tx.ExecContext(ctx, `
+UPDATE stock_transfer_items
+SET sent_qty = requested_qty
+WHERE id = $1 AND tenant_id = $2`, item.id, tenantID)
+		if err != nil {
+			return fmt.Errorf("WMSRepo.DispatchTransfer: update sent_qty: %w", err)
+		}
+	}
+
+	res, err := tx.ExecContext(ctx, `
+UPDATE stock_transfers
+SET status = 'IN_TRANSIT', dispatched_at = $3, updated_at = $3
+WHERE id = $1 AND tenant_id = $2 AND status = 'APPROVED'`, transferID, tenantID, now)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.DispatchTransfer: update transfer status: %w", err)
+	}
+	rowsAff, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("WMSRepo.DispatchTransfer: rows affected: %w", err)
+	}
+	if rowsAff == 0 {
+		return domain.ErrInvalidTransferStatus
+	}
+
+	auditDetails, _ := json.Marshal(map[string]any{
+		"transfer_number": transferNumber,
+		"status":          domain.TransferStatusInTransit,
+		"dispatched_at":   now,
+	})
+	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "stock_transfer", transferID, "dispatched", auditDetails); err != nil {
+		return fmt.Errorf("WMSRepo.DispatchTransfer: audit: %w", err)
+	}
+
+	return tx.Commit()
+}
+
+func (r *WMSRepo) ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUID, transferID uuid.UUID, transitLocID uuid.UUID, defaultTargetLocID *uuid.UUID, now time.Time) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: set tenant: %w", err)
+	}
+
+	var status, transferNumber string
+	var toWarehouseID uuid.UUID
+	err = tx.QueryRowContext(ctx, `
+SELECT status, transfer_number, to_warehouse_id
+FROM stock_transfers
+WHERE id = $1 AND tenant_id = $2
+FOR UPDATE`, transferID, tenantID).Scan(&status, &transferNumber, &toWarehouseID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrTransferNotFound
+		}
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: lock transfer: %w", err)
+	}
+
+	curStatus := domain.TransferStatus(status)
+	if curStatus != domain.TransferStatusInTransit && curStatus != domain.TransferStatusDispatched {
+		return domain.ErrInvalidTransferStatus
+	}
+
+	// T4 Idempotency guard: check if receive movements already exist
+	var existingRecvCount int
+	err = tx.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM stock_movements
+WHERE tenant_id = $1 AND reference_type = 'TRANSFER' AND reference_id = $2
+  AND source_location_id = $3 AND status = 'DONE'`, tenantID, transferID, transitLocID).Scan(&existingRecvCount)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: check existing receive movements: %w", err)
+	}
+	if existingRecvCount > 0 {
+		return domain.ErrInvalidTransferStatus
+	}
+
+	// Query dispatched movements: exactly what left for transit
+	dispRows, err := tx.QueryContext(ctx, `
+SELECT id, product_id, batch_id, quantity, unit_cost
+FROM stock_movements
+WHERE tenant_id = $1 AND reference_type = 'TRANSFER' AND reference_id = $2
+  AND dest_location_id = $3 AND status = 'DONE'
+ORDER BY created_at ASC`, tenantID, transferID, transitLocID)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: query dispatched movements: %w", err)
+	}
+	defer dispRows.Close()
+
+	type dispMov struct {
+		id        uuid.UUID
+		productID uuid.UUID
+		batchID   *uuid.UUID
+		quantity  decimal.Decimal
+		unitCost  decimal.Decimal
+	}
+	var dispMovs []dispMov
+	for dispRows.Next() {
+		var dm dispMov
+		var bID sql.NullString
+		if err := dispRows.Scan(&dm.id, &dm.productID, &bID, &dm.quantity, &dm.unitCost); err != nil {
+			return fmt.Errorf("WMSRepo.ReceiveTransfer: scan dispatched movement: %w", err)
+		}
+		dm.batchID = nullUUIDToPtr(bID)
+		dispMovs = append(dispMovs, dm)
+	}
+	if err := dispRows.Err(); err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: dispatched rows: %w", err)
+	}
+	_ = dispRows.Close()
+
+	// T4: Reject if no dispatched movements exist (no fake stock creation!)
+	if len(dispMovs) == 0 {
+		return fmt.Errorf("%w: no dispatched stock found in transit", domain.ErrInvalidTransferStatus)
+	}
+
+	// Query transfer items to map target rack per product
+	itemRows, err := tx.QueryContext(ctx, `
+SELECT id, product_id, dest_location_id
+FROM stock_transfer_items
+WHERE transfer_id = $1 AND tenant_id = $2`, transferID, tenantID)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: query items: %w", err)
+	}
+	defer itemRows.Close()
+
+	destLocMap := make(map[uuid.UUID]uuid.UUID)
+	for itemRows.Next() {
+		var itID, pID uuid.UUID
+		var dst sql.NullString
+		if err := itemRows.Scan(&itID, &pID, &dst); err != nil {
+			return fmt.Errorf("WMSRepo.ReceiveTransfer: scan item: %w", err)
+		}
+		if dst.Valid {
+			parsed, err := uuid.Parse(dst.String)
+			if err != nil {
+				return fmt.Errorf("WMSRepo.ReceiveTransfer: parse dest location: %w", err)
+			}
+			destLocMap[pID] = parsed
+		}
+	}
+	if err := itemRows.Err(); err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: item rows: %w", err)
+	}
+	_ = itemRows.Close()
+
+	// Move stock from @TRANSIT to target location: exactly 1 receive per 1 dispatch!
+	for i, dm := range dispMovs {
+		targetLocID, ok := destLocMap[dm.productID]
+		if !ok {
+			if defaultTargetLocID != nil {
+				targetLocID = *defaultTargetLocID
+			} else {
+				return fmt.Errorf("ReceiveTransfer: no target location for product %s", dm.productID)
+			}
+		}
+
+		movID := uuid.New()
+		movNum := fmt.Sprintf("TR-RECV-%s-%d", transferNumber, i+1)
+		_, err := tx.ExecContext(ctx, createStockMovementSQL,
+			movID, tenantID, movNum, dm.productID,
+			transitLocID, targetLocID, dm.quantity,
+			dm.unitCost, string(domain.StockMovementStatusDone),
+			string(domain.StockRefTransfer), transferID,
+			ptrToNullUUID(&userID), ptrToNullUUID(dm.batchID), now)
+		if err != nil {
+			return fmt.Errorf("WMSRepo.ReceiveTransfer: insert receive movement: %w", err)
+		}
+	}
+
+	// T5: Update received_qty = sent_qty on items
+	_, err = tx.ExecContext(ctx, `
+UPDATE stock_transfer_items
+SET received_qty = sent_qty
+WHERE transfer_id = $1 AND tenant_id = $2`, transferID, tenantID)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: update received_qty: %w", err)
+	}
+
+	// Update transfer status to RECEIVED
+	res, err := tx.ExecContext(ctx, `
+UPDATE stock_transfers
+SET status = 'RECEIVED', received_at = $3, updated_at = $3
+WHERE id = $1 AND tenant_id = $2 AND status IN ('IN_TRANSIT', 'DISPATCHED')`, transferID, tenantID, now)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: update status: %w", err)
+	}
+	rowsAff, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: rows affected: %w", err)
+	}
+	if rowsAff == 0 {
+		return domain.ErrInvalidTransferStatus
+	}
+
+	auditDetails, _ := json.Marshal(map[string]any{
+		"transfer_number": transferNumber,
+		"status":          domain.TransferStatusReceived,
+		"received_at":     now,
+	})
+	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "stock_transfer", transferID, "received", auditDetails); err != nil {
+		return fmt.Errorf("WMSRepo.ReceiveTransfer: audit: %w", err)
 	}
 
 	return tx.Commit()

@@ -398,6 +398,107 @@ func (m *mockWMSRepo) ListTransfers(ctx context.Context, tenantID uuid.UUID, war
 	return list, nil
 }
 
+func (m *mockWMSRepo) DispatchTransfer(ctx context.Context, tenantID, userID uuid.UUID, transferID uuid.UUID, transitLocID uuid.UUID, now time.Time) error {
+	t, ok := m.transfers[transferID]
+	if !ok || t.TenantID != tenantID {
+		return domain.ErrTransferNotFound
+	}
+	if t.Status != domain.TransferStatusApproved {
+		return domain.ErrInvalidTransferStatus
+	}
+	items := m.transferItems[transferID]
+	for i := range items {
+		it := &items[i]
+		if it.SourceLocationID == nil {
+			return domain.ErrSourceLocationRequired
+		}
+		key := fmt.Sprintf("%s:%s:%s", tenantID, *it.SourceLocationID, it.ProductID)
+		current := m.stockLevels[key]
+		if current.LessThan(it.RequestedQty) {
+			return domain.ErrInsufficientStock
+		}
+		m.stockLevels[key] = current.Sub(it.RequestedQty)
+		transitKey := fmt.Sprintf("%s:%s:%s", tenantID, transitLocID, it.ProductID)
+		m.stockLevels[transitKey] = m.stockLevels[transitKey].Add(it.RequestedQty)
+
+		it.SentQty = it.RequestedQty
+		m.stockMovements = append(m.stockMovements, domain.StockMovement{
+			ID:               uuid.New(),
+			TenantID:         tenantID,
+			MovementNumber:   fmt.Sprintf("TR-DISP-%s-%d", t.TransferNumber, i+1),
+			ProductID:        it.ProductID,
+			SourceLocationID: *it.SourceLocationID,
+			DestLocationID:   transitLocID,
+			Quantity:         it.RequestedQty,
+			Status:           domain.StockMovementStatusDone,
+			ReferenceType:    domain.StockRefTransfer,
+			ReferenceID:      transferID,
+			ExecutedBy:       &userID,
+			CreatedAt:        now,
+		})
+	}
+	m.transferItems[transferID] = items
+	t.Status = domain.TransferStatusInTransit
+	t.DispatchedAt = &now
+	return nil
+}
+
+func (m *mockWMSRepo) ReceiveTransfer(ctx context.Context, tenantID, userID uuid.UUID, transferID uuid.UUID, transitLocID uuid.UUID, defaultTargetLocID *uuid.UUID, now time.Time) error {
+	t, ok := m.transfers[transferID]
+	if !ok || t.TenantID != tenantID {
+		return domain.ErrTransferNotFound
+	}
+	if t.Status != domain.TransferStatusInTransit && t.Status != domain.TransferStatusDispatched {
+		return domain.ErrInvalidTransferStatus
+	}
+
+	var dispMovs []domain.StockMovement
+	for _, sm := range m.stockMovements {
+		if sm.TenantID == tenantID && sm.ReferenceType == domain.StockRefTransfer && sm.ReferenceID == transferID && sm.DestLocationID == transitLocID {
+			dispMovs = append(dispMovs, sm)
+		}
+	}
+	if len(dispMovs) == 0 {
+		return domain.ErrInvalidTransferStatus
+	}
+
+	items := m.transferItems[transferID]
+	for i, dm := range dispMovs {
+		var targetLocID uuid.UUID
+		if len(items) > 0 && items[0].DestLocationID != nil {
+			targetLocID = *items[0].DestLocationID
+		} else if defaultTargetLocID != nil {
+			targetLocID = *defaultTargetLocID
+		}
+		transitKey := fmt.Sprintf("%s:%s:%s", tenantID, transitLocID, dm.ProductID)
+		m.stockLevels[transitKey] = m.stockLevels[transitKey].Sub(dm.Quantity)
+		targetKey := fmt.Sprintf("%s:%s:%s", tenantID, targetLocID, dm.ProductID)
+		m.stockLevels[targetKey] = m.stockLevels[targetKey].Add(dm.Quantity)
+
+		m.stockMovements = append(m.stockMovements, domain.StockMovement{
+			ID:               uuid.New(),
+			TenantID:         tenantID,
+			MovementNumber:   fmt.Sprintf("TR-RECV-%s-%d", t.TransferNumber, i+1),
+			ProductID:        dm.ProductID,
+			SourceLocationID: transitLocID,
+			DestLocationID:   targetLocID,
+			Quantity:         dm.Quantity,
+			Status:           domain.StockMovementStatusDone,
+			ReferenceType:    domain.StockRefTransfer,
+			ReferenceID:      transferID,
+			ExecutedBy:       &userID,
+			CreatedAt:        now,
+		})
+	}
+	for i := range items {
+		items[i].ReceivedQty = items[i].SentQty
+	}
+	m.transferItems[transferID] = items
+	t.Status = domain.TransferStatusReceived
+	t.ReceivedAt = &now
+	return nil
+}
+
 func (m *mockWMSRepo) CreateDeliveryOrder(ctx context.Context, do *domain.DeliveryOrder, items []domain.DeliveryOrderItem) error {
 	m.deliveryOrders[do.ID] = do
 	m.doItems[do.ID] = items
@@ -986,6 +1087,7 @@ func TestStockTransferLifecycleAndNegativeStockRejection(t *testing.T) {
 			FromWarehouseID: whSource,
 			ToWarehouseID:   whTarget,
 			TransferNumber:  "TR-TEST-001",
+			VehiclePlate:    ptr("B 1234 TR"),
 			Items: []uc.CreateTransferItemRequest{
 				{
 					ProductID:        productID,
@@ -1015,6 +1117,7 @@ func TestStockTransferLifecycleAndNegativeStockRejection(t *testing.T) {
 			FromWarehouseID: whSource,
 			ToWarehouseID:   whTarget,
 			TransferNumber:  "TR-TEST-002",
+			VehiclePlate:    ptr("B 1234 TR"),
 			Items: []uc.CreateTransferItemRequest{
 				{
 					ProductID:        productID,
@@ -1149,6 +1252,7 @@ func TestStockTransferLifecycleAndNegativeStockRejection(t *testing.T) {
 			FromWarehouseID: whSource,
 			ToWarehouseID:   whTarget,
 			TransferNumber:  "TR-SPOOF-03",
+			VehiclePlate:    ptr("B 1234 TR"),
 			Items: []uc.CreateTransferItemRequest{
 				{
 					ProductID:        productID,
@@ -1178,6 +1282,7 @@ func TestStockTransferLifecycleAndNegativeStockRejection(t *testing.T) {
 			FromWarehouseID: whSource,
 			ToWarehouseID:   whTarget,
 			TransferNumber:  "TR-AUD-01",
+			VehiclePlate:    ptr("B 1234 TR"),
 			Items: []uc.CreateTransferItemRequest{
 				{
 					ProductID:        productID,
@@ -1356,15 +1461,26 @@ func TestStockTransferApprovalFlow(t *testing.T) {
 		assert.Equal(t, "TR-CANCEL-001", cancelled.TransferNumber)
 	})
 
-	t.Run("CancelTransfer: guardrail rejects anything past DRAFT", func(t *testing.T) {
+	t.Run("CancelTransfer: requester can cancel DRAFT or withdraw PENDING_APPROVAL transfer", func(t *testing.T) {
 		tr := newDraftTransfer(t, "TR-CANCEL-002")
 		_, err := usecase.SubmitTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
 		require.NoError(t, err)
 
-		_, err = usecase.CancelTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
-		assert.ErrorIs(t, err, domain.ErrTransferNotDraft, "PENDING_APPROVAL transfer must not be cancellable")
+		// Requester withdrawing their own PENDING_APPROVAL transfer succeeds
+		withdrawn, err := usecase.CancelTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.TransferStatusCancelled, withdrawn.Status)
 
-		// Cancelling twice must also fail (already CANCELLED, not DRAFT).
+		// Cancelling an APPROVED transfer is rejected
+		approvedTr := newDraftTransfer(t, "TR-CANCEL-002B")
+		_, err = usecase.SubmitTransfer(ctx, tenantID, requesterID, "warehouse", approvedTr.ID)
+		require.NoError(t, err)
+		_, err = usecase.ApproveTransfer(ctx, tenantID, approverID, "admin", approvedTr.ID)
+		require.NoError(t, err)
+		_, err = usecase.CancelTransfer(ctx, tenantID, requesterID, "warehouse", approvedTr.ID)
+		assert.ErrorIs(t, err, domain.ErrTransferNotDraft, "APPROVED transfer must not be cancellable")
+
+		// Cancelling twice must also fail (already CANCELLED).
 		draft := newDraftTransfer(t, "TR-CANCEL-003")
 		_, err = usecase.CancelTransfer(ctx, tenantID, requesterID, "warehouse", draft.ID)
 		require.NoError(t, err)
@@ -1381,6 +1497,41 @@ func TestStockTransferApprovalFlow(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrInvalidTransferStatus)
 		_, err = usecase.DispatchTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
 		assert.ErrorIs(t, err, domain.ErrInvalidTransferStatus)
+	})
+
+	t.Run("T6 Segregation of duties: staff requester cannot receive at destination warehouse", func(t *testing.T) {
+		tr := newDraftTransfer(t, "TR-T6-SAME")
+		tr.VehiclePlate = ptr("B 9999 AA")
+		_, err := usecase.SubmitTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		require.NoError(t, err)
+		_, err = usecase.ApproveTransfer(ctx, tenantID, approverID, "admin", tr.ID)
+		require.NoError(t, err)
+
+		// Top up stock
+		repo.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, locSourceID, productID)] = decimal.NewFromInt(10)
+		_, err = usecase.DispatchTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		require.NoError(t, err)
+
+		// Requester with warehouse role attempting to receive -> ErrSelfApprovalForbidden
+		repo.userWarehouses[fmt.Sprintf("%s:%s", tenantID, requesterID)] = []uuid.UUID{whSource, whTarget}
+		_, err = usecase.ReceiveTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		assert.ErrorIs(t, err, domain.ErrSelfApprovalForbidden, "warehouse staff who requested transfer cannot receive at dest warehouse")
+
+		// Admin is exempt
+		_, err = usecase.ReceiveTransfer(ctx, tenantID, approverID, "admin", tr.ID)
+		require.NoError(t, err, "admin should be allowed to receive")
+	})
+
+	t.Run("T7 Transport validation: dispatch requires vehicle plate, driver name, or notes", func(t *testing.T) {
+		tr := newDraftTransfer(t, "TR-T7-TRANSPORT")
+		// no vehicle, driver, or notes
+		_, err := usecase.SubmitTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		require.NoError(t, err)
+		_, err = usecase.ApproveTransfer(ctx, tenantID, approverID, "admin", tr.ID)
+		require.NoError(t, err)
+
+		_, err = usecase.DispatchTransfer(ctx, tenantID, requesterID, "warehouse", tr.ID)
+		assert.ErrorIs(t, err, domain.ErrInvalidInput, "dispatching without transport details must be rejected")
 	})
 }
 
@@ -3216,7 +3367,7 @@ func TestTransferLocationResilience(t *testing.T) {
 
 	t.Run("receive into warehouse with zero racks auto-creates DEFAULT location", func(t *testing.T) {
 		tr, err := usecase.CreateTransfer(ctx, tenantID, adminID, "admin", uc.CreateTransferRequest{
-			FromWarehouseID: whSource, ToWarehouseID: whTarget, TransferNumber: "TR-NO-RACK",
+			FromWarehouseID: whSource, ToWarehouseID: whTarget, TransferNumber: "TR-NO-RACK", VehiclePlate: ptr("B 1 TR"),
 			Items: []uc.CreateTransferItemRequest{{ProductID: productID, RequestedQty: decimal.NewFromInt(4), SourceLocationID: &locSourceID}},
 		})
 		require.NoError(t, err)

@@ -1006,7 +1006,7 @@ func TestWMSHandlerEndpoints(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, wDO.Code)
 	})
 
-	t.Run("Security: Dispatching PENDING_APPROVAL transfer is rejected with 400", func(t *testing.T) {
+	t.Run("Security: Dispatching PENDING_APPROVAL transfer is rejected with 409 Conflict", func(t *testing.T) {
 		mock := &mockWMSUsecase{
 			dispatchTransferFn: func(ctx context.Context, tid, uid uuid.UUID, r string, transferID uuid.UUID) (*domain.StockTransfer, error) {
 				return nil, domain.ErrInvalidTransferStatus
@@ -1015,6 +1015,37 @@ func TestWMSHandlerEndpoints(t *testing.T) {
 		router := setupWMSTestRouter(mock)
 
 		req := withWMSAuth(httptest.NewRequest(http.MethodPost, "/api/v1/wms/transfers/"+uuid.New().String()+"/dispatch", nil), tenantID, userID, role)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusConflict, w.Code)
+	})
+
+	t.Run("CreateTransfer: Duplicate transfer number returns 409 Conflict", func(t *testing.T) {
+		mock := &mockWMSUsecase{
+			createTransferFn: func(ctx context.Context, tid, uid uuid.UUID, r string, req uc.CreateTransferRequest) (*domain.StockTransfer, error) {
+				return nil, domain.ErrDuplicateTransferNumber
+			},
+		}
+		router := setupWMSTestRouter(mock)
+
+		body := `{"from_warehouse_id":"` + uuid.New().String() + `","to_warehouse_id":"` + uuid.New().String() + `","transfer_number":"TR-DUP","items":[{"product_id":"` + uuid.New().String() + `","requested_qty":1}]}`
+		req := withWMSAuth(httptest.NewRequest(http.MethodPost, "/api/v1/wms/transfers", strings.NewReader(body)), tenantID, userID, role)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusConflict, w.Code)
+	})
+
+	t.Run("CreateTransfer: Self-transfer returns 400 Bad Request", func(t *testing.T) {
+		mock := &mockWMSUsecase{
+			createTransferFn: func(ctx context.Context, tid, uid uuid.UUID, r string, req uc.CreateTransferRequest) (*domain.StockTransfer, error) {
+				return nil, domain.ErrInvalidInput
+			},
+		}
+		router := setupWMSTestRouter(mock)
+
+		sameWH := uuid.New().String()
+		body := `{"from_warehouse_id":"` + sameWH + `","to_warehouse_id":"` + sameWH + `","transfer_number":"TR-SELF","items":[{"product_id":"` + uuid.New().String() + `","requested_qty":1}]}`
+		req := withWMSAuth(httptest.NewRequest(http.MethodPost, "/api/v1/wms/transfers", strings.NewReader(body)), tenantID, userID, role)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
