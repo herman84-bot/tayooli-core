@@ -3,7 +3,8 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { renderHook } from '@testing-library/react'
 import BarcodeScannerPage from '@/app/(app)/wms/scanner/page'
-import { useManualRefresh } from '@/hooks/useManualRefresh'
+import { useManualRefresh, MIN_REFRESH_FEEDBACK_MS, REFRESH_DONE_VISIBLE_MS } from '@/hooks/useManualRefresh'
+import { RefreshButton } from '@/components/ui/RefreshButton'
 
 const mockConfirm = jest.fn()
 const mockResolve = jest.fn()
@@ -164,27 +165,58 @@ describe('Scanner no longer fabricates products', () => {
 })
 
 describe('useManualRefresh', () => {
-  test('tracks in-flight state and ignores double click', async () => {
-    let resolveFn: (v: unknown) => void = () => {}
-    const fn = jest.fn(() => new Promise((r) => (resolveFn = r)))
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => jest.useRealTimers())
+
+  test('spinner stays visible at least MIN_REFRESH_FEEDBACK_MS even when refetch is instant', async () => {
+    const fn = jest.fn().mockResolvedValue({ isError: false })
     const { result } = renderHook(() => useManualRefresh([fn]))
+    let p: Promise<void> = Promise.resolve()
     act(() => {
-      void result.current.refresh()
-      void result.current.refresh()
+      p = result.current.refresh()
+      void result.current.refresh() // double click ignored
     })
-    expect(result.current.refreshing).toBe(true)
     expect(fn).toHaveBeenCalledTimes(1)
-    await act(async () => resolveFn({ isError: false }))
-    expect(result.current.refreshing).toBe(false)
+    expect(result.current.status).toBe('refreshing')
+    await act(async () => {
+      jest.advanceTimersByTime(MIN_REFRESH_FEEDBACK_MS - 50)
+    })
+    expect(result.current.status).toBe('refreshing')
+    await act(async () => {
+      jest.advanceTimersByTime(60)
+      await p
+    })
+    expect(result.current.status).toBe('done')
     expect(result.current.lastRefreshedAt).not.toBeNull()
+    await act(async () => {
+      jest.advanceTimersByTime(REFRESH_DONE_VISIBLE_MS)
+    })
+    expect(result.current.status).toBe('idle')
   })
 
   test('reports error when refetch result isError', async () => {
     const fn = jest.fn().mockResolvedValue({ isError: true, error: new Error('Network down') })
     const { result } = renderHook(() => useManualRefresh([fn]))
-    await act(async () => {
-      await result.current.refresh()
+    let p: Promise<void> = Promise.resolve()
+    act(() => {
+      p = result.current.refresh()
     })
+    await act(async () => {
+      jest.advanceTimersByTime(MIN_REFRESH_FEEDBACK_MS)
+      await p
+    })
+    expect(result.current.status).toBe('error')
     expect(result.current.refreshError).toBe('Network down')
+  })
+
+  test('RefreshButton renders spinning icon, then success label', () => {
+    const { rerender } = render(<RefreshButton status="refreshing" onClick={() => {}} showLabel />)
+    const btn = screen.getByRole('button')
+    expect(btn).toBeDisabled()
+    expect(btn.querySelector('svg')).toHaveClass('animate-spin')
+    expect(btn).toHaveTextContent('Menyegarkan...')
+    rerender(<RefreshButton status="done" onClick={() => {}} showLabel />)
+    expect(screen.getByRole('button')).toHaveTextContent('Diperbarui')
+    expect(screen.getByRole('button')).not.toBeDisabled()
   })
 })

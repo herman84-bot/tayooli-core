@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react"
 import Link from "next/link"
 import { useManualRefresh } from "@/hooks/useManualRefresh"
+import { RefreshButton } from "@/components/ui/RefreshButton"
 import {
   Warehouse as WarehouseIcon,
   Plus,
@@ -60,7 +61,7 @@ export default function WMSDashboardPage() {
     isLoading: loadingStock,
     refetch: refetchStock,
   } = useWMSStock(activeWarehouseFilter ?? undefined)
-  const { refresh, refreshing } = useManualRefresh([refetchWarehouses, refetchLocations, refetchMovements, refetchStock])
+  const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetchWarehouses, refetchLocations, refetchMovements, refetchStock])
 
   // Modals state
   const [showCreateWhModal, setShowCreateWhModal] = useState(false)
@@ -309,15 +310,14 @@ export default function WMSDashboardPage() {
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Pilih Gudang Aktif
               </span>
-              <button
+              <RefreshButton
+                status={refreshStatus}
+                error={refreshError}
                 onClick={() => void refresh()}
-                disabled={refreshing}
-                aria-busy={refreshing}
-                className="text-xs text-[#2563EB] hover:underline flex items-center gap-1 min-h-[32px]"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-                {refreshing ? "Menyegarkan..." : "Segarkan"}
-              </button>
+                showLabel
+                iconClassName="w-3.5 h-3.5"
+                className="text-xs text-[#2563EB] hover:bg-blue-50 rounded-md px-2 border border-transparent flex items-center gap-1 min-h-[36px]"
+              />
             </div>
 
             <div className="mt-3">

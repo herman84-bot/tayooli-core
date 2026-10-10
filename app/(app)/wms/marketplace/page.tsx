@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useManualRefresh } from "@/hooks/useManualRefresh"
+import { RefreshButton } from "@/components/ui/RefreshButton"
 import {
   UploadCloud,
   CheckCircle2,
@@ -175,7 +176,7 @@ export default function MarketplacePage() {
     isLoading: loadingMappings,
     refetch: refetchMappings,
   } = useMarketplaceSKUMappings()
-  const { refresh, refreshing } = useManualRefresh([refetchBatches, refetchOrders, refetchMappings])
+  const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetchBatches, refetchOrders, refetchMappings])
 
   // Mutations
   const importOrdersMutation = useImportMarketplaceOrders()
@@ -657,16 +658,14 @@ export default function MarketplacePage() {
 
             {/* Quick Action Buttons */}
             <div className="flex items-center gap-2">
-              <button
+              <RefreshButton
+                status={refreshStatus}
+                error={refreshError}
                 onClick={() => void refresh()}
-                disabled={refreshing}
-                aria-busy={refreshing}
-                className="inline-flex items-center justify-center min-h-[48px] px-3.5 py-2 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-                title="Segarkan data"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-                {refreshing ? "Menyegarkan..." : "Segarkan"}
-              </button>
+                showLabel
+                iconClassName="w-4 h-4"
+                className="inline-flex items-center justify-center gap-2 min-h-[48px] px-3.5 py-2 rounded-lg text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50"
+              />
 
               <button
                 onClick={() => openCreateMapping()}
