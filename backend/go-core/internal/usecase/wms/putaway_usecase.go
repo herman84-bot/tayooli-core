@@ -229,7 +229,7 @@ func (u *Usecase) ConfirmPutaway(ctx context.Context, tenantID, userID uuid.UUID
 // ReleaseStockReceipt promotes all ON_HOLD lots of a posted receipt to RELEASED.
 // Only owner, admin, or regional_manager can approve release (PDF-06).
 func (u *Usecase) ReleaseStockReceipt(ctx context.Context, tenantID, userID uuid.UUID, role string, receiptID uuid.UUID) (*domain.StockReceipt, error) {
-	if role != "owner" && role != "admin" && role != "regional_manager" {
+	if role != "owner" && role != "admin" && role != "regional_manager" && role != "warehouse_manager" {
 		return nil, domain.ErrUnauthorized
 	}
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -27,6 +27,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/brand/Logo'
+import { canAccessRoute, ROLE_LABELS } from '@/lib/rbac'
 
 interface NavItem {
   href: string
@@ -118,6 +119,15 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
 
   const userInitial = user?.email?.charAt(0).toUpperCase() ?? '?'
 
+  // RBAC: tampilkan hanya menu yang boleh diakses role saat ini.
+  const visibleGroups = useMemo(
+    () =>
+      navGroups
+        .map((g) => ({ ...g, items: g.items.filter((it) => canAccessRoute(user?.role, it.href)) }))
+        .filter((g) => g.items.length > 0),
+    [user?.role],
+  )
+
   /* ── Mobile drawer ────────────────────────────────────────────────── */
   if (isMobile) {
     return (
@@ -161,7 +171,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
 
           {/* Nav */}
           <nav className="flex-1 px-2.5 py-3 overflow-y-auto">
-            {navGroups.map((group, gi) => (
+            {visibleGroups.map((group, gi) => (
               <div key={group.label} className={gi > 0 ? 'mt-4' : undefined}>
                 <p className="px-2.5 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
                   {group.label}
@@ -199,6 +209,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-medium text-foreground truncate">{user.email}</div>
+                  {user.role && <div className="text-[10px] text-muted-foreground truncate">{ROLE_LABELS[user.role] ?? user.role}</div>}
                 </div>
                 <button
                   onClick={() => {
@@ -267,7 +278,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 overflow-y-auto overflow-x-hidden" data-tutorial="sidebar">
-        {navGroups.map((group, gi) => (
+        {visibleGroups.map((group, gi) => (
           <div key={group.label} className={gi > 0 ? 'mt-4' : undefined}>
             {!collapsed && (
               <p className="px-2.5 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
@@ -351,6 +362,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-medium text-foreground truncate">{user.email}</div>
+                  {user.role && <div className="text-[10px] text-muted-foreground truncate">{ROLE_LABELS[user.role] ?? user.role}</div>}
               </div>
               <button
                 onClick={() => {

@@ -12,6 +12,19 @@ import (
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/domain"
 )
 
+// AllowedInviteRoles lists valid roles that can be invited or assigned.
+var AllowedInviteRoles = map[string]bool{
+	domain.RoleAdmin:            true,
+	domain.RoleWarehouseManager: true,
+	"regional_manager":          true, // alias backward compatibility
+	domain.RoleWarehouse:        true,
+	domain.RoleCashier:          true,
+	domain.RoleAuditor:          true,
+	domain.RoleMember:           true,
+	"accountant":                true, // backward compatibility
+	"approver":                  true, // backward compatibility
+}
+
 // UserReader provides the user operations needed by team management.
 type UserReader interface {
 	ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]domain.User, error)
@@ -20,6 +33,9 @@ type UserReader interface {
 	CreateUser(ctx context.Context, user *domain.User) error
 	UpdateUserRole(ctx context.Context, userID, tenantID uuid.UUID, role string) error
 	DeleteUser(ctx context.Context, userID, tenantID uuid.UUID) error
+	CreateUserWithWarehouses(ctx context.Context, user *domain.User, warehouseIDs []uuid.UUID) error
+	UpdateUserRoleAndWarehouses(ctx context.Context, userID, tenantID uuid.UUID, role string, warehouseIDs []uuid.UUID) error
+	GetUserWarehouses(ctx context.Context, tenantID, userID uuid.UUID) ([]domain.AssignedWarehouse, error)
 }
 
 // Usecase handles team management operations.
@@ -37,10 +53,15 @@ func (u *Usecase) ListMembers(ctx context.Context, tenantID uuid.UUID) ([]domain
 }
 
 // InviteMember adds a new team member to the tenant.
-func (u *Usecase) InviteMember(ctx context.Context, tenantID uuid.UUID, email, role string, requesterID uuid.UUID) (*domain.User, error) {
-	allowedRoles := map[string]bool{"admin": true, "member": true, "accountant": true, "approver": true}
-	if !allowedRoles[role] {
+func (u *Usecase) InviteMember(ctx context.Context, tenantID uuid.UUID, email, role string, warehouseIDs []uuid.UUID, requesterID uuid.UUID) (*domain.User, error) {
+	normRole := strings.ToLower(strings.TrimSpace(role))
+	if !AllowedInviteRoles[normRole] {
 		return nil, fmt.Errorf("invalid role: %s", role)
+	}
+
+	// Invariant: Staf gudang dan Kepala gudang wajib memiliki minimal 1 penugasan gudang
+	if needsWarehouse(normRole) && len(warehouseIDs) == 0 {
+		return nil, fmt.Errorf("staf atau kepala gudang wajib ditugaskan ke minimal 1 gudang")
 	}
 
 	email = strings.TrimSpace(strings.ToLower(email))
@@ -61,29 +82,47 @@ func (u *Usecase) InviteMember(ctx context.Context, tenantID uuid.UUID, email, r
 		return nil, fmt.Errorf("generate password hash: %w", err)
 	}
 
+	now := time.Now().UTC()
 	newUser := &domain.User{
-		ID:           uuid.New(),
-		TenantID:     tenantID,
-		Email:        email,
-		FullName:     strings.Split(email, "@")[0],
-		PasswordHash: string(hash),
-		Role:         role,
-		CreatedAt:    time.Now().UTC(),
-		UpdatedAt:    time.Now().UTC(),
+		ID:                 uuid.New(),
+		TenantID:           tenantID,
+		Email:              email,
+		FullName:           strings.Split(email, "@")[0],
+		PasswordHash:       string(hash),
+		Role:               normRole,
+		AssignedWarehouses: []domain.AssignedWarehouse{},
+		CreatedAt:          now,
+		UpdatedAt:          now,
 	}
 
-	if err := u.repo.CreateUser(ctx, newUser); err != nil {
+	// Hanya role gudang yang menyimpan penugasan gudang.
+	if !needsWarehouse(normRole) {
+		warehouseIDs = nil
+	}
+	if err := u.repo.CreateUserWithWarehouses(ctx, newUser, warehouseIDs); err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
+	}
+
+	if len(warehouseIDs) > 0 {
+		whs, err := u.repo.GetUserWarehouses(ctx, tenantID, newUser.ID)
+		if err == nil {
+			newUser.AssignedWarehouses = whs
+		}
 	}
 
 	return newUser, nil
 }
 
-// ChangeRole updates a user's role. Validates the role value and prevents changing the owner's role.
-func (u *Usecase) ChangeRole(ctx context.Context, tenantID, userID uuid.UUID, newRole string, requesterID uuid.UUID) error {
-	allowedRoles := map[string]bool{"admin": true, "member": true, "accountant": true, "approver": true}
-	if !allowedRoles[newRole] {
+// ChangeRole updates a user's role and assigned warehouses. Validates the role value and prevents changing the owner's role.
+func (u *Usecase) ChangeRole(ctx context.Context, tenantID, userID uuid.UUID, newRole string, warehouseIDs []uuid.UUID, requesterID uuid.UUID) error {
+	normRole := strings.ToLower(strings.TrimSpace(newRole))
+	if !AllowedInviteRoles[normRole] {
 		return fmt.Errorf("invalid role: %s", newRole)
+	}
+
+	// Invariant: Staf gudang dan Kepala gudang wajib memiliki minimal 1 penugasan gudang
+	if needsWarehouse(normRole) && len(warehouseIDs) == 0 {
+		return fmt.Errorf("staf atau kepala gudang wajib ditugaskan ke minimal 1 gudang")
 	}
 
 	// Cannot change your own role
@@ -96,11 +135,14 @@ func (u *Usecase) ChangeRole(ctx context.Context, tenantID, userID uuid.UUID, ne
 	if err != nil {
 		return err
 	}
-	if target.Role == "owner" {
+	if target.Role == domain.RoleOwner {
 		return fmt.Errorf("cannot change the owner's role")
 	}
 
-	return u.repo.UpdateUserRole(ctx, userID, tenantID, newRole)
+	if !needsWarehouse(normRole) {
+		warehouseIDs = nil // role non-gudang: cabut semua penugasan gudang
+	}
+	return u.repo.UpdateUserRoleAndWarehouses(ctx, userID, tenantID, normRole, warehouseIDs)
 }
 
 // RemoveMember deletes a user from the tenant. Prevents removing the owner.
@@ -114,9 +156,14 @@ func (u *Usecase) RemoveMember(ctx context.Context, tenantID, userID uuid.UUID, 
 	if err != nil {
 		return err
 	}
-	if target.Role == "owner" {
+	if target.Role == domain.RoleOwner {
 		return fmt.Errorf("cannot remove the owner")
 	}
 
 	return u.repo.DeleteUser(ctx, userID, tenantID)
+}
+
+// needsWarehouse reports whether a role is scoped to assigned warehouses.
+func needsWarehouse(role string) bool {
+	return role == domain.RoleWarehouse || role == domain.RoleWarehouseManager || role == "regional_manager"
 }

@@ -84,7 +84,7 @@ func (u *Usecase) ValidateWarehouseWriteAccess(ctx context.Context, tenantID, us
 	if normalizedRole == "auditor" {
 		return domain.ErrForbidden
 	}
-	if normalizedRole != "admin" && normalizedRole != "owner" && normalizedRole != "warehouse" && normalizedRole != "regional_manager" {
+	if normalizedRole != "admin" && normalizedRole != "owner" && normalizedRole != "warehouse" && normalizedRole != "regional_manager" && normalizedRole != "warehouse_manager" {
 		return domain.ErrForbidden
 	}
 	return u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, warehouseID)
@@ -571,7 +571,7 @@ func (u *Usecase) CreateTransfer(ctx context.Context, tenantID, userID uuid.UUID
 // transfer cannot approve their own or anyone else's transfer.
 func isTransferApproverRole(role string) bool {
 	normalizedRole := strings.ToLower(strings.TrimSpace(role))
-	return normalizedRole == "admin" || normalizedRole == "owner" || normalizedRole == "regional_manager"
+	return normalizedRole == "admin" || normalizedRole == "owner" || normalizedRole == "regional_manager" || normalizedRole == "warehouse_manager"
 }
 
 // SubmitTransfer moves a DRAFT transfer into PENDING_APPROVAL, signaling that
@@ -1377,7 +1377,7 @@ func (u *Usecase) CompleteStockOpname(ctx context.Context, tenantID, userID uuid
 	}
 
 	// Approver check
-	isApprover := role == "admin" || role == "owner" || role == "regional_manager"
+	isApprover := role == "admin" || role == "owner" || role == "regional_manager" || role == "warehouse_manager"
 	if !isApprover {
 		if op.Status == domain.StockOpnameStatusDraft || op.Status == domain.StockOpnameStatusInProgress {
 			// Transition to PENDING_APPROVAL without writing ledger movements
@@ -2035,7 +2035,7 @@ func (u *Usecase) ResolveSKUMapping(ctx context.Context, tenantID, userID uuid.U
 	if normalizedRole == "auditor" {
 		return nil, domain.ErrForbidden
 	}
-	if normalizedRole != "admin" && normalizedRole != "owner" && normalizedRole != "warehouse" && normalizedRole != "regional_manager" {
+	if normalizedRole != "admin" && normalizedRole != "owner" && normalizedRole != "warehouse" && normalizedRole != "regional_manager" && normalizedRole != "warehouse_manager" {
 		return nil, domain.ErrForbidden
 	}
 

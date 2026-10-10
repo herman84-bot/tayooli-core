@@ -35,6 +35,24 @@ type TenantProfile struct {
 	Division string    `json:"division"`
 }
 
+// Enterprise RBAC Roles
+const (
+	RoleOwner            = "owner"
+	RoleAdmin            = "admin"
+	RoleWarehouseManager = "warehouse_manager"
+	RoleWarehouse        = "warehouse"
+	RoleCashier          = "cashier"
+	RoleAuditor          = "auditor"
+	RoleMember           = "member"
+)
+
+// AssignedWarehouse represents a summary of a warehouse assigned to a user.
+type AssignedWarehouse struct {
+	ID   uuid.UUID `json:"id"`
+	Code string    `json:"code"`
+	Name string    `json:"name"`
+}
+
 type User struct {
 	ID                      uuid.UUID
 	TenantID                uuid.UUID
@@ -42,6 +60,7 @@ type User struct {
 	FullName                string
 	PasswordHash            string
 	Role                    string
+	AssignedWarehouses      []AssignedWarehouse `json:"assigned_warehouses,omitempty"`
 	EmailVerifiedAt         *time.Time
 	VerificationToken       *string
 	VerificationExpiresAt   *time.Time

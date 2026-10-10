@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -304,9 +305,47 @@ func (r *UserRepo) ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]doma
 		if err := rows.Scan(&u.ID, &u.TenantID, &u.Email, &u.FullName, &u.Role, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
+		u.AssignedWarehouses = []domain.AssignedWarehouse{}
 		users = append(users, u)
 	}
-	return users, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Fetch assigned warehouses for all users in this tenant
+	const whQuery = `
+		SELECT uw.user_id, w.id, w.code, w.name
+		FROM user_warehouses uw
+		JOIN warehouses w ON w.id = uw.warehouse_id AND w.tenant_id = uw.tenant_id
+		WHERE uw.tenant_id = $1
+		ORDER BY w.name ASC`
+	whRows, err := tx.QueryContext(ctx, whQuery, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("list user warehouses: %w", err)
+	}
+	defer whRows.Close()
+	userWhMap := make(map[uuid.UUID][]domain.AssignedWarehouse)
+	for whRows.Next() {
+		var uid uuid.UUID
+		var aw domain.AssignedWarehouse
+		if err := whRows.Scan(&uid, &aw.ID, &aw.Code, &aw.Name); err != nil {
+			return nil, fmt.Errorf("scan user warehouse: %w", err)
+		}
+		userWhMap[uid] = append(userWhMap[uid], aw)
+	}
+	if err := whRows.Err(); err != nil {
+		return nil, fmt.Errorf("user warehouses rows: %w", err)
+	}
+	for i := range users {
+		if whs, ok := userWhMap[users[i].ID]; ok {
+			users[i].AssignedWarehouses = whs
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 // UpdateUserRole changes a user's role within a tenant.
@@ -355,6 +394,120 @@ func (r *UserRepo) DeleteUser(ctx context.Context, userID, tenantID uuid.UUID) e
 		return domain.ErrNotFound
 	}
 	return tx.Commit()
+}
+
+// replaceUserWarehousesTx swaps a user's warehouse assignments inside an
+// existing transaction. A warehouse that does not belong to the tenant fails
+// the composite FK (warehouse_id, tenant_id) and aborts the whole tx.
+func replaceUserWarehousesTx(ctx context.Context, tx *sql.Tx, tenantID, userID uuid.UUID, warehouseIDs []uuid.UUID) error {
+	const delQ = `DELETE FROM user_warehouses WHERE tenant_id = $1 AND user_id = $2`
+	if _, err := tx.ExecContext(ctx, delQ, tenantID, userID); err != nil {
+		return fmt.Errorf("delete user_warehouses: %w", err)
+	}
+	const insQ = `INSERT INTO user_warehouses (user_id, warehouse_id, tenant_id, assigned_at)
+	              VALUES ($1, $2, $3, NOW())
+	              ON CONFLICT (user_id, warehouse_id) DO NOTHING`
+	for _, whID := range warehouseIDs {
+		if _, err := tx.ExecContext(ctx, insQ, userID, whID, tenantID); err != nil {
+			return fmt.Errorf("%w: gudang %s tidak valid", domain.ErrInvalidInput, whID)
+		}
+	}
+	return nil
+}
+
+// CreateUserWithWarehouses inserts a user and its warehouse assignments
+// atomically: either both persist or neither does.
+func (r *UserRepo) CreateUserWithWarehouses(ctx context.Context, user *domain.User, warehouseIDs []uuid.UUID) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := setTenantLocally(ctx, tx, user.TenantID); err != nil {
+		return err
+	}
+	const q = `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at, updated_at)
+	           VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	if _, err := tx.ExecContext(ctx, q,
+		user.ID, user.TenantID, user.Email, user.PasswordHash, user.Role,
+		user.CreatedAt, user.UpdatedAt); err != nil {
+		return err
+	}
+	if err := replaceUserWarehousesTx(ctx, tx, user.TenantID, user.ID, warehouseIDs); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// UpdateUserRoleAndWarehouses changes a user's role and replaces its
+// warehouse assignments in one transaction (no partial state).
+func (r *UserRepo) UpdateUserRoleAndWarehouses(ctx context.Context, userID, tenantID uuid.UUID, role string, warehouseIDs []uuid.UUID) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return err
+	}
+	const q = `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3`
+	result, err := tx.ExecContext(ctx, q, role, userID, tenantID)
+	if err != nil {
+		return err
+	}
+	if n, _ := result.RowsAffected(); n == 0 {
+		return domain.ErrNotFound
+	}
+	if err := replaceUserWarehousesTx(ctx, tx, tenantID, userID, warehouseIDs); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// GetUserWarehouses returns the list of warehouses assigned to a specific user.
+func (r *UserRepo) GetUserWarehouses(ctx context.Context, tenantID, userID uuid.UUID) ([]domain.AssignedWarehouse, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, err
+	}
+
+	const q = `
+		SELECT w.id, w.code, w.name
+		FROM user_warehouses uw
+		JOIN warehouses w ON w.id = uw.warehouse_id AND w.tenant_id = uw.tenant_id
+		WHERE uw.tenant_id = $1 AND uw.user_id = $2
+		ORDER BY w.name ASC`
+	rows, err := tx.QueryContext(ctx, q, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []domain.AssignedWarehouse
+	for rows.Next() {
+		var aw domain.AssignedWarehouse
+		if err := rows.Scan(&aw.ID, &aw.Code, &aw.Name); err != nil {
+			return nil, err
+		}
+		result = append(result, aw)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	if result == nil {
+		result = []domain.AssignedWarehouse{}
+	}
+	return result, nil
 }
 
 // UpdatePasswordResetToken stores a reset token and its expiry for a user.

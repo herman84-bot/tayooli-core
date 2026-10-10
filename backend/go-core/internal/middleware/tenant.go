@@ -243,6 +243,25 @@ func RequireRole(roles ...string) func(http.Handler) http.Handler {
 	}
 }
 
+// DenyRole returns middleware that rejects requests whose JWT role claim
+// matches one of the provided roles. Used to isolate narrow roles (e.g.
+// cashier) from whole route groups without listing every allowed role.
+func DenyRole(roles ...string) func(http.Handler) http.Handler {
+	denied := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		denied[r] = true
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if denied[GetRole(r.Context())] {
+				writeJSONError(w, http.StatusForbidden, "forbidden")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // RequestBodyLimit returns middleware that limits request body size to maxBytes.
 func RequestBodyLimit(maxBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

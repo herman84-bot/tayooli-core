@@ -2,16 +2,26 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
-type TeamMember = {
+export type AssignedWarehouse = { id: string; code: string; name: string }
+
+export type TeamMember = {
   id: string
   email: string
   full_name: string
   role: string
+  assigned_warehouses?: AssignedWarehouse[]
   created_at: string
+}
+
+async function readError(res: Response, fallback: string): Promise<string> {
+  const err = await res.json().catch(() => ({}))
+  if (typeof err?.error === 'string' && err.error) return err.error
+  return err?.error?.message || err?.message || fallback
 }
 
 export function useTeamMembers() {
   const queryClient = useQueryClient()
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['team-members'] })
 
   const members = useQuery<TeamMember[]>({
     queryKey: ['team-members'],
@@ -23,23 +33,32 @@ export function useTeamMembers() {
     },
   })
 
+  const inviteMember = useMutation({
+    mutationFn: async ({ email, role, warehouseIds = [] }: { email: string; role: string; warehouseIds?: string[] }) => {
+      const res = await fetch('/api/v1/settings/team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, role, warehouse_ids: warehouseIds }),
+      })
+      if (!res.ok) throw new Error(await readError(res, 'Gagal mengundang anggota'))
+      return res.json()
+    },
+    onSuccess: invalidate,
+  })
+
   const changeRole = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+    mutationFn: async ({ userId, role, warehouseIds = [] }: { userId: string; role: string; warehouseIds?: string[] }) => {
       const res = await fetch(`/api/v1/settings/team/${userId}/role`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ role, warehouse_ids: warehouseIds }),
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error?.message || 'Gagal mengubah role')
-      }
+      if (!res.ok) throw new Error(await readError(res, 'Gagal mengubah role'))
       return res.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['team-members'] })
-    },
+    onSuccess: invalidate,
   })
 
   const removeMember = useMutation({
@@ -48,21 +67,17 @@ export function useTeamMembers() {
         method: 'DELETE',
         credentials: 'include',
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error?.message || 'Gagal menghapus anggota')
-      }
+      if (!res.ok) throw new Error(await readError(res, 'Gagal menghapus anggota'))
       return res.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['team-members'] })
-    },
+    onSuccess: invalidate,
   })
 
   return {
     members: members.data ?? [],
     isLoading: members.isLoading,
     error: members.error,
+    inviteMember,
     changeRole,
     removeMember,
   }

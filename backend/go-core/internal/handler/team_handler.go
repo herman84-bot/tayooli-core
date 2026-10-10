@@ -15,9 +15,9 @@ import (
 // teamUsecase abstracts team management operations.
 type teamUsecase interface {
 	ListMembers(ctx context.Context, tenantID uuid.UUID) ([]domain.User, error)
-	ChangeRole(ctx context.Context, tenantID, userID uuid.UUID, newRole string, requesterID uuid.UUID) error
+	ChangeRole(ctx context.Context, tenantID, userID uuid.UUID, newRole string, warehouseIDs []uuid.UUID, requesterID uuid.UUID) error
 	RemoveMember(ctx context.Context, tenantID, userID uuid.UUID, requesterID uuid.UUID) error
-	InviteMember(ctx context.Context, tenantID uuid.UUID, email, role string, requesterID uuid.UUID) (*domain.User, error)
+	InviteMember(ctx context.Context, tenantID uuid.UUID, email, role string, warehouseIDs []uuid.UUID, requesterID uuid.UUID) (*domain.User, error)
 }
 
 // TeamHandler handles HTTP requests for team management.
@@ -34,8 +34,40 @@ type teamMemberResponse struct {
 	ID        string `json:"id"`
 	Email     string `json:"email"`
 	FullName  string `json:"full_name"`
-	Role      string `json:"role"`
-	CreatedAt string `json:"created_at"`
+	Role               string                     `json:"role"`
+	AssignedWarehouses []domain.AssignedWarehouse `json:"assigned_warehouses"`
+	CreatedAt          string                     `json:"created_at"`
+}
+
+func toTeamMemberResponse(m domain.User) teamMemberResponse {
+	whs := m.AssignedWarehouses
+	if whs == nil {
+		whs = []domain.AssignedWarehouse{}
+	}
+	return teamMemberResponse{
+		ID:                 m.ID.String(),
+		Email:              m.Email,
+		FullName:           m.FullName,
+		Role:               m.Role,
+		AssignedWarehouses: whs,
+		CreatedAt:          m.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+}
+
+func parseWarehouseIDs(raw []string) ([]uuid.UUID, error) {
+	ids := make([]uuid.UUID, 0, len(raw))
+	seen := map[uuid.UUID]bool{}
+	for _, s := range raw {
+		id, err := uuid.Parse(s)
+		if err != nil {
+			return nil, err
+		}
+		if !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
 }
 
 // ListMembers handles GET /api/v1/settings/team.
@@ -54,13 +86,7 @@ func (h *TeamHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 
 	resp := make([]teamMemberResponse, len(members))
 	for i, m := range members {
-		resp[i] = teamMemberResponse{
-			ID:        m.ID.String(),
-			Email:     m.Email,
-			FullName:  m.FullName,
-			Role:      m.Role,
-			CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		}
+		resp[i] = toTeamMemberResponse(m)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]any{"members": resp})
@@ -68,7 +94,8 @@ func (h *TeamHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 
 // changeRoleRequest is the JSON body for PATCH /api/v1/settings/team/{id}/role.
 type changeRoleRequest struct {
-	Role string `json:"role"`
+	Role         string   `json:"role"`
+	WarehouseIDs []string `json:"warehouse_ids"`
 }
 
 // ChangeRole handles PATCH /api/v1/settings/team/{id}/role.
@@ -100,7 +127,13 @@ func (h *TeamHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.uc.ChangeRole(r.Context(), tenantID, userID, req.Role, requesterID); err != nil {
+	whIDs, err := parseWarehouseIDs(req.WarehouseIDs)
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid warehouse id")
+		return
+	}
+
+	if err := h.uc.ChangeRole(r.Context(), tenantID, userID, req.Role, whIDs, requesterID); err != nil {
 		respondError(w, r, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -110,8 +143,9 @@ func (h *TeamHandler) ChangeRole(w http.ResponseWriter, r *http.Request) {
 
 // inviteMemberRequest is the JSON body for POST /api/v1/settings/team.
 type inviteMemberRequest struct {
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	Email        string   `json:"email"`
+	Role         string   `json:"role"`
+	WarehouseIDs []string `json:"warehouse_ids"`
 }
 
 // InviteMember handles POST /api/v1/settings/team.
@@ -140,7 +174,13 @@ func (h *TeamHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
 		req.Role = "member"
 	}
 
-	user, err := h.uc.InviteMember(r.Context(), tenantID, req.Email, req.Role, requesterID)
+	whIDs, err := parseWarehouseIDs(req.WarehouseIDs)
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid warehouse id")
+		return
+	}
+
+	user, err := h.uc.InviteMember(r.Context(), tenantID, req.Email, req.Role, whIDs, requesterID)
 	if err != nil {
 		respondError(w, r, http.StatusBadRequest, err.Error())
 		return
@@ -148,13 +188,7 @@ func (h *TeamHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusCreated, map[string]any{
 		"message": "undangan berhasil dikirim",
-		"member": teamMemberResponse{
-			ID:        user.ID.String(),
-			Email:     user.Email,
-			FullName:  user.FullName,
-			Role:      user.Role,
-			CreatedAt: user.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		},
+		"member":  toTeamMemberResponse(*user),
 	})
 }
 

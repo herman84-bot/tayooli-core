@@ -630,15 +630,20 @@ func main() {
 		r.Get("/inventory", productHandler.ListInventory)
 		r.Get("/inventory/{id}", productHandler.GetInventory)
 		r.Group(func(r chi.Router) {
-			r.Use(tenantMiddleware.RequireRole("owner", "admin", "warehouse"))
+			r.Use(tenantMiddleware.RequireRole("owner", "admin", "warehouse_manager", "warehouse"))
 			r.Post("/inventory", productHandler.CreateInventory)
 		})
 
-		// WMS Module
-		wmsHandler.RegisterRoutes(r)
+		// WMS Module (RBAC: kasir diisolasi total dari modul gudang)
+		r.Group(func(r chi.Router) {
+			r.Use(tenantMiddleware.DenyRole("cashier"))
+			wmsHandler.RegisterRoutes(r)
+		})
 
 		// POS (Point of Sale)
 		r.Route("/pos", func(r chi.Router) {
+			// RBAC: staf/kepala gudang & auditor tidak boleh transaksi kasir.
+			r.Use(tenantMiddleware.DenyRole("warehouse", "warehouse_manager", "regional_manager", "auditor"))
 			r.Post("/checkout", posHandler.Checkout)
 			r.Get("/orders", posHandler.ListOrders)
 			r.Get("/history", posHandler.ListOrders)
