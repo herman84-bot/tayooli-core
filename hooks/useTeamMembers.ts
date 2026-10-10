@@ -13,6 +13,13 @@ export type TeamMember = {
   created_at: string
 }
 
+export type InviteResponse = {
+  message: string
+  email_sent: boolean
+  email_error?: string
+  member: TeamMember
+}
+
 async function readError(res: Response, fallback: string): Promise<string> {
   const err = await res.json().catch(() => ({}))
   if (typeof err?.error === 'string' && err.error) return err.error
@@ -34,7 +41,7 @@ export function useTeamMembers() {
   })
 
   const inviteMember = useMutation({
-    mutationFn: async ({ email, role, warehouseIds = [] }: { email: string; role: string; warehouseIds?: string[] }) => {
+    mutationFn: async ({ email, role, warehouseIds = [] }: { email: string; role: string; warehouseIds?: string[] }): Promise<InviteResponse> => {
       const res = await fetch('/api/v1/settings/team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,6 +52,17 @@ export function useTeamMembers() {
       return res.json()
     },
     onSuccess: invalidate,
+  })
+
+  const resendInvite = useMutation({
+    mutationFn: async (userId: string): Promise<InviteResponse> => {
+      const res = await fetch(`/api/v1/settings/team/${userId}/resend-invite`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(await readError(res, 'Gagal mengirim ulang undangan'))
+      return res.json()
+    },
   })
 
   const changeRole = useMutation({
@@ -78,6 +96,7 @@ export function useTeamMembers() {
     isLoading: members.isLoading,
     error: members.error,
     inviteMember,
+    resendInvite,
     changeRole,
     removeMember,
   }

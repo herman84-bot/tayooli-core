@@ -263,7 +263,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authUsecase).WithTokenRevoker(revokedTokenRepo)
 
 	// Team Management
-	teamUsecase := teamUC.New(userRepo)
+	teamUsecase := teamUC.New(userRepo).WithInviter(userRepo, emailMailer)
 	teamHandler := handler.NewTeamHandler(teamUsecase)
 
 	// Approvals
@@ -683,6 +683,7 @@ func main() {
 			r.Post("/settings/team", teamHandler.InviteMember)
 			r.Patch("/settings/team/{id}/role", teamHandler.ChangeRole)
 			r.Delete("/settings/team/{id}", teamHandler.RemoveMember)
+			r.Post("/settings/team/{id}/resend-invite", teamHandler.ResendInvitation)
 			r.Post("/team", teamHandler.InviteMember)
 			r.Patch("/team/{id}/role", teamHandler.ChangeRole)
 			r.Delete("/team/{id}", teamHandler.RemoveMember)

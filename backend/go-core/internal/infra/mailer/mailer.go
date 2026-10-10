@@ -278,6 +278,67 @@ Tim Tayooli ERP
 	return m.send(toEmail, subject, htmlBody, textBody)
 }
 
+// SendInvitationEmail sends a team invitation with a link to set the account
+// password. The token reuses the password-reset mechanism (/reset-password).
+func (m *Mailer) SendInvitationEmail(toEmail, token string) error {
+	baseURL := strings.TrimRight(m.appURL, "/")
+	if baseURL == "" {
+		baseURL = DefaultAppURL
+	}
+	link := fmt.Sprintf("%s/reset-password?token=%s&invite=1", baseURL, url.QueryEscape(token))
+	escapedLink := html.EscapeString(link)
+	escapedEmail := html.EscapeString(toEmail)
+
+	subject := "Undangan bergabung ke Tayooli ERP"
+
+	textBody := fmt.Sprintf(`Halo,
+
+Anda diundang bergabung ke workspace Tayooli ERP dengan email %s.
+
+Buka tautan berikut untuk membuat kata sandi dan mengaktifkan akun Anda:
+%s
+
+Tautan ini berlaku selama 72 jam. Setelah itu, minta admin mengirim ulang undangan.
+
+Salam,
+Tim Tayooli ERP
+%s`, toEmail, link, baseURL)
+
+	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="id">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Undangan Tayooli ERP</title></head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:40px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%%" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+        <tr><td style="padding:28px 36px 20px;background:#0f172a;">
+          <span style="font-size:22px;font-weight:700;color:#ffffff;">Tayooli ERP</span>
+        </td></tr>
+        <tr><td style="padding:32px 36px;">
+          <h1 style="font-size:20px;font-weight:600;color:#0f172a;margin:0 0 16px;">Anda diundang bergabung</h1>
+          <p style="font-size:15px;line-height:1.6;color:#475569;margin:0 0 24px;">
+            Akun untuk <strong>%s</strong> telah dibuat. Klik tombol di bawah untuk membuat kata sandi dan mulai menggunakan Tayooli ERP.
+          </p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;"><tr>
+            <td style="border-radius:8px;background-color:#0284c7;">
+              <a href="%s" target="_blank" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Aktifkan Akun &rarr;</a>
+            </td>
+          </tr></table>
+          <p style="font-size:14px;color:#64748b;margin:0 0 16px;">Tautan berlaku selama <strong>72 jam</strong>.</p>
+          <p style="font-size:13px;line-height:1.5;color:#94a3b8;margin:24px 0 0;">
+            Jika tombol tidak dapat diklik, salin tautan berikut:<br>
+            <a href="%s" style="color:#0284c7;word-break:break-all;">%s</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`, escapedEmail, escapedLink, escapedLink, escapedLink)
+
+	return m.send(toEmail, subject, htmlBody, textBody)
+}
+
 // send routes delivery to Brevo HTTP API (primary), standard SMTP (secondary), or no-op log (fallback).
 func (m *Mailer) send(to, subject, htmlBody, textBody string) error {
 	// Defense-in-depth: guard against SMTP header injection via newline characters

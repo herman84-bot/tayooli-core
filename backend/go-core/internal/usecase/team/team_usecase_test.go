@@ -2,7 +2,9 @@ package team
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -202,5 +204,56 @@ func TestInviteMember_NonWarehouseRoleDropsWarehouses(t *testing.T) {
 	}
 	if len(repo.warehouses[u.ID]) != 0 {
 		t.Fatal("cashier must not keep warehouse assignments")
+	}
+}
+type fakeInviter struct {
+	tokens map[uuid.UUID]string
+	sent   []string
+	fail   bool
+}
+
+func (f *fakeInviter) UpdatePasswordResetToken(_ context.Context, userID uuid.UUID, token string, _ time.Time) error {
+	f.tokens[userID] = token
+	return nil
+}
+func (f *fakeInviter) SendInvitationEmail(to, token string) error {
+	if f.fail {
+		return errors.New("smtp down")
+	}
+	f.sent = append(f.sent, to+"|"+token)
+	return nil
+}
+func (f *fakeInviter) IsConfigured() bool { return true }
+
+func TestInviteMember_SendsInvitationEmailWithToken(t *testing.T) {
+	repo := newFakeRepo()
+	inv := &fakeInviter{tokens: map[uuid.UUID]string{}}
+	uc := New(repo).WithInviter(inv, inv)
+	res, err := uc.Invite(context.Background(), uuid.New(), "baru@x.com", "cashier", nil, uuid.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok := inv.tokens[res.User.ID]
+	if tok == "" {
+		t.Fatal("invite token must be stored")
+	}
+	if len(inv.sent) != 1 || inv.sent[0] != "baru@x.com|"+tok {
+		t.Fatalf("invitation email not sent with token: %v", inv.sent)
+	}
+	if !res.EmailSent {
+		t.Fatal("EmailSent must be true")
+	}
+}
+
+func TestInviteMember_EmailFailureReportedNotSilent(t *testing.T) {
+	repo := newFakeRepo()
+	inv := &fakeInviter{tokens: map[uuid.UUID]string{}, fail: true}
+	uc := New(repo).WithInviter(inv, inv)
+	res, err := uc.Invite(context.Background(), uuid.New(), "baru@x.com", "cashier", nil, uuid.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.EmailSent || res.EmailError == "" {
+		t.Fatalf("email failure must be reported, got %+v", res)
 	}
 }

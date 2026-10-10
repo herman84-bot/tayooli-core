@@ -256,3 +256,32 @@ func TestMailer_HTMLSpecialCharactersEscaping(t *testing.T) {
 		t.Errorf("HTMLContent contains unescaped <script> tag: %s", capturedPayload.HTMLContent)
 	}
 }
+
+func TestMailer_Brevo_SendInvitationEmail(t *testing.T) {
+	var captured brevoEmailPayload
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &captured)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"messageId": "<inv@brevo>"}`))
+	}))
+	defer ts.Close()
+
+	m := New("test-key", "noreply@tayooli.com", "Tayooli ERP", "", "", "", "", "", "https://tayooli.my.id")
+	m.brevoBaseURL = ts.URL
+	m.httpClient = ts.Client()
+
+	if err := m.SendInvitationEmail("staf@example.com", "inv-token-789"); err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	if len(captured.To) != 1 || captured.To[0].Email != "staf@example.com" {
+		t.Errorf("recipient = %+v", captured.To)
+	}
+	link := "https://tayooli.my.id/reset-password?token=inv-token-789&invite=1"
+	if !strings.Contains(captured.TextContent, link) {
+		t.Errorf("TextContent missing invite link %s", link)
+	}
+	if !strings.Contains(captured.HTMLContent, "token=inv-token-789&amp;invite=1") {
+		t.Errorf("HTMLContent missing escaped invite link")
+	}
+}

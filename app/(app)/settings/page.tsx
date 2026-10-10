@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTeamMembers } from '@/hooks/useTeamMembers'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Warehouse } from '@/lib/api'
-import { type TeamMember } from '@/hooks/useTeamMembers'
+import { type TeamMember, type InviteResponse } from '@/hooks/useTeamMembers'
 import { ASSIGNABLE_ROLES, ROLE_COLORS, ROLE_DESCRIPTIONS, ROLE_LABELS, requiresWarehouse, type AppRole } from '@/lib/rbac'
 import { usePaymentConfig } from '@/hooks/usePaymentConfig'
 import { useCompanyProfile } from '@/hooks/useCompanyProfile'
@@ -136,10 +136,11 @@ function EditRoleDialog({ member, onClose }: { member: TeamMember; onClose: () =
   )
 }
 
-function MemberActions({ member, onEdit, onRemove }: {
+function MemberActions({ member, onEdit, onRemove, onResend }: {
   member: TeamMember
   onEdit: (m: TeamMember) => void
   onRemove: (userId: string) => void
+  onResend: (userId: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -173,6 +174,13 @@ function MemberActions({ member, onEdit, onRemove }: {
             Ubah Role &amp; Gudang
           </button>
           <button
+            onClick={() => { onResend(member.id); setOpen(false) }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+          >
+            <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
+            Kirim Ulang Undangan
+          </button>
+          <button
             onClick={() => {
               if (window.confirm(`Hapus ${member.email} dari tim?`)) onRemove(member.id)
               setOpen(false)
@@ -188,7 +196,7 @@ function MemberActions({ member, onEdit, onRemove }: {
   )
 }
 
-function InviteForm({ onDone }: { onDone: () => void }) {
+function InviteForm({ onDone }: { onDone: (r: InviteResponse) => void }) {
   const { inviteMember } = useTeamMembers()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<string>('warehouse')
@@ -203,7 +211,7 @@ function InviteForm({ onDone }: { onDone: () => void }) {
     if (invalid) return
     inviteMember.mutate(
       { email: email.trim(), role, warehouseIds: needsWh ? whIds : [] },
-      { onSuccess: () => { setEmail(''); setWhIds([]); onDone() } },
+      { onSuccess: (r) => { setEmail(''); setWhIds([]); onDone(r) } },
     )
   }
 
@@ -245,8 +253,10 @@ function InviteForm({ onDone }: { onDone: () => void }) {
 }
 
 function TeamTab() {
-  const { members, isLoading, error, removeMember } = useTeamMembers()
+  const { members, isLoading, error, removeMember, resendInvite } = useTeamMembers()
   const [showInvite, setShowInvite] = useState(false)
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
+  const showResult = (r: InviteResponse) => setNotice({ ok: r.email_sent, text: r.message })
   const [editing, setEditing] = useState<TeamMember | null>(null)
 
   return (
@@ -267,7 +277,25 @@ function TeamTab() {
         </button>
       </div>
 
-      {showInvite && <InviteForm onDone={() => setShowInvite(false)} />}
+      {showInvite && <InviteForm onDone={(r) => { setShowInvite(false); showResult(r) }} />}
+
+      {notice && (
+        <div
+          role="status"
+          className={cn(
+            'mb-4 p-3 rounded-lg border text-sm flex items-start justify-between gap-3',
+            notice.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-800',
+          )}
+        >
+          <span>{notice.text}</span>
+          <button onClick={() => setNotice(null)} className="text-xs underline shrink-0">Tutup</button>
+        </div>
+      )}
+      {resendInvite.error && (
+        <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+          {(resendInvite.error as Error).message}
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
@@ -321,7 +349,7 @@ function TeamTab() {
                       : requiresWarehouse(m.role) ? <span className="text-amber-600">Belum ditugaskan</span> : 'Semua / tidak relevan'}
                   </td>
                   <td className="px-3 py-2.5">
-                    <MemberActions member={m} onEdit={setEditing} onRemove={(id) => removeMember.mutate(id)} />
+                    <MemberActions member={m} onEdit={setEditing} onRemove={(id) => removeMember.mutate(id)} onResend={(id) => resendInvite.mutate(id, { onSuccess: showResult })} />
                   </td>
                 </tr>
               ))}

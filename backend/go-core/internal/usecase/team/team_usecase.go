@@ -3,6 +3,7 @@ package team
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -38,9 +39,88 @@ type UserReader interface {
 	GetUserWarehouses(ctx context.Context, tenantID, userID uuid.UUID) ([]domain.AssignedWarehouse, error)
 }
 
+// InviteTokenStore persists a one-time token that lets an invited user set
+// their own password (reuses the password-reset token mechanism).
+type InviteTokenStore interface {
+	UpdatePasswordResetToken(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time) error
+}
+
+// InvitationSender delivers the invitation email.
+type InvitationSender interface {
+	SendInvitationEmail(toEmail, token string) error
+	IsConfigured() bool
+}
+
+// InviteTokenTTL is how long an invitation link stays valid.
+const InviteTokenTTL = 72 * time.Hour
+
+// InviteResult reports the created member and whether the email was delivered.
+type InviteResult struct {
+	User       *domain.User
+	EmailSent  bool
+	EmailError string
+}
+
 // Usecase handles team management operations.
 type Usecase struct {
-	repo UserReader
+	repo   UserReader
+	tokens InviteTokenStore
+	mailer InvitationSender
+}
+
+// WithInviter enables invitation emails. Without it, members are created but
+// no email is sent (EmailSent=false is reported to the caller).
+func (u *Usecase) WithInviter(tokens InviteTokenStore, mailer InvitationSender) *Usecase {
+	u.tokens = tokens
+	u.mailer = mailer
+	return u
+}
+
+// Invite creates the member and sends an invitation email containing a link
+// to set their password. Email delivery failure does not roll back the member;
+// it is reported so the admin can resend instead of failing silently.
+func (u *Usecase) Invite(ctx context.Context, tenantID uuid.UUID, email, role string, warehouseIDs []uuid.UUID, requesterID uuid.UUID) (*InviteResult, error) {
+	user, err := u.InviteMember(ctx, tenantID, email, role, warehouseIDs, requesterID)
+	if err != nil {
+		return nil, err
+	}
+	res := &InviteResult{User: user}
+	res.EmailSent, res.EmailError = u.sendInvitation(ctx, user)
+	return res, nil
+}
+
+// ResendInvitation issues a fresh token and resends the email for an existing member.
+func (u *Usecase) ResendInvitation(ctx context.Context, tenantID, userID uuid.UUID) (*InviteResult, error) {
+	user, err := u.repo.GetByID(ctx, userID, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if user.Role == domain.RoleOwner {
+		return nil, fmt.Errorf("owner tidak perlu diundang")
+	}
+	res := &InviteResult{User: user}
+	res.EmailSent, res.EmailError = u.sendInvitation(ctx, user)
+	return res, nil
+}
+
+func (u *Usecase) sendInvitation(ctx context.Context, user *domain.User) (bool, string) {
+	if u.tokens == nil || u.mailer == nil {
+		return false, "layanan email belum dikonfigurasi"
+	}
+	if !u.mailer.IsConfigured() {
+		return false, "layanan email (Brevo/SMTP) belum dikonfigurasi di server"
+	}
+	token := uuid.New().String()
+	if err := u.tokens.UpdatePasswordResetToken(ctx, user.ID, token, time.Now().Add(InviteTokenTTL)); err != nil {
+		log.Printf("[TEAM] store invite token for %s: %v", user.Email, err)
+		return false, "gagal membuat tautan undangan"
+	}
+	if err := u.mailer.SendInvitationEmail(user.Email, token); err != nil {
+		log.Printf("[TEAM] send invitation to %s: %v", user.Email, err)
+		return false, "gagal mengirim email undangan"
+	}
+	log.Printf("[TEAM] invitation email dispatched to %s", user.Email)
+	return true, ""
 }
 
 func New(repo UserReader) *Usecase {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/domain"
 	appMiddleware "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/middleware"
+	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/team"
 )
 
 // teamUsecase abstracts team management operations.
@@ -17,7 +18,8 @@ type teamUsecase interface {
 	ListMembers(ctx context.Context, tenantID uuid.UUID) ([]domain.User, error)
 	ChangeRole(ctx context.Context, tenantID, userID uuid.UUID, newRole string, warehouseIDs []uuid.UUID, requesterID uuid.UUID) error
 	RemoveMember(ctx context.Context, tenantID, userID uuid.UUID, requesterID uuid.UUID) error
-	InviteMember(ctx context.Context, tenantID uuid.UUID, email, role string, warehouseIDs []uuid.UUID, requesterID uuid.UUID) (*domain.User, error)
+	Invite(ctx context.Context, tenantID uuid.UUID, email, role string, warehouseIDs []uuid.UUID, requesterID uuid.UUID) (*team.InviteResult, error)
+	ResendInvitation(ctx context.Context, tenantID, userID uuid.UUID) (*team.InviteResult, error)
 }
 
 // TeamHandler handles HTTP requests for team management.
@@ -180,16 +182,46 @@ func (h *TeamHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.uc.InviteMember(r.Context(), tenantID, req.Email, req.Role, whIDs, requesterID)
+	res, err := h.uc.Invite(r.Context(), tenantID, req.Email, req.Role, whIDs, requesterID)
 	if err != nil {
 		respondError(w, r, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	respondJSON(w, http.StatusCreated, map[string]any{
-		"message": "undangan berhasil dikirim",
-		"member":  toTeamMemberResponse(*user),
-	})
+	respondJSON(w, http.StatusCreated, inviteResponse(res, "anggota ditambahkan"))
+}
+
+func inviteResponse(res *team.InviteResult, base string) map[string]any {
+	msg := base + " dan email undangan terkirim"
+	if !res.EmailSent {
+		msg = base + ", tetapi email undangan TIDAK terkirim: " + res.EmailError
+	}
+	return map[string]any{
+		"message":     msg,
+		"email_sent":  res.EmailSent,
+		"email_error": res.EmailError,
+		"member":      toTeamMemberResponse(*res.User),
+	}
+}
+
+// ResendInvitation handles POST /api/v1/settings/team/{id}/resend-invite.
+func (h *TeamHandler) ResendInvitation(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		respondError(w, r, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	userID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, "invalid user id")
+		return
+	}
+	res, err := h.uc.ResendInvitation(r.Context(), tenantID, userID)
+	if err != nil {
+		respondError(w, r, http.StatusBadRequest, err.Error())
+		return
+	}
+	respondJSON(w, http.StatusOK, inviteResponse(res, "undangan diproses"))
 }
 
 // RemoveMember handles DELETE /api/v1/settings/team/{id}.
