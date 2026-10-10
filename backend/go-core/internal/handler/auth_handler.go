@@ -174,27 +174,12 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 // Logout handles POST /api/v1/auth/logout.
-// Revokes the presented JWT server-side (when a revoker is wired) and clears
-// the auth cookie. If revocation fails the request fails with 500, so the
-// client never believes a still-valid token was invalidated.
+// Registered OUTSIDE TenantMiddleware so an expired/revoked/garbage cookie can
+// always be cleared (otherwise the middleware 401s first and the dead httpOnly
+// cookie sticks). The cookie is cleared on EVERY outcome. A still-valid token
+// is revoked server-side; if that revoke fails the response is 500 so the
+// client never believes a live token was invalidated.
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	if h.revoker != nil {
-		if tok := appMiddleware.ExtractToken(r); tok != "" {
-			exp, ok := appMiddleware.GetTokenExpiry(r.Context())
-			if !ok {
-				exp = time.Now().Add(24 * time.Hour) // conservative upper bound
-			}
-			var uidPtr *uuid.UUID
-			if uid, ok := appMiddleware.GetUserID(r.Context()); ok {
-				uidPtr = &uid
-			}
-			if err := h.revoker.Revoke(r.Context(), appMiddleware.TokenHash(tok), uidPtr, exp); err != nil {
-				log.Error().Err(err).Msg("logout: revoke token failed")
-				respondError(w, r, http.StatusInternalServerError, "logout failed")
-				return
-			}
-		}
-	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "tayooli_auth",
 		Value:    "",
@@ -202,8 +187,26 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   isSecureCookie(),
 		SameSite: http.SameSiteStrictMode,
-		MaxAge:   0,
+		MaxAge:   -1, // emits Max-Age=0: delete now
 	})
+
+	if h.revoker != nil {
+		if tok := appMiddleware.ExtractToken(r); tok != "" {
+			// Only a token that verifies (signature + exp) is worth revoking;
+			// invalid/expired ones are already unusable.
+			if claims, ok := appMiddleware.VerifyToken(tok); ok {
+				var uidPtr *uuid.UUID
+				if uid, err := uuid.Parse(claims.Subject); err == nil {
+					uidPtr = &uid
+				}
+				if err := h.revoker.Revoke(r.Context(), appMiddleware.TokenHash(tok), uidPtr, claims.ExpiresAt); err != nil {
+					log.Error().Err(err).Msg("logout: revoke token failed")
+					respondError(w, r, http.StatusInternalServerError, "logout failed")
+					return
+				}
+			}
+		}
+	}
 	respondJSON(w, http.StatusOK, map[string]string{"message": "logged out"})
 }
 

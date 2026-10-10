@@ -83,13 +83,41 @@ func TokenHash(token string) string {
 // ExtractToken exposes the cookie/Bearer token lookup to the logout handler.
 func ExtractToken(r *http.Request) string { return extractToken(r) }
 
-// TokenExpiry returns the `exp` of an already-validated token in context.
-const TokenExpKey contextKey = "token_exp"
+// VerifiedClaims is the subset of a verified JWT needed for revocation.
+type VerifiedClaims struct {
+	Subject   string
+	ExpiresAt time.Time
+}
 
-// GetTokenExpiry returns the validated token's expiry stored by TenantMiddleware.
-func GetTokenExpiry(ctx context.Context) (time.Time, bool) {
-	t, ok := ctx.Value(TokenExpKey).(time.Time)
-	return t, ok
+// VerifyToken checks signature (strict HS256) and exp with the same rules as
+// TenantMiddleware. It does NOT consult the revocation store.
+func VerifyToken(tokenStr string) (VerifiedClaims, bool) {
+	secret := os.Getenv("JWT_SECRET")
+	if len(secret) < config.MinJWTSecretLength {
+		return VerifiedClaims{}, false
+	}
+	token, err := jwt.NewParser(
+		jwt.WithValidMethods([]string{"HS256"}),
+		jwt.WithExpirationRequired(),
+	).Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid {
+		return VerifiedClaims{}, false
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return VerifiedClaims{}, false
+	}
+	exp, err := claims.GetExpirationTime()
+	if err != nil || exp == nil {
+		return VerifiedClaims{}, false
+	}
+	sub, _ := claims["sub"].(string)
+	return VerifiedClaims{Subject: sub, ExpiresAt: exp.Time}, true
 }
 
 // TenantMiddleware validates JWT (strict HS256), extracts tenant_id and role,
@@ -166,9 +194,6 @@ func TenantMiddleware(next http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), TenantIDKey, tenantID)
 		ctx = context.WithValue(ctx, RoleKey, role)
-		if exp, err := claims.GetExpirationTime(); err == nil && exp != nil {
-			ctx = context.WithValue(ctx, TokenExpKey, exp.Time)
-		}
 
 		// Extract user_id from "sub" claim (set by auth service on login).
 		if userIDStr, ok := claims["sub"].(string); ok {

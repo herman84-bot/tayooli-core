@@ -15,7 +15,10 @@ export const PROTECTED_PREFIXES = [
   "/customers",
   "/sales-invoices",
   "/sales-orders",
+  "/onboarding",
 ] as const
+// Intentionally public: /payments/* (gateway return pages), /login, /register,
+// /forgot-password, /reset-password, /verify-email.
 
 export function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))

@@ -51,5 +51,6 @@ export const config = {
     "/customers/:path*",
     "/sales-invoices/:path*",
     "/sales-orders/:path*",
+    "/onboarding/:path*",
   ],
 }

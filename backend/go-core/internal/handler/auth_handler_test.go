@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/domain"
@@ -365,8 +366,9 @@ func TestAuthHandler_Logout_Success(t *testing.T) {
 	if cookie.Value != "" {
 		t.Errorf("expected empty cookie value, got %s", cookie.Value)
 	}
-	if cookie.MaxAge != 0 {
-		t.Errorf("expected MaxAge=0, got %d", cookie.MaxAge)
+	// MaxAge:-1 is serialized as "Max-Age=0" (delete now); parsed back as -1.
+	if cookie.MaxAge >= 0 {
+		t.Errorf("expected cookie deletion (MaxAge<0), got %d", cookie.MaxAge)
 	}
 	if !cookie.HttpOnly {
 		t.Error("expected HttpOnly=true")
@@ -397,23 +399,46 @@ func (f *fakeRevoker) Revoke(_ context.Context, h string, uid *uuid.UUID, exp ti
 	return f.err
 }
 
+const logoutTestSecret = "test-secret-key-32-chars-long!!!"
+
+func signLogoutToken(t *testing.T, sub string, exp time.Time) string {
+	t.Helper()
+	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": sub, "exp": exp.Unix()}).
+		SignedString([]byte(logoutTestSecret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func assertCookieCleared(t *testing.T, rr *httptest.ResponseRecorder) {
+	t.Helper()
+	for _, c := range rr.Result().Cookies() {
+		if c.Name == "tayooli_auth" && c.Value == "" && c.MaxAge < 0 {
+			return
+		}
+	}
+	t.Fatalf("expected tayooli_auth to be cleared, got %v", rr.Result().Cookies())
+}
+
 func TestAuthHandler_Logout_RevokesTokenServerSide(t *testing.T) {
+	t.Setenv("JWT_SECRET", logoutTestSecret)
 	rv := &fakeRevoker{}
 	h := handler.NewAuthHandler(&mockAuthUsecase{}).WithTokenRevoker(rv)
 	userID := uuid.New()
 	exp := time.Now().Add(30 * time.Minute).Truncate(time.Second)
+	tok := signLogoutToken(t, userID.String(), exp)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
-	req.AddCookie(&http.Cookie{Name: "tayooli_auth", Value: "jwt-abc"})
-	req = withAuthContext(req, uuid.New(), userID)
-	req = req.WithContext(context.WithValue(req.Context(), appMiddleware.TokenExpKey, exp))
+	req.AddCookie(&http.Cookie{Name: "tayooli_auth", Value: tok})
 	rr := httptest.NewRecorder()
 	h.Logout(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
-	if rv.hash != appMiddleware.TokenHash("jwt-abc") {
+	assertCookieCleared(t, rr)
+	if rv.hash != appMiddleware.TokenHash(tok) {
 		t.Errorf("revoked wrong hash: %q", rv.hash)
 	}
 	if rv.userID == nil || *rv.userID != userID {
@@ -425,13 +450,41 @@ func TestAuthHandler_Logout_RevokesTokenServerSide(t *testing.T) {
 }
 
 func TestAuthHandler_Logout_RevokeFailureReturns500(t *testing.T) {
+	t.Setenv("JWT_SECRET", logoutTestSecret)
 	h := handler.NewAuthHandler(&mockAuthUsecase{}).WithTokenRevoker(&fakeRevoker{err: errors.New("db down")})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
-	req.Header.Set("Authorization", "Bearer jwt-xyz")
+	req.Header.Set("Authorization", "Bearer "+signLogoutToken(t, uuid.NewString(), time.Now().Add(time.Hour)))
 	rr := httptest.NewRecorder()
 	h.Logout(rr, req)
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500 when revocation fails, got %d", rr.Code)
+	}
+	assertCookieCleared(t, rr)
+}
+
+// A dead (expired/garbage) cookie must still be cleared, without a revoke call,
+// so the browser is never stuck with an unusable httpOnly session.
+func TestAuthHandler_Logout_DeadCookieStillCleared(t *testing.T) {
+	t.Setenv("JWT_SECRET", logoutTestSecret)
+	for name, tok := range map[string]string{
+		"expired": signLogoutToken(t, uuid.NewString(), time.Now().Add(-time.Minute)),
+		"garbage": "not-a-jwt",
+	} {
+		t.Run(name, func(t *testing.T) {
+			rv := &fakeRevoker{}
+			h := handler.NewAuthHandler(&mockAuthUsecase{}).WithTokenRevoker(rv)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+			req.AddCookie(&http.Cookie{Name: "tayooli_auth", Value: tok})
+			rr := httptest.NewRecorder()
+			h.Logout(rr, req)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d", rr.Code)
+			}
+			assertCookieCleared(t, rr)
+			if rv.hash != "" {
+				t.Errorf("dead token must not be written to revocation store")
+			}
+		})
 	}
 }
 

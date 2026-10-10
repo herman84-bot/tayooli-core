@@ -42,8 +42,6 @@ func runWithChecker(t *testing.T, c RevocationChecker, tok string) (int, bool) {
 	called := false
 	h := TenantMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		_, ok := GetTokenExpiry(r.Context())
-		assert.True(t, ok, "token expiry must be propagated for logout")
 	}))
 	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	req.AddCookie(&http.Cookie{Name: "tayooli_auth", Value: tok})
@@ -71,6 +69,29 @@ func TestTenantMiddleware_RevocationStoreErrorFailsClosed(t *testing.T) {
 	code, called := runWithChecker(t, &fakeRevocation{err: errors.New("db down")}, tok)
 	assert.Equal(t, http.StatusServiceUnavailable, code)
 	assert.False(t, called)
+}
+
+func TestVerifyToken(t *testing.T) {
+	setupTestEnv(t)
+	sub := uuid.New().String()
+	exp := time.Now().Add(time.Hour).Truncate(time.Second)
+	good := createTestToken(t, jwt.MapClaims{"sub": sub, "exp": exp.Unix()})
+	c, ok := VerifyToken(good)
+	assert.True(t, ok)
+	assert.Equal(t, sub, c.Subject)
+	assert.True(t, c.ExpiresAt.Equal(exp))
+
+	expired := createTestToken(t, jwt.MapClaims{"sub": sub, "exp": time.Now().Add(-time.Minute).Unix()})
+	_, ok = VerifyToken(expired)
+	assert.False(t, ok, "expired token must not verify")
+
+	_, ok = VerifyToken("garbage")
+	assert.False(t, ok)
+
+	forged := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": sub, "exp": exp.Unix()})
+	fs, _ := forged.SignedString([]byte("another-secret-key-32-chars-long!!"))
+	_, ok = VerifyToken(fs)
+	assert.False(t, ok, "wrong-secret token must not verify")
 }
 
 func TestTokenHash_StableAndHex(t *testing.T) {
