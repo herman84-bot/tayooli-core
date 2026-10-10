@@ -43,12 +43,22 @@ type Finding = {
 const OUT = path.resolve(__dirname, '../../test-results/audit');
 const findings: Finding[] = [];
 
+let authState: Awaited<ReturnType<import('@playwright/test').BrowserContext['storageState']>> | undefined;
+
 async function login(page: Page) {
+  if (authState) {
+    await page.context().addCookies(authState.cookies);
+    await page.context().addInitScript((origins) => {
+      for (const o of origins) for (const kv of o.localStorage) localStorage.setItem(kv.name, kv.value);
+    }, authState.origins);
+    return;
+  }
   await page.goto('/login');
   await page.fill('#email', EMAIL);
   await page.fill('#password', PASSWORD);
   await page.click('button[type="submit"]');
   await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  authState = await page.context().storageState();
 }
 
 const JUNK: { label: string; re: RegExp }[] = [
@@ -85,8 +95,8 @@ for (const m of MODULES) {
     page.on('pageerror', (e) => pageErrors.push(String(e.message).slice(0, 300)));
 
     await page.goto(m.route);
-    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
-    await page.waitForTimeout(2_500);
+    await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {});
+    await page.waitForTimeout(1_500);
 
     const body = (await page.locator('main').first().innerText().catch(async () => page.locator('body').innerText())) || '';
     const junkText: string[] = [];

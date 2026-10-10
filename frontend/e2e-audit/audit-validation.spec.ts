@@ -11,12 +11,22 @@ const EMAIL = process.env.TAYOOLI_EMAIL || 'admin@test.com';
 const PASSWORD = process.env.TAYOOLI_PASSWORD || 'password123';
 const OUT = path.resolve(__dirname, '../../test-results/audit');
 
+let authState: Awaited<ReturnType<import('@playwright/test').BrowserContext['storageState']>> | undefined;
+
 async function login(page: Page) {
+  if (authState) {
+    await page.context().addCookies(authState.cookies);
+    await page.context().addInitScript((origins) => {
+      for (const o of origins) for (const kv of o.localStorage) localStorage.setItem(kv.name, kv.value);
+    }, authState.origins);
+    return;
+  }
   await page.goto('/login');
   await page.fill('#email', EMAIL);
   await page.fill('#password', PASSWORD);
   await page.click('button[type="submit"]');
   await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  authState = await page.context().storageState();
 }
 
 type Case = { name: string; product: string; sku: string; price: string; cost?: string };
