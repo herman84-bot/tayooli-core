@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useManualRefresh } from '@/hooks/useManualRefresh'
 import { useDashboardSummary } from '@/lib/queries/dashboard'
 import { useWMSOutboundKPI } from '@/hooks/useWMSManifests'
 import { TooltipWalkthrough } from '@/components/tutorial/TooltipWalkthrough'
@@ -162,6 +163,7 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
   const { data: summary, isLoading, error, refetch } = useDashboardSummary(period)
   const { data: kpis, refetch: refetchKPI } = useWMSOutboundKPI()
+  const { refresh, refreshing } = useManualRefresh([refetch, refetchKPI])
   const s = summary ?? EMPTY_DASHBOARD_SUMMARY
   const loading = isLoading && !summary
   const status = (error as { response?: { status?: number } } | null)?.response?.status
@@ -198,15 +200,13 @@ export default function DashboardPage() {
           </Link>
           <button
             type="button"
-            onClick={() => {
-              void refetch()
-              void refetchKPI()
-            }}
-            disabled={isLoading}
+            onClick={() => void refresh()}
+            disabled={isLoading || refreshing}
+            aria-busy={refreshing}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border/60 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            Segarkan
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading || refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Menyegarkan...' : 'Segarkan'}
           </button>
         </div>
       </div>

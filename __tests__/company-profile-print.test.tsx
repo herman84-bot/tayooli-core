@@ -7,7 +7,7 @@ import { PrintShippingManifest } from '@/components/wms/PrintShippingManifest'
 import type { DeliveryOrder, DeliveryOrderItem, QCInspection, QCInspectionItem, ShippingManifestDetail } from '@/lib/api'
 import type { SalesInvoice } from '@/hooks/useSalesInvoices'
 
-const mockDO: DeliveryOrder = {
+const mockDO = {
   id: 'do-12345678-uuid',
   do_number: 'DO-2026-0001',
   order_type: 'SALES_ORDER',
@@ -20,9 +20,9 @@ const mockDO: DeliveryOrder = {
   updated_at: '2026-10-10T08:00:00Z',
   total_items: 2,
   total_qty: 10,
-}
+} as unknown as DeliveryOrder
 
-const mockDOItems: DeliveryOrderItem[] = [
+const mockDOItems = [
   {
     id: 'doi-1',
     delivery_order_id: 'do-12345678-uuid',
@@ -33,9 +33,9 @@ const mockDOItems: DeliveryOrderItem[] = [
     unit: 'PCS',
     created_at: '2026-10-10T08:00:00Z',
   },
-]
+] as unknown as DeliveryOrderItem[]
 
-const mockInvoice: SalesInvoice = {
+const mockInvoice = {
   id: 'inv-123',
   invoiceNumber: 'INV/2026/001',
   orderId: 'so-123',
@@ -50,9 +50,9 @@ const mockInvoice: SalesInvoice = {
   dueDate: '2026-11-10',
   createdAt: '2026-10-10T08:00:00Z',
   updatedAt: '2026-10-10T08:00:00Z',
-}
+} as unknown as SalesInvoice
 
-const mockQCInspection: QCInspection = {
+const mockQCInspection = {
   id: 'qc-1',
   receipt_id: 'rec-1',
   receipt_number: 'GR-2026-001',
@@ -70,9 +70,9 @@ const mockQCInspection: QCInspection = {
   supplier_name: 'PT Vendor Jaya',
   created_at: '2026-10-10T08:00:00Z',
   updated_at: '2026-10-10T08:00:00Z',
-}
+} as unknown as QCInspection
 
-const mockQCItems: QCInspectionItem[] = [
+const mockQCItems = [
   {
     id: 'qci-1',
     inspection_id: 'qc-1',
@@ -86,9 +86,9 @@ const mockQCItems: QCInspectionItem[] = [
     action: 'REJECT',
     created_at: '2026-10-10T08:00:00Z',
   },
-]
+] as unknown as QCInspectionItem[]
 
-const mockManifestDetail: ShippingManifestDetail = {
+const mockManifestDetail = {
   manifest: {
     id: 'man-1',
     manifest_number: 'MAN-2026-0001',
@@ -103,7 +103,7 @@ const mockManifestDetail: ShippingManifestDetail = {
     updated_at: '2026-10-10T08:00:00Z',
   },
   items: [],
-}
+} as unknown as ShippingManifestDetail
 
 describe('Dynamic Company Profile on Printable Documents', () => {
   test('PrintDeliveryOrder displays custom company name, address, and contact', () => {

@@ -26,6 +26,9 @@ jest.mock('@/hooks/useBarcodeScanner', () => ({
 
 // Mock useWMS
 jest.mock('@/hooks/useWMS', () => ({
+  useConfirmPutaway: () => ({ mutateAsync: jest.fn() }),
+  usePutawayPending: () => ({ data: [] }),
+  useDeliveryOrders: () => ({ data: [] }),
   useResolveBarcode: () => ({
     data: null,
     isFetching: false,

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import Link from "next/link"
+import { useManualRefresh } from "@/hooks/useManualRefresh"
 import {
   ClipboardCheck,
   Plus,
@@ -74,6 +75,7 @@ export default function StockOpnamePage() {
     isLoading: loadingActiveOpname,
     refetch: refetchActiveOpname,
   } = useStockOpname(activeOpnameId)
+  const { refresh, refreshing } = useManualRefresh([refetchOpnames, refetchWarehouses])
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -522,14 +524,13 @@ export default function StockOpnamePage() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                refetchOpnames()
-                refetchWarehouses()
-              }}
+              onClick={() => void refresh()}
+              disabled={refreshing}
+              aria-busy={refreshing}
               className="p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 min-h-[48px] min-w-[48px] flex items-center justify-center transition-colors"
               title="Refresh Data"
             >
-              <RefreshCw className="w-5 h-5" />
+              <RefreshCw className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`} />
             </button>
             <button
               onClick={() => {

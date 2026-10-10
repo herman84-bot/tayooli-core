@@ -28,8 +28,15 @@ import {
   Check,
   XCircle,
 } from "lucide-react"
-import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
-import { useResolveBarcode, useWarehouseLocations } from "@/hooks/useWMS"
+import { useBarcodeScanner, playScannerTone } from "@/hooks/useBarcodeScanner"
+import { useCameraBarcodeDecoder } from "@/hooks/useCameraBarcodeDecoder"
+import {
+  useResolveBarcode,
+  useWarehouseLocations,
+  useConfirmPutaway,
+  usePutawayPending,
+  useDeliveryOrders,
+} from "@/hooks/useWMS"
 import {
   useShippingManifests,
   useShippingManifestDetail,
@@ -40,7 +47,7 @@ import {
   useStockLPNDetail,
   useMoveLPN,
 } from "@/hooks/useWMSDocksAndLPNs"
-import { ResolvedProduct } from "@/lib/api"
+import { api, ResolvedProduct } from "@/lib/api"
 
 type ScannerMode = "PUTAWAY" | "OUTBOUND" | "PRICE_CHECK" | "LOADING_TRUCK" | "PALLET_LPN"
 
@@ -64,9 +71,25 @@ export default function BarcodeScannerPage() {
   const [putawayRack, setPutawayRack] = useState<string | null>(null)
   const [putawaySuccessMessage, setPutawaySuccessMessage] = useState<string | null>(null)
 
-  // Outbound verification state
-  const [expectedSku, setExpectedSku] = useState<string>("SKU-ROJO-10K")
-  const [verificationStatus, setVerificationStatus] = useState<"IDLE" | "MATCH" | "MISMATCH">("IDLE")
+  const [putawayRackId, setPutawayRackId] = useState<string | null>(null)
+  const [putawayWarehouseId, setPutawayWarehouseId] = useState<string | null>(null)
+  const [putawayError, setPutawayError] = useState<string | null>(null)
+  const [putawaySubmitting, setPutawaySubmitting] = useState(false)
+  const confirmPutaway = useConfirmPutaway()
+  const { data: putawayPending = [] } = usePutawayPending(putawayWarehouseId)
+
+  // Outbound verification state (real Surat Jalan pack-scan)
+  const [outboundDoId, setOutboundDoId] = useState<string | null>(null)
+  const [outboundResult, setOutboundResult] = useState<{
+    success: boolean
+    message: string
+    progress?: string
+  } | null>(null)
+  const { data: allDeliveryOrders = [] } = useDeliveryOrders()
+  const outboundOrders = useMemo(
+    () => allDeliveryOrders.filter((o) => o.status === "CONFIRMED" || o.status === "PICKED"),
+    [allDeliveryOrders]
+  )
 
   // State for LOADING_TRUCK mode
   const [selectedManifestId, setSelectedManifestId] = useState<string | null>(null)
@@ -106,6 +129,83 @@ export default function BarcodeScannerPage() {
   const { data: stockLPNs = [] } = useStockLPNs(activeWarehouseId)
   const { data: lpnDetail, isLoading: lpnDetailLoading } = useStockLPNDetail(matchedLPNId)
   const moveLPNMutation = useMoveLPN()
+
+  // Putaway step 2: resolve product, find its pending staging line, confirm putaway.
+  const submitPutaway = useCallback(
+    async (code: string) => {
+      if (!putawayRackId || !putawayWarehouseId) return
+      setPutawaySubmitting(true)
+      setPutawayError(null)
+      try {
+        let product: ResolvedProduct
+        try {
+          product = await api.wms.barcodes.resolve(code)
+        } catch {
+          throw new Error(`Barcode [${code}] tidak terdaftar di master produk.`)
+        }
+        const line = putawayPending.find((p) => p.product_id === product.product_id)
+        if (!line) {
+          throw new Error(
+            `${product.name} tidak memiliki stok di area staging inbound gudang ini (tidak ada yang perlu di-putaway).`
+          )
+        }
+        if (line.suggested_location_id && line.suggested_location_id !== putawayRackId) {
+          throw new Error(
+            `Rak ${putawayRack} bukan rak tujuan untuk ${product.name}. Rak yang disarankan: ${
+              line.suggested_location_code ?? line.suggested_location_id
+            }. Gunakan menu Putaway untuk override dengan alasan.`
+          )
+        }
+        await confirmPutaway.mutateAsync({
+          warehouse_id: putawayWarehouseId,
+          product_id: line.product_id,
+          batch_id: line.batch_id,
+          quantity: Number(line.quantity),
+          dest_location_id: putawayRackId,
+        })
+        playScannerTone("success")
+        setPutawaySuccessMessage(
+          `BERHASIL: ${line.quantity} ${product.name} (batch ${line.batch_number}) dipindahkan ke ${putawayRack}.`
+        )
+      } catch (err) {
+        playScannerTone("error")
+        setPutawaySuccessMessage(null)
+        setPutawayError(err instanceof Error ? err.message : "Putaway gagal diproses server.")
+      } finally {
+        setPutawaySubmitting(false)
+      }
+    },
+    [putawayRackId, putawayWarehouseId, putawayRack, putawayPending, confirmPutaway]
+  )
+
+  // Outbound: server-side validation of scanned item against the selected Surat Jalan.
+  const submitOutboundScan = useCallback(
+    async (code: string) => {
+      if (!outboundDoId) return
+      try {
+        const res = await api.wms.deliveryOrders.scanPackItem(outboundDoId, code, 1)
+        const d = res.data
+        playScannerTone("success")
+        setOutboundResult({
+          success: true,
+          message: `${d.product_name} (${d.product_sku}) cocok dengan Surat Jalan.`,
+          progress: `${d.packed_qty}/${d.requested_qty} unit item ini · ${d.packed_items}/${d.total_items} item lengkap${
+            d.order_completed ? " · SURAT JALAN LENGKAP" : ""
+          }`,
+        })
+      } catch (err) {
+        playScannerTone("error")
+        setOutboundResult({
+          success: false,
+          message:
+            err instanceof Error && err.message
+              ? `Barang [${code}] ditolak: ${err.message}`
+              : `Barang [${code}] tidak sesuai dengan Surat Jalan ini.`,
+        })
+      }
+    },
+    [outboundDoId]
+  )
 
   // Hardware Scanner Integration
   const handleBarcodeDetected = useCallback(
@@ -229,37 +329,44 @@ export default function BarcodeScannerPage() {
         return
       }
 
-      // Inbound Putaway Mode Logic: Step 1 (Rack) -> Step 2 (Product)
+      // Inbound Putaway Mode: Step 1 scan a registered rack -> Step 2 scan product.
+      // Step 2 posts POST /wms/putaway/confirm (staging -> rack) — real stock movement.
       if (mode === "PUTAWAY") {
+        const trimmed = code.trim().toUpperCase()
         if (!putawayRack) {
-          // If code looks like a location (e.g. starts with RAK, BIN, LOC, PLT)
-          if (
-            code.toUpperCase().startsWith("RAK") ||
-            code.toUpperCase().startsWith("BIN") ||
-            code.toUpperCase().startsWith("LOC") ||
-            code.toUpperCase().startsWith("PLT") ||
-            locations.some((l) => l.code === code.toUpperCase())
-          ) {
-            setPutawayRack(code.toUpperCase())
-            setPutawaySuccessMessage(`Rak ${code.toUpperCase()} terpilih! Silakan scan barang.`)
-          } else {
-            // Assume first scan is rack anyway if user intended
-            setPutawayRack(code.toUpperCase())
-            setPutawaySuccessMessage(`Lokasi ${code.toUpperCase()} diset. Sekarang scan produk.`)
-          }
-        } else {
-          // Step 2: Item scanned into putawayRack
-          setPutawaySuccessMessage(
-            `BERHASIL: Barang [${code}] berhasil ditempatkan di ${putawayRack}!`
+          const loc = locations.find(
+            (l) =>
+              l.code.toUpperCase() === trimmed ||
+              l.id.toUpperCase() === trimmed ||
+              (l.barcode && l.barcode.toUpperCase() === trimmed)
           )
+          if (!loc) {
+            playTone("error")
+            setPutawayError(`Lokasi rak [${code.trim()}] tidak terdaftar di master lokasi gudang.`)
+            setPutawaySuccessMessage(null)
+            return
+          }
+          setPutawayRack(loc.code)
+          setPutawayRackId(loc.id)
+          setPutawayWarehouseId(loc.warehouse_id ?? null)
+          setPutawayError(null)
+          setPutawaySuccessMessage(`Rak ${loc.code} terpilih. Silakan scan barang.`)
+          return
         }
-      } else if (mode === "OUTBOUND") {
-        // Outbound verification logic
-        if (code === expectedSku || code.includes("ROJO")) {
-          setVerificationStatus("MATCH")
-        } else {
-          setVerificationStatus("MISMATCH")
+        if (!putawayRackId || !putawayWarehouseId || putawaySubmitting) return
+        void submitPutaway(code.trim())
+        return
+      }
+
+      // Outbound verification: POST /wms/delivery-orders/{id}/pack/scan validates the
+      // scanned barcode against the selected Surat Jalan items on the server.
+      if (mode === "OUTBOUND") {
+        if (!outboundDoId) {
+          playTone("error")
+          setOutboundResult({ success: false, message: "Pilih Surat Jalan terlebih dahulu." })
+          return
         }
+        void submitOutboundScan(code.trim())
       }
     },
     [
@@ -272,7 +379,12 @@ export default function BarcodeScannerPage() {
       selectedManifestId,
       scanLoadingMutation,
       putawayRack,
-      expectedSku,
+      putawayRackId,
+      putawayWarehouseId,
+      putawaySubmitting,
+      submitPutaway,
+      outboundDoId,
+      submitOutboundScan,
     ]
   )
 
@@ -281,6 +393,11 @@ export default function BarcodeScannerPage() {
     soundFeedback: soundEnabled,
     hapticFeedback: true,
   })
+
+  // Camera frames -> native BarcodeDetector -> same handler as USB/manual scans
+  const { supported: cameraDecodeSupported } = useCameraBarcodeDecoder(videoRef, cameraActive, (code) =>
+    triggerScan(code)
+  )
 
   // Start Camera
   const startCamera = async () => {
@@ -365,26 +482,8 @@ export default function BarcodeScannerPage() {
     setManualCode("")
   }
 
-  // Fallback demo resolution when backend has not seeded this barcode
-  const displayProduct: ResolvedProduct | null = useMemo(() => {
-    if (resolvedProduct) return resolvedProduct
-    if (activeCode) {
-      // Demo resolution fallback
-      return {
-        product_id: "demo-prod-001",
-        sku: activeCode.startsWith("SKU-") ? activeCode : `SKU-${activeCode.slice(-6).toUpperCase()}`,
-        name: activeCode.includes("ROJO")
-          ? "Beras Premium Rojolele 10kg"
-          : activeCode.includes("SANIA")
-          ? "Minyak Goreng Sania 2L"
-          : `Produk Master [${activeCode}]`,
-        barcode: activeCode,
-        multiplier: "1.00",
-        source: "BARCODE",
-      }
-    }
-    return null
-  }, [resolvedProduct, activeCode])
+  // Only real server data is shown; unknown barcodes surface as "not found".
+  const displayProduct: ResolvedProduct | null = resolvedProduct ?? null
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16">
@@ -438,6 +537,8 @@ export default function BarcodeScannerPage() {
             onClick={() => {
               setMode("PUTAWAY")
               setPutawayRack(null)
+              setPutawayRackId(null)
+              setPutawayError(null)
               setPutawaySuccessMessage(null)
             }}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
@@ -454,7 +555,7 @@ export default function BarcodeScannerPage() {
             type="button"
             onClick={() => {
               setMode("OUTBOUND")
-              setVerificationStatus("IDLE")
+              setOutboundResult(null)
             }}
             className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
               mode === "OUTBOUND"
@@ -509,7 +610,7 @@ export default function BarcodeScannerPage() {
             }`}
           >
             <Tag className="w-4 h-4 shrink-0" />
-            <span className="truncate">Cek SKU & Harga</span>
+            <span className="truncate">Cek SKU</span>
           </button>
         </div>
 
@@ -554,6 +655,8 @@ export default function BarcodeScannerPage() {
             <button
               onClick={() => {
                 setPutawayRack(null)
+                setPutawayRackId(null)
+                setPutawayError(null)
                 setPutawaySuccessMessage(null)
               }}
               className="text-xs font-bold text-rose-600 hover:underline min-h-[36px] flex items-center"
@@ -591,7 +694,9 @@ export default function BarcodeScannerPage() {
               >
                 <div className="text-[11px] uppercase tracking-wider">Langkah 2: Produk / Barang</div>
                 <div className="text-sm font-mono mt-1">
-                  {putawaySuccessMessage?.includes("BERHASIL")
+                  {putawaySubmitting
+                    ? "Memproses..."
+                    : putawaySuccessMessage?.includes("BERHASIL")
                     ? `✓ ${lastScannedCode}`
                     : putawayRack
                     ? "Siap Scan Barang..."
@@ -599,6 +704,13 @@ export default function BarcodeScannerPage() {
                 </div>
               </div>
             </div>
+
+            {putawayError && (
+              <div className="mt-3 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{putawayError}</span>
+              </div>
+            )}
 
             {putawaySuccessMessage && (
               <div className="mt-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center gap-2">
@@ -612,41 +724,53 @@ export default function BarcodeScannerPage() {
         {/* ── Outbound Verification Status Banner (Match / Mismatch) ── */}
         {mode === "OUTBOUND" && (
           <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>Target SKU Picking:</span>
-              <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
-                {expectedSku}
-              </span>
+            <div>
+              <label
+                htmlFor="outbound-do-select"
+                className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+              >
+                Pilih Surat Jalan (CONFIRMED / PICKED)
+              </label>
+              <select
+                id="outbound-do-select"
+                value={outboundDoId || ""}
+                onChange={(e) => {
+                  setOutboundDoId(e.target.value || null)
+                  setOutboundResult(null)
+                }}
+                className="w-full min-h-[48px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-medium"
+              >
+                <option value="">-- Pilih Surat Jalan --</option>
+                {outboundOrders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.do_number}
+                    {o.customer_name ? ` — ${o.customer_name}` : ""} [{o.status}]
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {verificationStatus === "MATCH" && (
-              <div className="p-4 rounded-xl bg-emerald-50 border-2 border-emerald-500 text-emerald-900 flex items-center gap-3">
-                <div className="p-2 rounded-full bg-emerald-200 text-emerald-800">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
+            {outboundResult && (
+              <div
+                className={`p-4 rounded-xl border-2 flex items-center gap-3 ${
+                  outboundResult.success
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-900"
+                    : "bg-rose-50 border-rose-500 text-rose-900"
+                }`}
+              >
+                {outboundResult.success ? (
+                  <CheckCircle2 className="w-6 h-6 text-emerald-700 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-6 h-6 text-rose-700 shrink-0" />
+                )}
                 <div>
-                  <div className="text-base font-extrabold text-emerald-900">
-                    MATCH: BARANG COCOK!
+                  <div className="text-base font-extrabold">
+                    {outboundResult.success ? "COCOK" : "TIDAK COCOK"}
                   </div>
-                  <div className="text-xs text-emerald-700">
-                    Barang yang di-scan sesuai dengan Picking Order.
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {verificationStatus === "MISMATCH" && (
-              <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-500 text-rose-900 flex items-center gap-3">
-                <div className="p-2 rounded-full bg-rose-200 text-rose-800">
-                  <AlertCircle className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="text-base font-extrabold text-rose-900">
-                    MISMATCH: BARANG SALAH!
-                  </div>
-                  <div className="text-xs text-rose-700">
-                    Barang [{lastScannedCode}] tidak sesuai dengan target order ({expectedSku}).
-                  </div>
+                  <div className="text-xs">{outboundResult.message}</div>
+                  {outboundResult.progress && (
+                    <div className="text-xs font-mono mt-0.5">{outboundResult.progress}</div>
+                  )}
                 </div>
               </div>
             )}
@@ -1115,6 +1239,13 @@ export default function BarcodeScannerPage() {
               </div>
             )}
 
+            {cameraActive && cameraDecodeSupported === false && (
+              <div className="absolute bottom-3 left-3 right-3 text-xs text-amber-100 bg-amber-900/80 p-2.5 rounded-lg">
+                Browser ini tidak mendukung pembacaan barcode dari kamera (BarcodeDetector). Gunakan Chrome/Edge di
+                Android, USB scanner, atau ketik kode manual.
+              </div>
+            )}
+
             {/* Camera Floating Controls */}
             {cameraActive && (
               <div className="absolute top-3 right-3 flex items-center gap-2">
@@ -1164,41 +1295,16 @@ export default function BarcodeScannerPage() {
             </button>
           </form>
 
-          {/* Quick barcode simulation buttons for test */}
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-3 border-t border-slate-100">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Uji Cepat:
-            </span>
-            <button
-              type="button"
-              onClick={() => triggerScan("RAK-A-01")}
-              className="px-2.5 py-1 text-xs rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-mono"
-            >
-              [Lokasi] RAK-A-01
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerScan("LPN-20261008-0001")}
-              className="px-2.5 py-1 text-xs rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-mono"
-            >
-              [Palet] LPN-0001
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerScan("SKU-ROJO-10K")}
-              className="px-2.5 py-1 text-xs rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-mono"
-            >
-              [SKU] Rojolele 10kg
-            </button>
-            <button
-              type="button"
-              onClick={() => triggerScan("8999999123456")}
-              className="px-2.5 py-1 text-xs rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-mono"
-            >
-              [EAN-13] Sania 2L
-            </button>
-          </div>
         </div>
+
+        {activeCode && !resolving && resolveError && !displayProduct && mode === "PRICE_CHECK" && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>
+              Barcode <span className="font-mono font-bold">{activeCode}</span> tidak terdaftar di master produk.
+            </span>
+          </div>
+        )}
 
         {/* ── Immediate Product Resolution Card ── */}
         {displayProduct && (

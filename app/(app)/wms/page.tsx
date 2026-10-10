@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react"
 import Link from "next/link"
+import { useManualRefresh } from "@/hooks/useManualRefresh"
 import {
   Warehouse as WarehouseIcon,
   Plus,
@@ -59,6 +60,7 @@ export default function WMSDashboardPage() {
     isLoading: loadingStock,
     refetch: refetchStock,
   } = useWMSStock(activeWarehouseFilter ?? undefined)
+  const { refresh, refreshing } = useManualRefresh([refetchWarehouses, refetchLocations, refetchMovements, refetchStock])
 
   // Modals state
   const [showCreateWhModal, setShowCreateWhModal] = useState(false)
@@ -308,16 +310,13 @@ export default function WMSDashboardPage() {
                 Pilih Gudang Aktif
               </span>
               <button
-                onClick={() => {
-                  refetchWarehouses()
-                  refetchLocations()
-                  refetchMovements()
-                  refetchStock()
-                }}
+                onClick={() => void refresh()}
+                disabled={refreshing}
+                aria-busy={refreshing}
                 className="text-xs text-[#2563EB] hover:underline flex items-center gap-1 min-h-[32px]"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Segarkan
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Menyegarkan..." : "Segarkan"}
               </button>
             </div>
 
