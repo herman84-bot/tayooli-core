@@ -48,6 +48,7 @@ type mockWMSUsecase struct {
 	createDeliveryOrderFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateDeliveryOrderRequest) (*domain.DeliveryOrder, error)
 	confirmDeliveryOrderFn  func(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
 	dispatchDeliveryOrderFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
+	cancelDeliveryOrderFn   func(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
 	getDeliveryOrderFn      func(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, []domain.DeliveryOrderItem, error)
 	listDeliveryOrdersFn    func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.DeliveryOrder, error)
 
@@ -244,6 +245,13 @@ func (m *mockWMSUsecase) ConfirmDeliveryOrder(ctx context.Context, tenantID, use
 func (m *mockWMSUsecase) DispatchDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error) {
 	if m.dispatchDeliveryOrderFn != nil {
 		return m.dispatchDeliveryOrderFn(ctx, tenantID, userID, role, doID)
+	}
+	return nil, nil
+}
+
+func (m *mockWMSUsecase) CancelDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error) {
+	if m.cancelDeliveryOrderFn != nil {
+		return m.cancelDeliveryOrderFn(ctx, tenantID, userID, role, doID)
 	}
 	return nil, nil
 }
@@ -1565,5 +1573,68 @@ func TestWMSHandlerEndpoints(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("DELETE /api/v1/wms/delivery-orders/{id} cancels a draft DO with 200", func(t *testing.T) {
+		doID := uuid.New()
+		mock := &mockWMSUsecase{
+			cancelDeliveryOrderFn: func(ctx context.Context, tid, uid uuid.UUID, r string, id uuid.UUID) (*domain.DeliveryOrder, error) {
+				assert.Equal(t, doID, id)
+				return &domain.DeliveryOrder{
+					ID:       id,
+					TenantID: tid,
+					DONumber: "DO-CANCEL-001",
+					Status:   domain.DeliveryOrderStatusCancelled,
+				}, nil
+			},
+		}
+		router := setupWMSTestRouter(mock)
+
+		req := withWMSAuth(httptest.NewRequest(http.MethodDelete, "/api/v1/wms/delivery-orders/"+doID.String(), nil), tenantID, userID, role)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		var res domain.DeliveryOrder
+		require.NoError(t, json.NewDecoder(w.Body).Decode(&res))
+		assert.Equal(t, domain.DeliveryOrderStatusCancelled, res.Status)
+	})
+
+	t.Run("DELETE /api/v1/wms/delivery-orders/{id} returns 409 when not a draft", func(t *testing.T) {
+		doID := uuid.New()
+		mock := &mockWMSUsecase{
+			cancelDeliveryOrderFn: func(ctx context.Context, tid, uid uuid.UUID, r string, id uuid.UUID) (*domain.DeliveryOrder, error) {
+				return nil, domain.ErrDeliveryOrderNotDraft
+			},
+		}
+		router := setupWMSTestRouter(mock)
+
+		req := withWMSAuth(httptest.NewRequest(http.MethodDelete, "/api/v1/wms/delivery-orders/"+doID.String(), nil), tenantID, userID, role)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		assert.Contains(t, w.Body.String(), "DRAFT")
+	})
+
+	t.Run("POST /api/v1/wms/delivery-orders/{id}/cancel cancels a draft DO with 200", func(t *testing.T) {
+		doID := uuid.New()
+		mock := &mockWMSUsecase{
+			cancelDeliveryOrderFn: func(ctx context.Context, tid, uid uuid.UUID, r string, id uuid.UUID) (*domain.DeliveryOrder, error) {
+				return &domain.DeliveryOrder{
+					ID:       id,
+					TenantID: tid,
+					DONumber: "DO-CANCEL-002",
+					Status:   domain.DeliveryOrderStatusCancelled,
+				}, nil
+			},
+		}
+		router := setupWMSTestRouter(mock)
+
+		req := withWMSAuth(httptest.NewRequest(http.MethodPost, "/api/v1/wms/delivery-orders/"+doID.String()+"/cancel", nil), tenantID, userID, role)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
 	})
 }

@@ -229,13 +229,21 @@ test('e. surat jalan: over-alokasi ditolak, DRAFT tidak bisa dispatch, confirm -
   const [sDraft] = await call(A, 'POST', `/wms/delivery-orders/${doId}/dispatch`);
   const [sConf] = await call(A, 'POST', `/wms/delivery-orders/${doId}/confirm`);
   const [sConf2] = await call(A, 'POST', `/wms/delivery-orders/${doId}/confirm`);
+  const [sCancelConf] = await call(A, 'DELETE', `/wms/delivery-orders/${doId}`); // cancelling confirmed DO must be rejected (409)
+  // Test cancelling a DRAFT DO
+  const [, canDO] = await call(A, 'POST', '/wms/delivery-orders', {
+    warehouse_id: wh1, do_number: `DOCAN-${TS}`, recipient_name: 'Penerima Cancel', items: [{ product_id: productId, quantity: '1', location_id: rack1 }],
+  });
+  const canId = (canDO.delivery_order || canDO).id;
+  const [sCancelDraft] = await call(A, 'DELETE', `/wms/delivery-orders/${canId}`); // cancelling draft DO succeeds (200)
+
   const [sDisp, disp] = await call(A, 'POST', `/wms/delivery-orders/${doId}/dispatch`);
   const [sDisp2] = await call(A, 'POST', `/wms/delivery-orders/${doId}/dispatch`);
   const after = await rackQty(wh1, rack1);
-  const ok = sOver === 422 && sZero >= 400 && sDraft >= 400 && sConf < 300 && sConf2 >= 400 && sDisp < 300 && sDisp2 >= 400 && after.qty === r1.qty - 2;
+  const ok = sOver === 422 && sZero >= 400 && sDraft >= 400 && sConf < 300 && sConf2 >= 400 && sCancelConf === 409 && sCancelDraft < 300 && sDisp < 300 && sDisp2 >= 400 && after.qty === r1.qty - 2;
   record('e surat jalan', ok ? 'PASS' : 'FAIL',
     `overAlokasi=${sOver} qty0=${sZero} alokasiSetelahCreate=${allocAfterCreate} dispatchDraft=${sDraft} confirm=${sConf} confirmLagi=${sConf2} ` +
-    `dispatch=${sDisp}${sDisp >= 300 ? ' ' + JSON.stringify(disp) : ''} dispatchLagi=${sDisp2} rak ${r1.qty}->${after.qty}`);
+    `batalDraft=${sCancelDraft} batalConfirmed=${sCancelConf} dispatch=${sDisp}${sDisp >= 300 ? ' ' + JSON.stringify(disp) : ''} dispatchLagi=${sDisp2} rak ${r1.qty}->${after.qty}`);
   expect.soft(ok, JSON.stringify(over)).toBe(true);
 });
 

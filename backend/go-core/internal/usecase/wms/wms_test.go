@@ -453,6 +453,18 @@ func (m *mockWMSRepo) ConfirmDeliveryOrder(ctx context.Context, tenantID, id, us
 	return do, nil
 }
 
+func (m *mockWMSRepo) CancelDeliveryOrder(ctx context.Context, tenantID, id, userID uuid.UUID) error {
+	do, ok := m.deliveryOrders[id]
+	if !ok || do.TenantID != tenantID {
+		return domain.ErrDeliveryOrderNotFound
+	}
+	if do.Status != domain.DeliveryOrderStatusDraft {
+		return domain.ErrDeliveryOrderNotDraft
+	}
+	do.Status = domain.DeliveryOrderStatusCancelled
+	return nil
+}
+
 func (m *mockWMSRepo) GetAvailableStock(ctx context.Context, tenantID, warehouseID uuid.UUID, locationID *uuid.UUID, productID uuid.UUID) (decimal.Decimal, error) {
 	var total decimal.Decimal
 	for k, qty := range m.stockLevels {
@@ -1689,6 +1701,64 @@ func TestDeliveryOrderDispatchAndStockDeduction(t *testing.T) {
 		// Dispatch as auditor -> rejected
 		_, err = usecase.DispatchDeliveryOrder(ctx, tenantID, auditorID, "auditor", do.ID)
 		assert.ErrorIs(t, err, domain.ErrForbidden, "auditor cannot dispatch delivery order")
+	})
+}
+
+func TestCancelDeliveryOrder(t *testing.T) {
+	repo := newMockWMSRepo()
+	usecase := uc.New(repo)
+	ctx := context.Background()
+
+	tenantID := uuid.New()
+	adminID := uuid.New()
+	whID := uuid.New()
+	locID := uuid.New()
+	prodID := uuid.New()
+
+	repo.warehouses[whID] = domain.Warehouse{ID: whID, TenantID: tenantID, Code: "WH-CAN", Name: "Cancel Test WH"}
+	repo.locations[locID] = domain.WarehouseLocation{ID: locID, TenantID: tenantID, WarehouseID: &whID, Code: "R-CAN", Name: "Rack", Type: domain.LocationTypeInternal}
+	repo.stockLevels[fmt.Sprintf("%s:%s:%s", tenantID, locID, prodID)] = decimal.NewFromInt(10)
+
+	t.Run("Cancel draft delivery order succeeds", func(t *testing.T) {
+		req := uc.CreateDeliveryOrderRequest{
+			WarehouseID:   whID,
+			DONumber:      "DO-CAN-01",
+			RecipientName: ptr("Customer Cancel"),
+			Items: []uc.CreateDeliveryOrderItemRequest{
+				{ProductID: prodID, Quantity: decimal.NewFromInt(2), LocationID: locID},
+			},
+		}
+		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", req)
+		require.NoError(t, err)
+		assert.Equal(t, domain.DeliveryOrderStatusDraft, do.Status)
+
+		cancelled, err := usecase.CancelDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.DeliveryOrderStatusCancelled, cancelled.Status)
+	})
+
+	t.Run("Cancel confirmed delivery order is rejected with ErrDeliveryOrderNotDraft", func(t *testing.T) {
+		req := uc.CreateDeliveryOrderRequest{
+			WarehouseID:   whID,
+			DONumber:      "DO-CAN-02",
+			RecipientName: ptr("Customer Cancel 2"),
+			Items: []uc.CreateDeliveryOrderItemRequest{
+				{ProductID: prodID, Quantity: decimal.NewFromInt(1), LocationID: locID},
+			},
+		}
+		do, err := usecase.CreateDeliveryOrder(ctx, tenantID, adminID, "admin", req)
+		require.NoError(t, err)
+
+		_, err = usecase.ConfirmDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
+		require.NoError(t, err)
+
+		_, err = usecase.CancelDeliveryOrder(ctx, tenantID, adminID, "admin", do.ID)
+		assert.ErrorIs(t, err, domain.ErrDeliveryOrderNotDraft)
+	})
+
+	t.Run("Cancel non-existent delivery order returns ErrDeliveryOrderNotFound", func(t *testing.T) {
+		_, err := usecase.CancelDeliveryOrder(ctx, tenantID, adminID, "admin", uuid.New())
+		assert.ErrorIs(t, err, domain.ErrDeliveryOrderNotFound)
 	})
 }
 

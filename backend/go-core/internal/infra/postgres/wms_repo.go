@@ -253,7 +253,7 @@ func (r *WMSRepo) GetWarehouseByID(ctx context.Context, tenantID, id uuid.UUID) 
 const listWarehousesSQL = `
 SELECT id, tenant_id, regional_id, code, name, address, is_active, created_at, updated_at
 FROM warehouses
-WHERE tenant_id = $1
+WHERE tenant_id = $1 AND is_active = true
 ORDER BY name ASC`
 
 func (r *WMSRepo) ListWarehouses(ctx context.Context, tenantID uuid.UUID) ([]domain.Warehouse, error) {
@@ -761,6 +761,19 @@ func (r *WMSRepo) CreateSKUMapping(ctx context.Context, m *domain.ProductSKUMapp
 
 	if err := setTenantLocally(ctx, tx, m.TenantID); err != nil {
 		return fmt.Errorf("WMSRepo.CreateSKUMapping: set tenant: %w", err)
+	}
+
+	var prodExists bool
+	err = tx.QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM products
+			WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL
+		)`, m.ProductID, m.TenantID).Scan(&prodExists)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.CreateSKUMapping: check product: %w", err)
+	}
+	if !prodExists {
+		return domain.ErrNotFound
 	}
 
 	if m.ID == uuid.Nil {
@@ -1966,6 +1979,50 @@ WHERE id = $1 AND tenant_id = $2`, id, tenantID, userID, now)
 
 	do, _, err := r.GetDeliveryOrderByID(ctx, tenantID, id)
 	return do, err
+}
+
+func (r *WMSRepo) CancelDeliveryOrder(ctx context.Context, tenantID, id, userID uuid.UUID) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.CancelDeliveryOrder: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return fmt.Errorf("WMSRepo.CancelDeliveryOrder: set tenant: %w", err)
+	}
+
+	var status string
+	var doNumber string
+	err = tx.QueryRowContext(ctx, `SELECT status, do_number FROM delivery_orders WHERE id = $1 AND tenant_id = $2 FOR UPDATE`, id, tenantID).Scan(&status, &doNumber)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrDeliveryOrderNotFound
+		}
+		return fmt.Errorf("WMSRepo.CancelDeliveryOrder: lock DO: %w", err)
+	}
+	if status != string(domain.DeliveryOrderStatusDraft) {
+		return domain.ErrDeliveryOrderNotDraft
+	}
+
+	now := time.Now().UTC()
+	_, err = tx.ExecContext(ctx, `
+UPDATE delivery_orders
+SET status = 'CANCELLED', updated_at = $3
+WHERE id = $1 AND tenant_id = $2`, id, tenantID, now)
+	if err != nil {
+		return fmt.Errorf("WMSRepo.CancelDeliveryOrder: update status: %w", err)
+	}
+
+	auditDetails, _ := json.Marshal(map[string]any{
+		"do_number": doNumber,
+		"status":    domain.DeliveryOrderStatusCancelled,
+	})
+	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "delivery_order", id, "cancelled", auditDetails); err != nil {
+		return fmt.Errorf("WMSRepo.CancelDeliveryOrder: audit: %w", err)
+	}
+
+	return tx.Commit()
 }
 
 func (r *WMSRepo) UpdateDeliveryOrderStatus(ctx context.Context, tenantID, id uuid.UUID, status domain.DeliveryOrderStatus, receivedDate *time.Time) error {

@@ -1143,6 +1143,29 @@ func (u *Usecase) ConfirmDeliveryOrder(ctx context.Context, tenantID, userID uui
 	return u.repo.ConfirmDeliveryOrder(ctx, tenantID, doID, userID)
 }
 
+// CancelDeliveryOrder cancels a DRAFT Delivery Order and releases allocated stock.
+func (u *Usecase) CancelDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error) {
+	do, _, err := u.repo.GetDeliveryOrderByID(ctx, tenantID, doID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, do.WarehouseID); err != nil {
+		return nil, err
+	}
+
+	if do.Status != domain.DeliveryOrderStatusDraft {
+		return nil, domain.ErrDeliveryOrderNotDraft
+	}
+
+	if err := u.repo.CancelDeliveryOrder(ctx, tenantID, do.ID, userID); err != nil {
+		return nil, fmt.Errorf("CancelDeliveryOrder: update status: %w", err)
+	}
+
+	do.Status = domain.DeliveryOrderStatusCancelled
+	return do, nil
+}
+
 // DispatchDeliveryOrder transitions a DO to SHIPPED and deducts inventory from rack to @CUSTOMER.
 func (u *Usecase) DispatchDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error) {
 	do, items, err := u.repo.GetDeliveryOrderByID(ctx, tenantID, doID)

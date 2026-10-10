@@ -31,6 +31,7 @@ var (
 	// receive so the ledger stays consistent.
 	ErrTransferNotDraft = errors.New("only draft stock transfer can be cancelled")
 	ErrDeliveryOrderNotFound = errors.New("delivery order not found")
+	ErrDeliveryOrderNotDraft = errors.New("only draft delivery order can be cancelled")
 	ErrTransferNotFound      = errors.New("stock transfer not found")
 	ErrOpnameNotFound        = errors.New("stock opname not found")
 	ErrScrapNotFound         = errors.New("stock scrap not found")
@@ -740,6 +741,7 @@ type WMSRepository interface {
 	GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UUID) (*DeliveryOrder, []DeliveryOrderItem, error)
 	ConfirmDeliveryOrder(ctx context.Context, tenantID, id, userID uuid.UUID) (*DeliveryOrder, error)
 	UpdateDeliveryOrderStatus(ctx context.Context, tenantID, id uuid.UUID, status DeliveryOrderStatus, receivedDate *time.Time) error
+	CancelDeliveryOrder(ctx context.Context, tenantID, id, userID uuid.UUID) error
 	ListDeliveryOrders(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID) ([]DeliveryOrder, error)
 	GetAvailableStock(ctx context.Context, tenantID, warehouseID uuid.UUID, locationID *uuid.UUID, productID uuid.UUID) (decimal.Decimal, error)
 

@@ -52,6 +52,7 @@ type WMSUsecase interface {
 	CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateDeliveryOrderRequest) (*domain.DeliveryOrder, error)
 	ConfirmDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
 	DispatchDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
+	CancelDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, error)
 	GetDeliveryOrder(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID) (*domain.DeliveryOrder, []domain.DeliveryOrderItem, error)
 	ListDeliveryOrders(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID) ([]domain.DeliveryOrder, error)
 
@@ -174,6 +175,8 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Get("/delivery-orders/{id}", h.GetDeliveryOrder)
 		r.Post("/delivery-orders/{id}/confirm", h.ConfirmDeliveryOrder)
 		r.Post("/delivery-orders/{id}/dispatch", h.DispatchDeliveryOrder)
+		r.Delete("/delivery-orders/{id}", h.CancelDeliveryOrder)
+		r.Post("/delivery-orders/{id}/cancel", h.CancelDeliveryOrder)
 		// Sprint 3 Outbound Picking & Pack Station
 		r.Get("/delivery-orders/{id}/picking", h.GetPickingTask)
 		r.Post("/delivery-orders/{id}/picking/start", h.StartPickingTask)
@@ -389,6 +392,8 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusConflict, "Hanya transfer berstatus DRAFT yang bisa dibatalkan. Transfer yang sudah diajukan atau diproses harus menunggu penolakan atau penerimaan.")
 	case errors.Is(err, domain.ErrDeliveryOrderNotFound):
 		RespondError(w, r, http.StatusNotFound, "delivery order not found")
+	case errors.Is(err, domain.ErrDeliveryOrderNotDraft):
+		RespondError(w, r, http.StatusConflict, "Hanya Surat Jalan berstatus DRAFT yang dapat dibatalkan")
 	case errors.Is(err, domain.ErrOpnameNotFound):
 		RespondError(w, r, http.StatusNotFound, "stock opname not found")
 	case errors.Is(err, domain.ErrScrapNotFound):
@@ -998,6 +1003,31 @@ func (h *WMSHandler) DispatchDeliveryOrder(w http.ResponseWriter, r *http.Reques
 	}
 
 	do, err := h.uc.DispatchDeliveryOrder(r.Context(), tenantID, userID, role, doID)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, do)
+}
+
+// CancelDeliveryOrder handles DELETE /api/v1/wms/delivery-orders/{id}
+// and POST /api/v1/wms/delivery-orders/{id}/cancel
+func (h *WMSHandler) CancelDeliveryOrder(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	doID, ok := parseUUIDParam(r, "id")
+	if !ok {
+		RespondError(w, r, http.StatusBadRequest, "invalid delivery order id")
+		return
+	}
+
+	do, err := h.uc.CancelDeliveryOrder(r.Context(), tenantID, userID, role, doID)
 	if err != nil {
 		handleWMSError(w, r, err)
 		return

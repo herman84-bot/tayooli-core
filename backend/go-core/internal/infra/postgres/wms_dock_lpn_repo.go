@@ -1057,7 +1057,7 @@ func (r *WMSRepo) GetLPNByID(ctx context.Context, tenantID, id uuid.UUID) (*doma
 	SELECT i.id, i.tenant_id, i.lpn_id, i.product_id, p.name, p.sku,
 	       i.batch_id, b.batch_number, b.expiry_date, i.quantity, i.created_at, i.updated_at
 	FROM stock_lpn_items i
-	JOIN products p ON p.id = i.product_id AND p.tenant_id = $2
+	LEFT JOIN products p ON p.id = i.product_id AND p.tenant_id = $2 AND p.deleted_at IS NULL
 	JOIN stock_batches b ON b.id = i.batch_id AND b.tenant_id = $2
 	WHERE i.lpn_id = $1 AND i.tenant_id = $2
 	ORDER BY i.created_at ASC`
@@ -1220,7 +1220,7 @@ func (r *WMSRepo) AddLPNItem(ctx context.Context, tenantID, lpnID uuid.UUID, req
 
 	// 2. Verify product
 	var prodName, prodSKU string
-	err = tx.QueryRowContext(ctx, `SELECT name, sku FROM products WHERE id = $1 AND tenant_id = $2`, req.ProductID, tenantID).Scan(&prodName, &prodSKU)
+	err = tx.QueryRowContext(ctx, `SELECT name, sku FROM products WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`, req.ProductID, tenantID).Scan(&prodName, &prodSKU)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
