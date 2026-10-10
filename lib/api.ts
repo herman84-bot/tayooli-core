@@ -842,6 +842,20 @@ export interface TenantPaymentConfigResponse {
   gateway_fee_percent?: number
 }
 
+export interface CompanyProfile {
+  tenant_id?: string
+  name: string
+  company_name?: string
+  address?: string
+  phone?: string
+  email?: string
+  tax_id?: string
+  website?: string
+  logo_url?: string
+  tagline?: string
+  division?: string
+}
+
 export interface UpsertPaymentConfigPayload {
   provider: string
   slug?: string
@@ -2024,6 +2038,14 @@ export const api = {
       request<{ message: string; provider: string }>("/payments/configs", {
         method: "POST",
         body: JSON.stringify(payload),
+      }),
+  },
+  settings: {
+    getProfile: () => request<{ data: CompanyProfile }>("/settings/profile"),
+    updateProfile: (data: Partial<CompanyProfile>) =>
+      request<{ success: boolean; data: CompanyProfile; company_name: string }>("/settings/profile", {
+        method: "PATCH",
+        body: JSON.stringify(data),
       }),
   },
 }

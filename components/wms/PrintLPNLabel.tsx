@@ -5,10 +5,12 @@
 
 import React from "react"
 import { Printer, X, Box, Layers, Weight, MapPin, Calendar, CheckCircle2 } from "lucide-react"
-import type { StockLPNDetail, PalletType } from "@/lib/api"
+import { useCompanyProfile } from "@/hooks/useCompanyProfile"
+import type { StockLPNDetail, PalletType, CompanyProfile } from "@/lib/api"
 
 export interface PrintLPNLabelProps {
   lpnDetail: StockLPNDetail
+  companyProfile?: Partial<CompanyProfile>
   onClose: () => void
 }
 
@@ -108,8 +110,11 @@ function parseNum(val: unknown): number {
   return 0
 }
 
-export function PrintLPNLabel({ lpnDetail, onClose }: PrintLPNLabelProps) {
+export function PrintLPNLabel({ lpnDetail, companyProfile, onClose }: PrintLPNLabelProps) {
   const { lpn, items = [] } = lpnDetail
+  const { profile: hookProfile } = useCompanyProfile()
+  const activeProfile = companyProfile || hookProfile
+  const companyName = (activeProfile?.name || activeProfile?.company_name || "TAYOOLI ERP - LOGISTICS").trim()
 
   const handlePrint = () => {
     window.print()
@@ -184,7 +189,7 @@ export function PrintLPNLabel({ lpnDetail, onClose }: PrintLPNLabelProps) {
             <div className="flex items-center justify-between border-b-2 border-zinc-900 pb-2">
               <div>
                 <span className="text-[11px] font-black tracking-widest text-zinc-900 block uppercase">
-                  TAYOOLI ERP - LOGISTICS
+                  {companyName}
                 </span>
                 <span className="text-[10px] font-bold text-zinc-600">
                   {lpn.warehouse_name || "GUDANG UTAMA LOGISTIK"}

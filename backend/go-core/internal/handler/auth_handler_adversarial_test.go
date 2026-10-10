@@ -48,6 +48,13 @@ func (m *adversarialUserRepo) UpdateTenantName(_ context.Context, tenantID uuid.
 	m.updatedName = name
 	return nil
 }
+func (m *adversarialUserRepo) GetTenantProfile(_ context.Context, tenantID uuid.UUID) (*domain.TenantProfile, error) {
+	return &domain.TenantProfile{TenantID: tenantID, Name: "Adversarial Co"}, nil
+}
+func (m *adversarialUserRepo) UpdateTenantProfile(_ context.Context, tenantID uuid.UUID, _ domain.TenantProfile) error {
+	m.updatedTenant = tenantID
+	return nil
+}
 func (m *adversarialUserRepo) GetUserByVerificationToken(_ context.Context, _ string) (*domain.User, error) {
 	return nil, domain.ErrNotFound
 }

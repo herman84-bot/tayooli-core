@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useTeamMembers } from '@/hooks/useTeamMembers'
 import { usePaymentConfig } from '@/hooks/usePaymentConfig'
+import { useCompanyProfile } from '@/hooks/useCompanyProfile'
 import {
   Settings,
   Users,
@@ -272,56 +273,228 @@ function TeamTab() {
 }
 
 function ProfileTab() {
-  return (
-    <div>
-      <h2 className="text-sm font-semibold text-foreground mb-1">Profil Bisnis / Toko</h2>
-      <p className="text-xs text-muted-foreground mb-4">Informasi ini ditampilkan pada struk kasir, surat jalan, dan dokumen operasional.</p>
+  const { user } = useAuth()
+  const { profile, isLoading, updateProfile } = useCompanyProfile()
 
-      <div className="space-y-3 max-w-lg">
+  const [companyName, setCompanyName] = useState('')
+  const [division, setDivision] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [address, setAddress] = useState('')
+  const [taxId, setTaxId] = useState('')
+  const [website, setWebsite] = useState('')
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const isAuthorized = user?.role === 'owner' || user?.role === 'admin'
+
+  useEffect(() => {
+    if (profile) {
+      setCompanyName(profile.name || profile.company_name || '')
+      setDivision(profile.division || '')
+      setEmail(profile.email || '')
+      setPhone(profile.phone || '')
+      setAddress(profile.address || '')
+      setTaxId(profile.tax_id || '')
+      setWebsite(profile.website || '')
+    }
+  }, [profile])
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaveError(null)
+    setSaveSuccess(false)
+
+    const trimmedName = companyName.trim()
+    if (trimmedName.length < 2) {
+      setSaveError('Nama perusahaan minimal 2 karakter.')
+      return
+    }
+
+    try {
+      await updateProfile.mutateAsync({
+        name: trimmedName,
+        division: division.trim() || undefined,
+        email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
+        address: address.trim() || undefined,
+        tax_id: taxId.trim() || undefined,
+        website: website.trim() || undefined,
+      })
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 4000)
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : 'Gagal menyimpan profil perusahaan')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span className="ml-2 text-xs text-muted-foreground">Memuat data perusahaan...</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-sm font-semibold text-foreground mb-1">Profil Bisnis / Perusahaan</h2>
+        <p className="text-xs text-muted-foreground">
+          Informasi ini digunakan otomatis pada kop Surat Jalan (Delivery Order), Faktur Penjualan, Berita Acara, dan Struk Kasir.
+        </p>
+      </div>
+
+      {/* Mini Live Preview Banner */}
+      <div className="rounded-lg border border-border/80 bg-muted/20 p-4 max-w-xl">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+          <Eye className="h-3.5 w-3.5 text-primary" /> Pratinjau Kop Surat Cetak
+        </div>
+        <div className="rounded border border-border bg-card p-3 shadow-xs flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-white font-black text-lg">
+            {companyName.trim().charAt(0).toUpperCase() || 'P'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-bold text-foreground truncate uppercase">
+              {companyName.trim() || 'NAMA PERUSAHAAN ANDA'}
+            </div>
+            <div className="text-[11px] font-medium text-muted-foreground truncate">
+              {division.trim() || 'Divisi Logistik & Pergudangan Terpadu'}
+            </div>
+            <div className="text-[10px] text-muted-foreground/80 truncate mt-0.5">
+              {address.trim() || 'Alamat operasional perusahaan'} &bull; Telp: {phone.trim() || '—'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-4 max-w-lg">
+        {saveSuccess && (
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-700 dark:text-emerald-400">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>Profil perusahaan berhasil disimpan dan disinkronkan ke seluruh dokumen cetak.</span>
+          </div>
+        )}
+
+        {saveError && (
+          <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{saveError}</span>
+          </div>
+        )}
+
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">Nama Perusahaan</label>
+          <label className="block text-xs font-medium text-foreground mb-1">
+            Nama Perusahaan / Toko <span className="text-destructive">*</span>
+          </label>
           <input
             type="text"
-            defaultValue="PT Tayooli Indonesia"
-            className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+            required
+            disabled={!isAuthorized}
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            placeholder="PT Maju Logistik Sentral"
+            className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60"
           />
         </div>
+
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">Email</label>
+          <label className="block text-xs font-medium text-foreground mb-1">Divisi / Unit Operasional</label>
           <input
-            type="email"
-            defaultValue="finance@tayooli.com"
-            className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
+            type="text"
+            disabled={!isAuthorized}
+            value={division}
+            onChange={(e) => setDivision(e.target.value)}
+            placeholder="Divisi Logistik & Pergudangan Terpadu"
+            className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60"
           />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-foreground mb-1">Telepon</label>
-          <input
-            type="tel"
-            defaultValue="+62 21 555 0123"
-            className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
-          />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1">Email Resmi</label>
+            <input
+              type="email"
+              disabled={!isAuthorized}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="kontak@perusahaan.co.id"
+              className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1">Telepon Kantor</label>
+            <input
+              type="tel"
+              disabled={!isAuthorized}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(021) 555-0123"
+              className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60"
+            />
+          </div>
         </div>
+
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">Alamat</label>
+          <label className="block text-xs font-medium text-foreground mb-1">Alamat Kantor / Gudang</label>
           <textarea
             rows={2}
-            defaultValue="Jl. Sudirman No. 123, Jakarta Selatan"
-            className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 resize-none"
+            disabled={!isAuthorized}
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Kawasan Industri Pulogadung Blok B No. 12, Jakarta Timur"
+            className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 resize-none disabled:opacity-60"
           />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-foreground mb-1">NPWP</label>
-          <input
-            type="text"
-            defaultValue="12.345.678.9-013.000"
-            className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50"
-          />
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1">NPWP / Tax ID</label>
+            <input
+              type="text"
+              disabled={!isAuthorized}
+              value={taxId}
+              onChange={(e) => setTaxId(e.target.value)}
+              placeholder="01.234.567.8-901.000"
+              className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1">Website</label>
+            <input
+              type="text"
+              disabled={!isAuthorized}
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              placeholder="www.perusahaan.co.id"
+              className="w-full text-sm px-3 py-1.5 rounded-md border border-border bg-background text-foreground outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-60"
+            />
+          </div>
         </div>
-        <button className="px-4 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
-          Simpan Perubahan
-        </button>
-      </div>
+
+        {isAuthorized ? (
+          <button
+            type="submit"
+            disabled={updateProfile.isPending}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-60 transition-colors shadow-xs"
+          >
+            {updateProfile.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Menyimpan...</span>
+              </>
+            ) : (
+              <span>Simpan Perubahan</span>
+            )}
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground p-2 rounded bg-muted/40 border border-border">
+            <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+            <span>Hanya Administrator atau Pemilik Akun yang berwenang memperbarui profil bisnis.</span>
+          </div>
+        )}
+      </form>
     </div>
   )
 }

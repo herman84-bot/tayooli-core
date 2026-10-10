@@ -2,12 +2,14 @@
 
 import React, { useId } from "react"
 import { Printer, X, FileWarning } from "lucide-react"
-import type { QCInspection, QCInspectionItem } from "@/lib/api"
+import { useCompanyProfile } from "@/hooks/useCompanyProfile"
+import type { QCInspection, QCInspectionItem, CompanyProfile } from "@/lib/api"
 
 export interface PrintBAKProps {
   inspection: QCInspection
   items: QCInspectionItem[]
   warehouseName?: string
+  companyProfile?: Partial<CompanyProfile>
   onClose: () => void
 }
 
@@ -22,7 +24,13 @@ function fmtDate(iso?: string | null): string {
  * Berita Acara Kerusakan Barang (BAK) — A4 printable, same isolation mechanism
  * as PrintDeliveryOrder (window.print + @media print visibility isolation).
  */
-export function PrintBAK({ inspection, items, warehouseName, onClose }: PrintBAKProps) {
+export function PrintBAK({ inspection, items, warehouseName, companyProfile, onClose }: PrintBAKProps) {
+  const { profile: hookProfile } = useCompanyProfile()
+  const activeProfile = companyProfile || hookProfile
+
+  const companyName = (activeProfile?.name || activeProfile?.company_name || "PT TAYOOLI DISTRIBUSI UTAMA").trim()
+  const division = (activeProfile?.division || "Divisi Logistik & Pergudangan (WMS Inbound QC)").trim()
+
   const elementId = `printable-bak-${useId().replace(/:/g, "")}`
   const damaged = items.filter((it) => Number(it.damaged_qty) > 0)
   const totalDamaged = damaged.reduce((s, it) => s + Number(it.damaged_qty || 0), 0)
@@ -101,8 +109,8 @@ export function PrintBAK({ inspection, items, warehouseName, onClose }: PrintBAK
             style={{ minHeight: "297mm", maxWidth: "210mm" }}
           >
             <div className="mb-4 border-b-2 border-zinc-900 pb-3">
-              <h1 className="text-base font-extrabold uppercase">PT TAYOOLI DISTRIBUSI UTAMA</h1>
-              <p className="text-[11px] text-zinc-600">Divisi Logistik & Pergudangan (WMS Inbound QC)</p>
+              <h1 className="text-base font-extrabold uppercase">{companyName}</h1>
+              <p className="text-[11px] text-zinc-600">{division}</p>
             </div>
 
             <div className="my-4 text-center">

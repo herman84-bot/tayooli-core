@@ -83,6 +83,42 @@ func (m *mockUserRepo) UpdateTenantName(_ context.Context, tenantID uuid.UUID, n
 	return nil
 }
 
+func (m *mockUserRepo) GetTenantProfile(_ context.Context, tenantID uuid.UUID) (*domain.TenantProfile, error) {
+	t, ok := m.tenants[tenantID]
+	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	return &domain.TenantProfile{
+		TenantID: t.ID,
+		Name:     t.Name,
+		Address:  t.Address,
+		Phone:    t.Phone,
+		Email:    t.Email,
+		TaxID:    t.TaxID,
+		Website:  t.Website,
+		LogoURL:  t.LogoURL,
+		Tagline:  t.Tagline,
+		Division: t.Division,
+	}, nil
+}
+
+func (m *mockUserRepo) UpdateTenantProfile(_ context.Context, tenantID uuid.UUID, p domain.TenantProfile) error {
+	t, ok := m.tenants[tenantID]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	t.Name = p.Name
+	t.Address = p.Address
+	t.Phone = p.Phone
+	t.Email = p.Email
+	t.TaxID = p.TaxID
+	t.Website = p.Website
+	t.LogoURL = p.LogoURL
+	t.Tagline = p.Tagline
+	t.Division = p.Division
+	return nil
+}
+
 func (m *mockUserRepo) GetUserByVerificationToken(_ context.Context, token string) (*domain.User, error) {
 	for _, u := range m.users {
 		if u.VerificationToken != nil && *u.VerificationToken == token {
@@ -360,6 +396,14 @@ func (alwaysErrorRepo) CreateTenantAndUser(_ context.Context, _ *domain.Tenant, 
 }
 
 func (alwaysErrorRepo) UpdateTenantName(_ context.Context, _ uuid.UUID, _ string) error {
+	return errors.New("db connection failed")
+}
+
+func (alwaysErrorRepo) GetTenantProfile(_ context.Context, _ uuid.UUID) (*domain.TenantProfile, error) {
+	return nil, errors.New("db connection failed")
+}
+
+func (alwaysErrorRepo) UpdateTenantProfile(_ context.Context, _ uuid.UUID, _ domain.TenantProfile) error {
 	return errors.New("db connection failed")
 }
 
@@ -658,5 +702,49 @@ func TestAuthUsecase_ResetPassword_InvalidToken(t *testing.T) {
 
 	err := uc.ResetPassword(context.Background(), "invalid-token", "newpassword123")
 	assert.ErrorIs(t, err, domain.ErrInvalidToken)
+}
+
+func TestAuthUsecase_CompanyProfile(t *testing.T) {
+	repo := newMockUserRepo()
+	tenantID := uuid.New()
+	repo.tenants[tenantID] = &domain.Tenant{
+		ID:   tenantID,
+		Name: "Original PT",
+		Plan: "pro",
+	}
+
+	uc := New(repo, "test-secret", time.Hour, nil, nil)
+
+	// 1. Get profile
+	p, err := uc.GetCompanyProfile(context.Background(), tenantID)
+	require.NoError(t, err)
+	assert.Equal(t, "Original PT", p.Name)
+
+	// 2. Update profile
+	err = uc.UpdateCompanyProfile(context.Background(), tenantID, domain.TenantProfile{
+		Name:     "PT Maju Logistik Utama",
+		Address:  "Jl. Merdeka No. 45, Jakarta",
+		Phone:    "021-888999",
+		Email:    "info@majulogistik.com",
+		TaxID:    "01.234.567.8-901.000",
+		Website:  "www.majulogistik.com",
+		Division: "WMS Fulfillment",
+	})
+	require.NoError(t, err)
+
+	// 3. Verify updated profile
+	updated, err := uc.GetCompanyProfile(context.Background(), tenantID)
+	require.NoError(t, err)
+	assert.Equal(t, "PT Maju Logistik Utama", updated.Name)
+	assert.Equal(t, "Jl. Merdeka No. 45, Jakarta", updated.Address)
+	assert.Equal(t, "021-888999", updated.Phone)
+	assert.Equal(t, "info@majulogistik.com", updated.Email)
+	assert.Equal(t, "01.234.567.8-901.000", updated.TaxID)
+	assert.Equal(t, "www.majulogistik.com", updated.Website)
+	assert.Equal(t, "WMS Fulfillment", updated.Division)
+
+	// 4. Update with invalid name (<2 chars)
+	err = uc.UpdateCompanyProfile(context.Background(), tenantID, domain.TenantProfile{Name: " "})
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 

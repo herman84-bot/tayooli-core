@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -156,6 +157,84 @@ func (r *UserRepo) UpdateTenantName(ctx context.Context, tenantID uuid.UUID, nam
 
 	const q = `UPDATE tenants SET name = $1, setup_completed_at = NOW(), updated_at = NOW() WHERE id = $2`
 	result, err := tx.ExecContext(ctx, q, name, tenantID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrNotFound
+	}
+	return tx.Commit()
+}
+
+// GetTenantProfile retrieves the tenant's company branding and profile.
+func (r *UserRepo) GetTenantProfile(ctx context.Context, tenantID uuid.UUID) (*domain.TenantProfile, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, err
+	}
+
+	const q = `
+SELECT id, name, COALESCE(address, ''), COALESCE(phone, ''), COALESCE(email, ''),
+       COALESCE(tax_id, ''), COALESCE(website, ''), COALESCE(logo_url, ''),
+       COALESCE(tagline, ''), COALESCE(division, '')
+FROM tenants
+WHERE id = $1`
+
+	var p domain.TenantProfile
+	err = tx.QueryRowContext(ctx, q, tenantID).Scan(
+		&p.TenantID, &p.Name, &p.Address, &p.Phone, &p.Email,
+		&p.TaxID, &p.Website, &p.LogoURL, &p.Tagline, &p.Division,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
+	}
+	_ = tx.Commit()
+	return &p, nil
+}
+
+// UpdateTenantProfile updates the tenant's full company profile.
+func (r *UserRepo) UpdateTenantProfile(ctx context.Context, tenantID uuid.UUID, p domain.TenantProfile) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return err
+	}
+
+	const q = `
+UPDATE tenants
+SET name = $1,
+    address = $2,
+    phone = $3,
+    email = $4,
+    tax_id = $5,
+    website = $6,
+    logo_url = $7,
+    tagline = $8,
+    division = $9,
+    updated_at = NOW()
+WHERE id = $10`
+
+	result, err := tx.ExecContext(ctx, q,
+		p.Name, p.Address, p.Phone, p.Email,
+		p.TaxID, p.Website, p.LogoURL, p.Tagline, p.Division,
+		tenantID,
+	)
 	if err != nil {
 		return err
 	}

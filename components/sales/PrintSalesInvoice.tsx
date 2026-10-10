@@ -4,6 +4,8 @@ import React, { useEffect, useState, useId } from 'react'
 import { Printer, X, Receipt, Building2, CreditCard, ShieldCheck } from 'lucide-react'
 import QRCode from 'qrcode'
 import { formatCurrency, terbilang } from '@/lib/currency'
+import { useCompanyProfile } from '@/hooks/useCompanyProfile'
+import type { CompanyProfile } from '@/lib/api'
 import type { SalesInvoice } from '@/hooks/useSalesInvoices'
 
 export interface InvoiceLineItem {
@@ -23,7 +25,13 @@ export interface PrintSalesInvoiceProps {
   customerPhone?: string
   deliveryOrderRef?: string
   items?: InvoiceLineItem[]
+  companyProfile?: Partial<CompanyProfile>
   onClose: () => void
+}
+
+function getCompanyInitial(name: string): string {
+  const clean = name.trim().replace(/^(PT|PT\.|CV|CV\.|UD|UD\.)\s+/i, '')
+  return clean.charAt(0).toUpperCase() || name.charAt(0).toUpperCase() || 'T'
 }
 
 export function PrintSalesInvoice({
@@ -34,8 +42,20 @@ export function PrintSalesInvoice({
   customerPhone = '(021) 529-0123',
   deliveryOrderRef,
   items,
+  companyProfile,
   onClose,
 }: PrintSalesInvoiceProps) {
+  const { profile: hookProfile } = useCompanyProfile()
+  const activeProfile = companyProfile || hookProfile
+
+  const companyName = (activeProfile?.name || activeProfile?.company_name || 'PT TAYOOLI DISTRIBUSI UTAMA').trim()
+  const division = (activeProfile?.division || 'General Trading, Logistics & B2B Distribution Center').trim()
+  const address = (activeProfile?.address || 'Kawasan Industri Pulogadung Blok B No. 12, Jakarta Timur 13920').trim()
+  const phone = (activeProfile?.phone || '(021) 460-8899').trim()
+  const email = (activeProfile?.email || 'billing@tayooli.co.id').trim()
+  const taxId = (activeProfile?.tax_id || '01.345.678.9-012.000').trim()
+  const logoInitial = getCompanyInitial(companyName)
+
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const printAreaId = useId().replace(/:/g, '')
   const elementId = `printable-inv-${printAreaId}`
@@ -200,20 +220,20 @@ export function PrintSalesInvoice({
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-700 text-white font-black text-xl">
-                    T
+                    {logoInitial}
                   </div>
                   <div>
                     <h1 className="text-base font-extrabold uppercase tracking-tight text-zinc-950">
-                      PT TAYOOLI DISTRIBUSI UTAMA
+                      {companyName}
                     </h1>
                     <p className="text-[11px] font-medium text-zinc-600">
-                      General Trading, Logistics & B2B Distribution Center
+                      {division}
                     </p>
                     <p className="text-[10px] text-zinc-500 mt-0.5">
-                      Kawasan Industri Pulogadung Blok B No. 12, Jakarta Timur 13920
+                      {address}
                     </p>
                     <p className="text-[10px] text-zinc-500">
-                      NPWP: 01.345.678.9-012.000 &bull; Telp: (021) 460-8899 &bull; Email: billing@tayooli.co.id
+                      NPWP: {taxId} &bull; Telp: {phone} &bull; Email: {email}
                     </p>
                   </div>
                 </div>
@@ -413,7 +433,7 @@ export function PrintSalesInvoice({
                   Jakarta, {formatDate(invoice.createdAt)}
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-900">
-                  PT TAYOOLI DISTRIBUSI UTAMA
+                  {companyName}
                 </p>
                 <div className="h-20 flex items-center justify-center">
                   <div className="rounded border border-dashed border-zinc-300 px-4 py-2 text-[9px] text-zinc-400 font-mono">

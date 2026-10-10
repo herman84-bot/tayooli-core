@@ -28,6 +28,8 @@ type mockAuthUsecase struct {
 	registerFn            func(ctx context.Context, fullName, email, password string) (*domain.User, error)
 	issueTokenFn          func(user *domain.User) (string, error)
 	updateWorkspaceNameFn func(ctx context.Context, tenantID uuid.UUID, name string) error
+	getCompanyProfileFn    func(ctx context.Context, tenantID uuid.UUID) (*domain.TenantProfile, error)
+	updateCompanyProfileFn func(ctx context.Context, tenantID uuid.UUID, p domain.TenantProfile) error
 	verifyEmailFn         func(ctx context.Context, token string) (*domain.User, error)
 	getUserByEmailFn      func(ctx context.Context, email string) (*domain.User, error)
 }
@@ -57,6 +59,20 @@ func (m *mockAuthUsecase) IssueToken(user *domain.User) (string, error) {
 func (m *mockAuthUsecase) UpdateWorkspaceName(ctx context.Context, tenantID uuid.UUID, name string) error {
 	if m.updateWorkspaceNameFn != nil {
 		return m.updateWorkspaceNameFn(ctx, tenantID, name)
+	}
+	return nil
+}
+
+func (m *mockAuthUsecase) GetCompanyProfile(ctx context.Context, tenantID uuid.UUID) (*domain.TenantProfile, error) {
+	if m.getCompanyProfileFn != nil {
+		return m.getCompanyProfileFn(ctx, tenantID)
+	}
+	return &domain.TenantProfile{TenantID: tenantID, Name: "PT Tayooli Indonesia"}, nil
+}
+
+func (m *mockAuthUsecase) UpdateCompanyProfile(ctx context.Context, tenantID uuid.UUID, p domain.TenantProfile) error {
+	if m.updateCompanyProfileFn != nil {
+		return m.updateCompanyProfileFn(ctx, tenantID, p)
 	}
 	return nil
 }
@@ -790,5 +806,71 @@ func TestAuthHandler_CreateWorkspace_InvalidBody(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestAuthHandler_GetCompanyProfile_Success(t *testing.T) {
+	tenantID := uuid.New()
+	userID := uuid.New()
+
+	uc := &mockAuthUsecase{
+		getCompanyProfileFn: func(ctx context.Context, tid uuid.UUID) (*domain.TenantProfile, error) {
+			return &domain.TenantProfile{
+				TenantID: tid,
+				Name:     "PT Sumber Rezeki",
+				Address:  "Jl. Hayam Wuruk 10",
+				Phone:    "08123456789",
+				Email:    "halo@sumberrezeki.id",
+			}, nil
+		},
+	}
+	h := handler.NewAuthHandler(uc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings/profile", nil)
+	req = withAuthContext(req, tenantID, userID)
+	rr := httptest.NewRecorder()
+
+	h.GetCompanyProfile(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	data, ok := resp["data"].(map[string]any)
+	if !ok || data["name"] != "PT Sumber Rezeki" {
+		t.Errorf("unexpected profile data: %v", resp)
+	}
+}
+
+func TestAuthHandler_UpdateCompanyProfile_Success(t *testing.T) {
+	tenantID := uuid.New()
+	userID := uuid.New()
+
+	var updatedProfile domain.TenantProfile
+	uc := &mockAuthUsecase{
+		updateCompanyProfileFn: func(ctx context.Context, tid uuid.UUID, p domain.TenantProfile) error {
+			updatedProfile = p
+			return nil
+		},
+	}
+	h := handler.NewAuthHandler(uc)
+
+	body := `{"company_name":"PT Makmur Abadi","address":"Jl. Thamrin 88","phone":"021-999888","email":"support@makmur.com","tax_id":"09.876.543.2-100.000","division":"Logistik Sentral"}`
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/settings/profile", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = withAuthContext(req, tenantID, userID)
+	rr := httptest.NewRecorder()
+
+	h.UpdateCompanyProfile(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if updatedProfile.Name != "PT Makmur Abadi" || updatedProfile.Address != "Jl. Thamrin 88" {
+		t.Errorf("profile not passed correctly to usecase: %+v", updatedProfile)
 	}
 }

@@ -3,14 +3,21 @@
 import React, { useEffect, useState, useId } from 'react'
 import { Printer, X, CheckCircle2, Truck, Box, ShieldCheck, MapPin } from 'lucide-react'
 import QRCode from 'qrcode'
-import type { DeliveryOrder, DeliveryOrderItem } from '@/lib/api'
+import { useCompanyProfile } from '@/hooks/useCompanyProfile'
+import type { DeliveryOrder, DeliveryOrderItem, CompanyProfile } from '@/lib/api'
 
 export interface PrintDeliveryOrderProps {
   deliveryOrder: DeliveryOrder
   items: DeliveryOrderItem[]
   warehouseName?: string
   warehouseAddress?: string
+  companyProfile?: Partial<CompanyProfile>
   onClose: () => void
+}
+
+function getCompanyInitial(name: string): string {
+  const clean = name.trim().replace(/^(PT|PT\.|CV|CV\.|UD|UD\.)\s+/i, '')
+  return clean.charAt(0).toUpperCase() || name.charAt(0).toUpperCase() || 'T'
 }
 
 export function PrintDeliveryOrder({
@@ -18,8 +25,20 @@ export function PrintDeliveryOrder({
   items,
   warehouseName = 'Gudang Distribusi Cakung (WH-JKT-01)',
   warehouseAddress = 'Kawasan Industri Pulogadung Blok B, Jakarta Timur',
+  companyProfile,
   onClose,
 }: PrintDeliveryOrderProps) {
+  const { profile: hookProfile } = useCompanyProfile()
+  const activeProfile = companyProfile || hookProfile
+
+  const companyName = (activeProfile?.name || activeProfile?.company_name || 'PT TAYOOLI DISTRIBUSI UTAMA').trim()
+  const division = (activeProfile?.division || 'Divisi Logistik & Pergudangan Terpadu (WMS Fulfillment)').trim()
+  const address = (activeProfile?.address || 'Kawasan Industri Pulogadung Blok B No. 12, Jakarta Timur 13920').trim()
+  const phone = (activeProfile?.phone || '(021) 460-8899').trim()
+  const email = (activeProfile?.email || 'wms@tayooli.co.id').trim()
+  const website = (activeProfile?.website || 'www.tayooli.com').trim()
+  const logoInitial = getCompanyInitial(companyName)
+
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const printAreaId = useId().replace(/:/g, '')
   const elementId = `printable-do-${printAreaId}`
@@ -160,20 +179,20 @@ export function PrintDeliveryOrder({
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-zinc-900 text-white font-black text-xl">
-                    T
+                    {logoInitial}
                   </div>
                   <div>
                     <h1 className="text-base font-extrabold uppercase tracking-tight text-zinc-950">
-                      PT TAYOOLI DISTRIBUSI UTAMA
+                      {companyName}
                     </h1>
                     <p className="text-[11px] font-medium text-zinc-600">
-                      Divisi Logistik & Pergudangan Terpadu (WMS Fulfillment)
+                      {division}
                     </p>
                     <p className="text-[10px] text-zinc-500 mt-0.5">
-                      Kawasan Industri Pulogadung Blok B No. 12, Jakarta Timur 13920
+                      {address}
                     </p>
                     <p className="text-[10px] text-zinc-500">
-                      Telp: (021) 460-8899 &bull; Email: wms@tayooli.co.id &bull; Website: www.tayooli.com
+                      Telp: {phone} &bull; Email: {email} &bull; Website: {website}
                     </p>
                   </div>
                 </div>

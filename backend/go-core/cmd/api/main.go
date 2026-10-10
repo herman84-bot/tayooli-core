@@ -669,6 +669,7 @@ func main() {
 		})
 
 		// Team Management & Profile Settings
+		r.Get("/settings/profile", authHandler.GetCompanyProfile)
 		r.Get("/settings/team", teamHandler.ListMembers)
 		r.Get("/team", teamHandler.ListMembers)
 		r.Group(func(r chi.Router) {

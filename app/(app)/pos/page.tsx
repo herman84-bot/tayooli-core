@@ -40,6 +40,7 @@ import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
 import { useProducts } from "@/hooks/useProducts"
 import { usePOSOrders, usePOSCheckout, usePOSCreatePayment, usePOSPaymentStatus, usePOSSimulatePayment } from "@/hooks/usePOS"
 import { useWMSStock } from "@/hooks/useWMSLedger"
+import { useCompanyProfile } from "@/hooks/useCompanyProfile"
 import type { POSOrder, POSPaymentCharge } from "@/lib/api"
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 import type { ExportColumn } from "@/lib/export"
@@ -108,6 +109,12 @@ export default function POSPage() {
 
   // Current retail sales mode toggle
   const [globalSaleMode, setGlobalSaleMode] = useState<SaleMode>("JUAL_PUTUS")
+
+  // Company Profile for Thermal Receipt & WhatsApp Header
+  const { profile: companyProfile } = useCompanyProfile()
+  const posStoreName = (companyProfile?.name || companyProfile?.company_name || "TAYOOLI RETAIL & WMS").trim()
+  const posStoreAddress = (companyProfile?.address || "Kav. Logistik Pergudangan No. 42").trim()
+  const posStorePhone = (companyProfile?.phone || "021-555-1234").trim()
 
   // Customer & Cart State
   const [customerName, setCustomerName] = useState<string>("Pelanggan Umum")
@@ -550,7 +557,7 @@ export default function POSPage() {
       .map((i) => `• ${i.name} (${i.quantity}x) = Rp ${(i.price * i.quantity).toLocaleString("id-ID")}`)
       .join("\n")
     const text =
-      `*STRUK PEMBAYARAN TAYOOLI POS*\n` +
+      `*STRUK PEMBAYARAN ${posStoreName.toUpperCase()}*\n` +
       `No. Transaksi: ${receiptData.orderNumber}\n` +
       `Waktu: ${receiptData.date}\n` +
       `Metode: ${receiptData.method}\n` +
@@ -1325,9 +1332,9 @@ export default function POSPage() {
                   }`}
                 >
                   <div className="text-center pb-2 border-b border-dashed border-slate-300">
-                    <div className="font-extrabold text-sm">TAYOOLI RETAIL & WMS</div>
-                    <div className="text-[10px] text-slate-500">Kav. Logistik Pergudangan No. 42</div>
-                    <div className="text-[10px] text-slate-500">Telp: 021-555-1234</div>
+                    <div className="font-extrabold text-sm uppercase">{posStoreName}</div>
+                    <div className="text-[10px] text-slate-500">{posStoreAddress}</div>
+                    <div className="text-[10px] text-slate-500">Telp: {posStorePhone}</div>
                   </div>
 
                   <div className="flex justify-between text-[11px]">

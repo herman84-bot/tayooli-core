@@ -23,6 +23,8 @@ type UserReader interface {
 	CreateUser(ctx context.Context, user *domain.User) error
 	CreateTenantAndUser(ctx context.Context, tenant *domain.Tenant, user *domain.User) error
 	UpdateTenantName(ctx context.Context, tenantID uuid.UUID, name string) error
+	GetTenantProfile(ctx context.Context, tenantID uuid.UUID) (*domain.TenantProfile, error)
+	UpdateTenantProfile(ctx context.Context, tenantID uuid.UUID, p domain.TenantProfile) error
 	GetUserByVerificationToken(ctx context.Context, token string) (*domain.User, error)
 	UpdateUserVerification(ctx context.Context, userID, tenantID uuid.UUID, verifiedAt time.Time) error
 	ClearVerificationToken(ctx context.Context, userID, tenantID uuid.UUID) error
@@ -183,6 +185,20 @@ func (u *Usecase) UpdateWorkspaceName(ctx context.Context, tenantID uuid.UUID, n
 		return domain.ErrInvalidInput
 	}
 	return u.userRepo.UpdateTenantName(ctx, tenantID, name)
+}
+
+// GetCompanyProfile retrieves the tenant's company branding profile.
+func (u *Usecase) GetCompanyProfile(ctx context.Context, tenantID uuid.UUID) (*domain.TenantProfile, error) {
+	return u.userRepo.GetTenantProfile(ctx, tenantID)
+}
+
+// UpdateCompanyProfile updates the tenant's full company profile.
+func (u *Usecase) UpdateCompanyProfile(ctx context.Context, tenantID uuid.UUID, p domain.TenantProfile) error {
+	p.Name = strings.TrimSpace(p.Name)
+	if len(p.Name) < 2 || len(p.Name) > 255 {
+		return domain.ErrInvalidInput
+	}
+	return u.userRepo.UpdateTenantProfile(ctx, tenantID, p)
 }
 
 // VerifyEmail verifies a user's email address using the verification token.

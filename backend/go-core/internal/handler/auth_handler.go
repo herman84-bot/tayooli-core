@@ -24,6 +24,8 @@ type authUsecase interface {
 	Register(ctx context.Context, fullName, email, password string) (*domain.User, error)
 	IssueToken(user *domain.User) (string, error)
 	UpdateWorkspaceName(ctx context.Context, tenantID uuid.UUID, name string) error
+	GetCompanyProfile(ctx context.Context, tenantID uuid.UUID) (*domain.TenantProfile, error)
+	UpdateCompanyProfile(ctx context.Context, tenantID uuid.UUID, p domain.TenantProfile) error
 	VerifyEmail(ctx context.Context, token string) (*domain.User, error)
 	ResendVerification(ctx context.Context, email string) error
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
@@ -454,6 +456,29 @@ func (h *AuthHandler) CreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetCompanyProfile handles GET /api/v1/settings/profile.
+func (h *AuthHandler) GetCompanyProfile(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		respondError(w, r, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	profile, err := h.uc.GetCompanyProfile(r.Context(), tenantID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			respondError(w, r, http.StatusNotFound, "profil perusahaan tidak ditemukan")
+			return
+		}
+		respondError(w, r, http.StatusInternalServerError, "gagal memuat profil perusahaan")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]any{
+		"data": profile,
+	})
+}
+
 // UpdateCompanyProfile handles PATCH /api/v1/settings/profile.
 func (h *AuthHandler) UpdateCompanyProfile(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := appMiddleware.GetTenantID(r.Context())
@@ -465,8 +490,15 @@ func (h *AuthHandler) UpdateCompanyProfile(w http.ResponseWriter, r *http.Reques
 	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
 	var req struct {
 		CompanyName string `json:"company_name"`
+		Name        string `json:"name"`
 		Address     string `json:"address"`
+		Phone       string `json:"phone"`
+		Email       string `json:"email"`
 		TaxID       string `json:"tax_id"`
+		Website     string `json:"website"`
+		LogoURL     string `json:"logo_url"`
+		Tagline     string `json:"tagline"`
+		Division    string `json:"division"`
 		Currency    string `json:"currency"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -475,6 +507,9 @@ func (h *AuthHandler) UpdateCompanyProfile(w http.ResponseWriter, r *http.Reques
 	}
 
 	companyName := strings.TrimSpace(req.CompanyName)
+	if companyName == "" {
+		companyName = strings.TrimSpace(req.Name)
+	}
 	if len(companyName) < 2 || len(companyName) > 255 {
 		respondError(w, r, http.StatusBadRequest, "company name must be between 2 and 255 characters")
 		return
@@ -486,7 +521,20 @@ func (h *AuthHandler) UpdateCompanyProfile(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.uc.UpdateWorkspaceName(r.Context(), tenantID, companyName); err != nil {
+	profile := domain.TenantProfile{
+		TenantID: tenantID,
+		Name:     companyName,
+		Address:  strings.TrimSpace(req.Address),
+		Phone:    strings.TrimSpace(req.Phone),
+		Email:    strings.TrimSpace(req.Email),
+		TaxID:    strings.TrimSpace(req.TaxID),
+		Website:  strings.TrimSpace(req.Website),
+		LogoURL:  strings.TrimSpace(req.LogoURL),
+		Tagline:  strings.TrimSpace(req.Tagline),
+		Division: strings.TrimSpace(req.Division),
+	}
+
+	if err := h.uc.UpdateCompanyProfile(r.Context(), tenantID, profile); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			respondError(w, r, http.StatusNotFound, "workspace tidak ditemukan")
 			return
@@ -497,9 +545,15 @@ func (h *AuthHandler) UpdateCompanyProfile(w http.ResponseWriter, r *http.Reques
 
 	respondJSON(w, http.StatusOK, map[string]any{
 		"success":      true,
+		"data":         profile,
 		"company_name": companyName,
-		"address":      req.Address,
-		"tax_id":       req.TaxID,
+		"address":      profile.Address,
+		"phone":        profile.Phone,
+		"email":        profile.Email,
+		"tax_id":       profile.TaxID,
+		"website":      profile.Website,
+		"tagline":      profile.Tagline,
+		"division":     profile.Division,
 		"currency":     req.Currency,
 	})
 }

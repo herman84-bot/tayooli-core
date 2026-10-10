@@ -2,20 +2,28 @@
 
 import React, { useId } from "react"
 import { Printer, X, Truck, FileText, CheckCircle2, Clock } from "lucide-react"
-import type { ShippingManifestDetail } from "@/lib/api"
+import { useCompanyProfile } from "@/hooks/useCompanyProfile"
+import type { ShippingManifestDetail, CompanyProfile } from "@/lib/api"
 
 export interface PrintShippingManifestProps {
   manifestDetail: ShippingManifestDetail
+  companyProfile?: Partial<CompanyProfile>
   onClose: () => void
 }
 
 export function PrintShippingManifest({
   manifestDetail,
+  companyProfile,
   onClose,
 }: PrintShippingManifestProps) {
   const { manifest, items = [] } = manifestDetail
   const printAreaId = useId().replace(/:/g, "")
   const elementId = `printable-manifest-${printAreaId}`
+
+  const { profile: hookProfile } = useCompanyProfile()
+  const activeProfile = companyProfile || hookProfile
+  const companyName = (activeProfile?.name || activeProfile?.company_name || "TAYOOLI LOGISTICS & WMS").trim()
+  const division = (activeProfile?.division || "Sistem Manajemen Pergudangan & Distribusi Terpadu").trim()
 
   const handlePrint = () => {
     if (typeof window !== "undefined") {
@@ -144,10 +152,10 @@ export function PrintShippingManifest({
               <div className="flex items-start justify-between">
                 <div>
                   <h1 className="text-xl font-black tracking-tight text-zinc-950 uppercase font-sans">
-                    TAYOOLI LOGISTICS &amp; WMS
+                    {companyName}
                   </h1>
                   <p className="text-xs text-zinc-600">
-                    Sistem Manajemen Pergudangan &amp; Distribusi Terpadu
+                    {division}
                   </p>
                   <p className="text-[11px] text-zinc-500 mt-0.5">
                     Gudang: {manifest.warehouse_name || "Pusat Distribusi"}
