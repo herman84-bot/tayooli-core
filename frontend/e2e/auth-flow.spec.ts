@@ -71,7 +71,12 @@ test.describe('Authentication Flow (Tayooli Core)', () => {
     await expect(page).toHaveURL('/login')
 
     // Back button must not resurrect the protected page.
+    // Login/logout use location.replace, so history may land on /login or about:blank —
+    // either is fine; what must never happen is landing on a protected page.
     await page.goBack()
+    await page.waitForLoadState()
+    expect(page.url()).not.toMatch(/\/(dashboard|pos|wms|products|settings)/)
+    await page.goto('/dashboard')
     await expect(page).toHaveURL('/login')
 
     // Replay the pre-logout cookie: the backend must reject it.
