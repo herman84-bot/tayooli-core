@@ -60,6 +60,7 @@ export default function WMSDashboardPage() {
     data: stockSummary = [],
     isLoading: loadingStock,
     refetch: refetchStock,
+    dataUpdatedAt,
   } = useWMSStock(activeWarehouseFilter ?? undefined)
   const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetchWarehouses, refetchLocations, refetchMovements, refetchStock])
 
@@ -311,6 +312,7 @@ export default function WMSDashboardPage() {
                 Pilih Gudang Aktif
               </span>
               <RefreshButton
+              updatedAt={dataUpdatedAt}
                 status={refreshStatus}
                 error={refreshError}
                 onClick={() => void refresh()}

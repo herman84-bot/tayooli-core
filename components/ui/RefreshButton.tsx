@@ -13,6 +13,8 @@ interface RefreshButtonProps {
   className?: string
   iconClassName?: string
   disabled?: boolean
+  /** Epoch ms of last successful data fetch (TanStack `dataUpdatedAt`). 0/undefined = hide. */
+  updatedAt?: number
 }
 
 const LABEL: Record<RefreshStatus, string> = {
@@ -35,6 +37,7 @@ export function RefreshButton({
   className = "",
   iconClassName = "w-4 h-4",
   disabled,
+  updatedAt,
 }: RefreshButtonProps) {
   const refreshing = status === "refreshing"
   const tone =
@@ -45,7 +48,10 @@ export function RefreshButton({
       : ""
   const title = status === "error" && error ? `Gagal menyegarkan: ${error}` : LABEL[status]
 
+  const timeLabel = updatedAt ? formatUpdatedAt(updatedAt) : null
+
   return (
+    <span className="inline-flex flex-col items-center gap-0.5">
     <button
       type="button"
       onClick={onClick}
@@ -67,5 +73,18 @@ export function RefreshButton({
         {status === "idle" ? "" : title}
       </span>
     </button>
+    {timeLabel && (
+      <span className="text-[10px] leading-none text-slate-500 whitespace-nowrap tabular-nums">
+        Data: {timeLabel}
+      </span>
+    )}
+    </span>
   )
+}
+
+/** HH:mm:ss in local time (id-ID). */
+export function formatUpdatedAt(ms: number): string {
+  const d = new Date(ms)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }

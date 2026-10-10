@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from "react"
 import Link from "next/link"
-import { useManualRefresh } from "@/hooks/useManualRefresh"
+import { useManualRefresh, AUTO_REFRESH_MS } from "@/hooks/useManualRefresh"
 import { RefreshButton } from "@/components/ui/RefreshButton"
 import {
   UploadCloud,
@@ -170,13 +170,14 @@ export default function MarketplacePage() {
     data: orders = [],
     isLoading: loadingOrders,
     refetch: refetchOrders,
+    dataUpdatedAt,
   } = useMarketplaceOrders()
   const {
     data: skuMappings = [],
     isLoading: loadingMappings,
     refetch: refetchMappings,
   } = useMarketplaceSKUMappings()
-  const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetchBatches, refetchOrders, refetchMappings])
+  const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetchBatches, refetchOrders, refetchMappings], { autoRefreshMs: AUTO_REFRESH_MS })
 
   // Mutations
   const importOrdersMutation = useImportMarketplaceOrders()
@@ -659,6 +660,7 @@ export default function MarketplacePage() {
             {/* Quick Action Buttons */}
             <div className="flex items-center gap-2">
               <RefreshButton
+              updatedAt={dataUpdatedAt}
                 status={refreshStatus}
                 error={refreshError}
                 onClick={() => void refresh()}

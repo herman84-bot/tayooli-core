@@ -9,7 +9,19 @@ export const MIN_REFRESH_FEEDBACK_MS = 700
 /** How long the "Diperbarui" success state stays after a refresh. */
 export const REFRESH_DONE_VISIBLE_MS = 2000
 
+/** Background auto-refresh interval for fast-changing pages (Dashboard, Marketplace). */
+export const AUTO_REFRESH_MS = 60_000
+
 export type RefreshStatus = "idle" | "refreshing" | "done" | "error"
+
+interface ManualRefreshOptions {
+  /**
+   * When set, refetch silently every N ms while the tab is visible. Skipped
+   * when the tab is hidden (no wasted requests on a locked phone) and while a
+   * manual refresh is in flight. Does not animate the button.
+   */
+  autoRefreshMs?: number
+}
 
 /**
  * Wraps one or more TanStack Query `refetch` functions for a manual "Refresh"
@@ -18,7 +30,8 @@ export type RefreshStatus = "idle" | "refreshing" | "done" | "error"
  * "error") for REFRESH_DONE_VISIBLE_MS so the user sees confirmation.
  * Repeated clicks while a refresh is running are ignored.
  */
-export function useManualRefresh(refetchers: RefetchFn[]) {
+export function useManualRefresh(refetchers: RefetchFn[], options: ManualRefreshOptions = {}) {
+  const { autoRefreshMs } = options
   const [status, setStatus] = useState<RefreshStatus>("idle")
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null)
   const [refreshError, setRefreshError] = useState<string | null>(null)
@@ -76,6 +89,18 @@ export function useManualRefresh(refetchers: RefetchFn[]) {
       if (mounted.current) setStatus("idle")
     }, REFRESH_DONE_VISIBLE_MS)
   }, [])
+
+  useEffect(() => {
+    if (!autoRefreshMs || autoRefreshMs <= 0) return
+    const id = setInterval(() => {
+      if (inFlight.current) return
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return
+      fnsRef.current.forEach((fn) => {
+        void Promise.resolve(fn()).catch(() => {})
+      })
+    }, autoRefreshMs)
+    return () => clearInterval(id)
+  }, [autoRefreshMs])
 
   return { refresh, refreshing: status === "refreshing", status, lastRefreshedAt, refreshError }
 }

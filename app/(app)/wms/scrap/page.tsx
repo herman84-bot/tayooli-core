@@ -57,6 +57,7 @@ export default function StockScrapPage() {
     data: scraps = [],
     isLoading: loadingScraps,
     refetch: refetchScraps,
+    dataUpdatedAt,
   } = useStockScraps(activeWarehouseFilter)
   const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetchScraps, refetchWarehouses])
 
@@ -365,6 +366,7 @@ export default function StockScrapPage() {
 
           <div className="flex items-center gap-2">
             <RefreshButton
+              updatedAt={dataUpdatedAt}
               status={refreshStatus}
               error={refreshError}
               onClick={() => void refresh()}

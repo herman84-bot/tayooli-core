@@ -67,6 +67,7 @@ export default function StockOpnamePage() {
     data: opnames = [],
     isLoading: loadingOpnames,
     refetch: refetchOpnames,
+    dataUpdatedAt,
   } = useStockOpnames(activeWarehouseFilter)
 
   // Drawer / Active Counting Session State
@@ -525,6 +526,7 @@ export default function StockOpnamePage() {
 
           <div className="flex items-center gap-2">
             <RefreshButton
+              updatedAt={dataUpdatedAt}
               status={refreshStatus}
               error={refreshError}
               onClick={() => void refresh()}

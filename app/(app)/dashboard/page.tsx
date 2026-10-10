@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useManualRefresh } from '@/hooks/useManualRefresh'
+import { useManualRefresh, AUTO_REFRESH_MS } from '@/hooks/useManualRefresh'
 import { RefreshButton } from '@/components/ui/RefreshButton'
 import { useDashboardSummary } from '@/lib/queries/dashboard'
 import { useWMSOutboundKPI } from '@/hooks/useWMSManifests'
@@ -162,9 +162,9 @@ function SOPKPICard({
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
-  const { data: summary, isLoading, error, refetch } = useDashboardSummary(period)
+  const { data: summary, isLoading, error, refetch, dataUpdatedAt } = useDashboardSummary(period)
   const { data: kpis, refetch: refetchKPI } = useWMSOutboundKPI()
-  const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetch, refetchKPI])
+  const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetch, refetchKPI], { autoRefreshMs: AUTO_REFRESH_MS })
   const s = summary ?? EMPTY_DASHBOARD_SUMMARY
   const loading = isLoading && !summary
   const status = (error as { response?: { status?: number } } | null)?.response?.status
@@ -200,6 +200,7 @@ export default function DashboardPage() {
             Buka Kasir POS
           </Link>
           <RefreshButton
+              updatedAt={dataUpdatedAt}
             status={isLoading && refreshStatus === 'idle' ? 'refreshing' : refreshStatus}
             error={refreshError}
             onClick={() => void refresh()}

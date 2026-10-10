@@ -62,7 +62,7 @@ interface LineItemDraft {
 
 export default function TransfersPage() {
   const { data: warehouses = [] } = useWarehouses()
-  const { data: transfers = [], isLoading, refetch } = useStockTransfers()
+  const { data: transfers = [], isLoading, refetch, dataUpdatedAt } = useStockTransfers()
   const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetch])
   const { data: products = [] } = useProducts()
   const currentUser = useAuthStore((s) => s.user)
@@ -500,6 +500,7 @@ export default function TransfersPage() {
 
           <div className="flex items-center gap-2">
             <RefreshButton
+              updatedAt={dataUpdatedAt}
               status={refreshStatus}
               error={refreshError}
               onClick={() => void refresh()}

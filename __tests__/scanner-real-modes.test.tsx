@@ -3,8 +3,8 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { renderHook } from '@testing-library/react'
 import BarcodeScannerPage from '@/app/(app)/wms/scanner/page'
-import { useManualRefresh, MIN_REFRESH_FEEDBACK_MS, REFRESH_DONE_VISIBLE_MS } from '@/hooks/useManualRefresh'
-import { RefreshButton } from '@/components/ui/RefreshButton'
+import { useManualRefresh, MIN_REFRESH_FEEDBACK_MS, REFRESH_DONE_VISIBLE_MS, AUTO_REFRESH_MS } from '@/hooks/useManualRefresh'
+import { RefreshButton, formatUpdatedAt } from '@/components/ui/RefreshButton'
 
 const mockConfirm = jest.fn()
 const mockResolve = jest.fn()
@@ -218,5 +218,33 @@ describe('useManualRefresh', () => {
     rerender(<RefreshButton status="done" onClick={() => {}} showLabel />)
     expect(screen.getByRole('button')).toHaveTextContent('Diperbarui')
     expect(screen.getByRole('button')).not.toBeDisabled()
+  })
+  test('auto-refresh calls refetch each interval while visible, skips when hidden, and does not spin', async () => {
+    const fn = jest.fn().mockResolvedValue({ isError: false })
+    const { result, unmount } = renderHook(() => useManualRefresh([fn], { autoRefreshMs: AUTO_REFRESH_MS }))
+    await act(async () => { jest.advanceTimersByTime(AUTO_REFRESH_MS) })
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(result.current.status).toBe('idle')
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+    await act(async () => { jest.advanceTimersByTime(AUTO_REFRESH_MS) })
+    expect(fn).toHaveBeenCalledTimes(1)
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    unmount()
+    await act(async () => { jest.advanceTimersByTime(AUTO_REFRESH_MS * 2) })
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  test('no auto-refresh unless opted in', async () => {
+    const fn = jest.fn()
+    renderHook(() => useManualRefresh([fn]))
+    await act(async () => { jest.advanceTimersByTime(AUTO_REFRESH_MS * 3) })
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  test('RefreshButton shows last data time', () => {
+    const ms = new Date(2026, 9, 10, 14, 32, 5).getTime()
+    expect(formatUpdatedAt(ms)).toBe('14:32:05')
+    render(<RefreshButton status="idle" onClick={() => {}} updatedAt={ms} />)
+    expect(screen.getByText('Data: 14:32:05')).toBeInTheDocument()
   })
 })
