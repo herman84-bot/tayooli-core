@@ -1291,6 +1291,7 @@ WITH movement_stock AS (
         SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) AS qty
     FROM stock_movements sm
     JOIN warehouse_locations loc ON (loc.id = sm.dest_location_id OR loc.id = sm.source_location_id) AND loc.tenant_id = sm.tenant_id
+    JOIN warehouses w ON w.id = loc.warehouse_id AND w.tenant_id = sm.tenant_id AND w.is_active = true
     WHERE sm.tenant_id = $1 AND sm.status = 'DONE' AND loc.warehouse_id IS NOT NULL
     GROUP BY sm.product_id, loc.warehouse_id, loc.id, loc.code, loc.type
 ),
@@ -1320,7 +1321,7 @@ SELECT
         ELSE GREATEST(0, COALESCE(ms.qty, 0) - COALESCE(als.allocated_qty, 0))
     END AS available_qty
 FROM movement_stock ms
-JOIN products p ON p.id = ms.product_id AND p.tenant_id = $1
+JOIN products p ON p.id = ms.product_id AND p.tenant_id = $1 AND p.deleted_at IS NULL
 LEFT JOIN warehouses w ON w.id = ms.warehouse_id AND w.tenant_id = $1
 LEFT JOIN allocated_stock als ON als.product_id = ms.product_id AND als.location_id = ms.location_id
 WHERE ($2::uuid IS NULL OR ms.warehouse_id = $2)
