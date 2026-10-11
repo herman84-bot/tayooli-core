@@ -238,7 +238,8 @@ func main() {
 	// Non-cash (QRIS) payments for POS sales: demo mode until a tenant adds
 	// their own gateway credentials (ADR-008 Model B).
 	posPaymentUsecase := posPaymentUC.New(paymentGatewayRepo, nil, cfg.AppURL)
-	posHandler := handler.NewPOSHandlerWithPayments(posUsecase, posPaymentUsecase)
+	posHandler := handler.NewPOSHandlerWithPayments(posUsecase, posPaymentUsecase).
+		WithIdempotency(postgres.NewIdempotencyRepo(db))
 
 	// Accounting Module
 	accountRepo := accountingPostgres.NewAccountRepository(db)

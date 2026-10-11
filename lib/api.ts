@@ -1985,6 +1985,8 @@ export const api = {
       warehouse_id?: string
       sale_mode?: string
       payment_order_id?: string
+      /** One per cart; a retry with the same key replays the first receipt. */
+      idempotency_key?: string
     }) =>
       request<{
         order_number: string
@@ -1999,10 +2001,14 @@ export const api = {
         sales_invoice_id?: string
         created_at: string
         items: POSOrderItem[]
-      }>("/pos/checkout", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
+      }>("/pos/checkout", (() => {
+        const { idempotency_key, ...body } = input
+        return {
+          method: "POST",
+          body: JSON.stringify(body),
+          headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
+        }
+      })()),
     orders: (limit?: number) =>
       request<{ data: POSOrder[] }>(`/pos/orders${limit ? `?limit=${limit}` : ""}`),
     order: (id: string) => request<POSOrder>(`/pos/orders/${id}`),

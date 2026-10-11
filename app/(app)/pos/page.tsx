@@ -80,6 +80,9 @@ export default function POSPage() {
   const { data: wmsStock = [] } = useWMSStock()
   const { data: posOrders = [], refetch: refetchOrders } = usePOSOrders(30)
   const posCheckout = usePOSCheckout()
+  // One Idempotency-Key per cart: if the response is lost (network drop,
+  // power cut) the retry replays the same sale instead of selling twice.
+  const checkoutKeyRef = useRef<string | null>(null)
 
   // Map real stock by product_id
   const stockByProduct = useMemo(() => {
@@ -321,6 +324,7 @@ export default function POSPage() {
 
   // Clear all cart (in-app modal confirmation)
   const clearCart = () => {
+    checkoutKeyRef.current = null
     if (cart.length > 0) {
       setShowClearCartModal(true)
     }
@@ -442,8 +446,10 @@ export default function POSPage() {
       autoConfirmRef.current = orderId
     }
     setCheckoutError(null)
+    if (!checkoutKeyRef.current) checkoutKeyRef.current = crypto.randomUUID()
     try {
       const res = await posCheckout.mutateAsync({
+        idempotency_key: checkoutKeyRef.current,
         items: cart.map((c) => ({
           product_id: c.id,
           qty: c.quantity,
@@ -479,6 +485,7 @@ export default function POSPage() {
       }
       setReceiptData(receipt)
       setIsPaidSuccess(true)
+      checkoutKeyRef.current = null
       setCart([])
       refetchOrders()
     } catch (err: any) {
