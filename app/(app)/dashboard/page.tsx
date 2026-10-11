@@ -107,7 +107,7 @@ function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
 
 interface SOPKPICardProps {
   label: string
-  /** null/undefined = no data yet: shows "â€”", no pass/fail verdict. */
+  /** null/undefined = no data yet: shows "—", no pass/fail verdict. */
   value: number | null | undefined
   unit: string
   target: string
@@ -165,7 +165,7 @@ function SOPKPICard({
           </div>
         ) : (
           <div className="flex items-baseline gap-1.5">
-            <span aria-hidden className="text-lg font-bold font-mono text-muted-foreground">â€”</span>
+            <span aria-hidden className="text-lg font-bold font-mono text-muted-foreground">—</span>
             <span className="text-[11px] text-muted-foreground">Belum ada data</span>
           </div>
         )}
@@ -292,7 +292,7 @@ export default function DashboardPage() {
 
       <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${loading ? 'opacity-50' : ''}`}>
         <section className="border border-border/60 rounded-lg bg-card">
-          <SectionHeader icon={Store} title="POS Kasir & Penjualan" href="/pos" linkLabel="Buka POS Kasir â†’" />
+          <SectionHeader icon={Store} title="POS Kasir & Penjualan" href="/pos" linkLabel="Buka POS Kasir →" />
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-3 gap-2.5">
               <MiniStat label="Omzet Hari Ini" value={formatCurrency(s.pos.today_revenue, { compact: true })} />
@@ -359,10 +359,10 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" /> Stok Menipis (â‰¤ 5 unit)
+                  <AlertTriangle className="h-3 w-3" /> Stok Menipis (≤ 5 unit)
                 </span>
                 <Link href="/products" className="text-[10px] font-medium text-muted-foreground hover:text-primary">
-                  Master Produk â†’
+                  Master Produk →
                 </Link>
               </div>
               {s.wms.low_stock_items.length > 0 ? (
@@ -375,7 +375,7 @@ export default function DashboardPage() {
                       <div className="min-w-0">
                         <div className="font-medium text-foreground truncate">{item.name}</div>
                         <div className="font-mono text-[10px] text-muted-foreground">
-                          {item.sku} â€¢ Min: {item.min_threshold}
+                          {item.sku} • Min: {item.min_threshold}
                         </div>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 tabular-nums shrink-0">
@@ -430,7 +430,7 @@ export default function DashboardPage() {
                 label="Dock-to-Stock Time"
                 value={kpis?.dock_to_stock_avg_minutes}
                 unit="menit"
-                target="Target: â‰¤ 120 menit"
+                target="Target: ≤ 120 menit"
                 subtext="Waktu bongkar s/d penataan rak"
                 icon={Clock}
                 iconClass="text-blue-600"
@@ -442,7 +442,7 @@ export default function DashboardPage() {
                 label="Receiving Accuracy"
                 value={kpis?.receiving_accuracy_pct}
                 unit="%"
-                target="Target: â‰¥ 99.5%"
+                target="Target: ≥ 99.5%"
                 subtext="Akurasi fisik vs PO/SJ penerimaan"
                 icon={CheckCircle2}
                 iconClass="text-emerald-600"
@@ -454,7 +454,7 @@ export default function DashboardPage() {
                 label="PO Compliance"
                 value={kpis?.po_compliance_pct}
                 unit="%"
-                target="Target: â‰¥ 95%"
+                target="Target: ≥ 95%"
                 subtext="Kepatuhan dokumen & ASN vendor"
                 icon={FileCheck2}
                 iconClass="text-teal-600"
@@ -489,7 +489,7 @@ export default function DashboardPage() {
                 label="Order-to-Dispatch Time"
                 value={kpis?.order_to_dispatch_avg_hours}
                 unit="jam"
-                target="Target: â‰¤ 4 jam"
+                target="Target: ≤ 4 jam"
                 subtext="Siklus rilis pesanan s/d muat armada"
                 icon={Zap}
                 iconClass="text-indigo-600"
@@ -501,7 +501,7 @@ export default function DashboardPage() {
                 label="Picking Tanpa Kerusakan"
                 value={kpis?.picking_accuracy_pct}
                 unit="%"
-                target="Target: â‰¥ 99.8%"
+                target="Target: ≥ 99.8%"
                 subtext="Baris picking selesai tanpa barang rusak"
                 icon={ScanBarcode}
                 iconClass="text-emerald-600"
@@ -513,7 +513,7 @@ export default function DashboardPage() {
                 label="Surat Jalan Terkirim"
                 value={kpis?.on_time_shipment_pct}
                 unit="%"
-                target="Target: â‰¥ 98%"
+                target="Target: ≥ 98%"
                 subtext="Surat jalan berstatus dikirim/diterima"
                 icon={Truck}
                 iconClass="text-blue-600"
@@ -566,7 +566,7 @@ export default function DashboardPage() {
               href="/wms/arus-barang"
               className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
             >
-              Buka Arus Barang â†’
+              Buka Arus Barang →
             </Link>
           </div>
         </div>

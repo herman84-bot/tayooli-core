@@ -8,7 +8,7 @@
 
 ## 1. Visi & DNA Produk
 Tayooli Core adalah sistem ERP Standalone berkinerja tinggi, ramping, dan mandiri yang dirancang khusus untuk bisnis ritel, pergudangan (WMS), dan kasir POS di Indonesia. 
-Sistem ini dipisahkan dari beban arsitektur enterprise yang kompleks (*Apache Kafka message broker, Python AI worker*) agar dapat berjalan sangat cepat dan hemat sumber daya pada lingkungan PaaS (Zeabur) atau VPS hemat (1â€“2 vCPU, 1â€“2 GB RAM).
+Sistem ini dipisahkan dari beban arsitektur enterprise yang kompleks (*Apache Kafka message broker, Python AI worker*) agar dapat berjalan sangat cepat dan hemat sumber daya pada lingkungan PaaS (Zeabur) atau VPS hemat (1–2 vCPU, 1–2 GB RAM).
 
 ---
 
@@ -63,20 +63,20 @@ Navigasi dan antarmuka pengguna `tayooli-core` dibatasi secara ketat hanya pada 
 
 ```text
 [ Pengguna / Browser ]
-          â”‚
-          â–¼
+          │
+          ▼
    tayooli.my.id (Domain Utama)
    43.157.210.155 (DNS A Record ke Zeabur Edge)
-          â”‚
-          â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-          â–¼                                         â–¼
+          │
+          ├─────────────────────────────────────────┐
+          ▼                                         ▼
 [ Zeabur Frontend Service ]             [ Zeabur Backend Service ]
  Next.js 15 Standalone Node              Go 1.24 Chi Binary API
  (tayooli-frontend.zeabur.app)           (tayooli-backend.zeabur.app)
-          â”‚                                         â”‚
-          â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ PROXY /api/v1/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
-                                                    â”‚
-                                                    â–¼
+          │                                         │
+          └─────────── PROXY /api/v1/* ─────────────┘
+                                                    │
+                                                    ▼
                                         [ PostgreSQL 15 Database ]
                                          Zeabur Managed PG Database
 ```
