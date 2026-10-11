@@ -321,7 +321,7 @@ export function PrintDeliveryOrder({
                           )}
                         </td>
                         <td className="border-r border-zinc-300 py-1.5 px-2 text-center font-mono font-medium text-zinc-700 bg-zinc-50/60">
-                          {item.location_code || 'BIN-A-01'}
+                          {item.location_code || '—'}
                         </td>
                         <td className="border-r border-zinc-300 py-1.5 px-2 text-right font-mono font-bold text-zinc-950">
                           {Number(item.quantity).toLocaleString('id-ID')}

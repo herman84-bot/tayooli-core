@@ -162,7 +162,7 @@ export function ActivityTimelineDrawer({
           <div className="space-y-0.5">
             <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold uppercase tracking-wider">
               <History className="h-3.5 w-3.5" />
-              <span>Riwayat Aktivitas & Jejak Audit (CR-05b)</span>
+              <span>Riwayat Aktivitas & Jejak Audit</span>
             </div>
             <h2 className="text-base font-bold text-slate-900 font-mono">{title}</h2>
             {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
@@ -218,7 +218,7 @@ export function ActivityTimelineDrawer({
 
               {metadata.batch_number && (
                 <div className="flex justify-between items-center text-slate-700">
-                  <span className="text-slate-500">Nomor Batch (FEFO)</span>
+                  <span className="text-slate-500">Nomor Batch</span>
                   <span className="font-mono font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded text-[11px]">
                     {metadata.batch_number}
                   </span>
@@ -353,7 +353,7 @@ export function ActivityTimelineDrawer({
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-[11px] text-slate-500">
           <span className="flex items-center gap-1">
             <Info className="h-3.5 w-3.5 text-slate-400" />
-            <span>Audit trail terkunci (immutable)</span>
+            <span>Riwayat ini tidak bisa diubah</span>
           </span>
           <button
             type="button"

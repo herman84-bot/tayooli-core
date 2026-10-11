@@ -505,6 +505,7 @@ func main() {
 		r.With(authRateLimiter.Middleware).Post("/resend-verification", authHandler.ResendVerification)
 		r.With(authRateLimiter.Middleware).Post("/forgot-password", authHandler.ForgotPassword)
 		r.With(authRateLimiter.Middleware).Post("/reset-password", authHandler.ResetPassword)
+		r.With(authRateLimiter.Middleware).Get("/reset-password/validate", authHandler.ValidateResetToken)
 		// Logout is public by design: it must clear a dead/expired cookie
 		// that TenantMiddleware would 401. It verifies the token itself
 		// before revoking.

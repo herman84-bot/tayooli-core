@@ -131,8 +131,8 @@ export default function PaymentGatewaysPage() {
       <div>
         <h1 className="text-xl font-bold text-zinc-900">Payment Gateway per Tenant</h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Pilih gateway untuk tiap tenant — Pakasir atau Midtrans. Model B:
-          setiap tenant punya akun gateway sendiri, dana masuk langsung ke
+          Pilih gateway untuk tiap tenant — Pakasir atau Midtrans. Setiap
+          tenant memakai akun gateway sendiri, sehingga dana masuk langsung ke
           rekening bank tenant.
         </p>
       </div>

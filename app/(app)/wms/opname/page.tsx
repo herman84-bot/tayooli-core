@@ -1238,7 +1238,7 @@ export default function StockOpnamePage() {
 
             <div className="bg-slate-50 p-4 rounded-xl text-xs space-y-2 text-slate-700 border border-slate-200">
               <p>
-                Sistem akan secara otomatis melakukan <strong>double-entry ledger balancing</strong>:
+                Setelah disetujui, stok di sistem <strong>otomatis disesuaikan</strong> dengan hasil hitung:
               </p>
               <ul className="list-disc pl-4 space-y-1 text-slate-600">
                 <li>

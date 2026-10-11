@@ -1,6 +1,7 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -19,6 +20,23 @@ const resetPasswordSchema = z.object({
 })
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>
 
+function DeadLink({ message }: { message: string }) {
+  return (
+    <div role="alert" className="space-y-4 text-center">
+      <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-left text-sm text-destructive">
+        <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+        <span>{message}</span>
+      </div>
+      <Link
+        href="/forgot-password"
+        className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+      >
+        Minta tautan baru
+      </Link>
+    </div>
+  )
+}
+
 export function ResetPasswordForm() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
@@ -33,6 +51,30 @@ export function ResetPasswordForm() {
   const { register, handleSubmit, formState: { errors } } = useForm<ResetPasswordFormData>({
     resolver: zodResolver(resetPasswordSchema),
   })
+
+  // Check the link as soon as the page opens, so an expired or already-used
+  // link is rejected before the user types a new password. If the check
+  // itself fails (network/server), keep the form: submit still validates.
+  const [deadLink, setDeadLink] = useState<string | null>(null)
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    fetch(`/api/v1/auth/reset-password/validate?token=${encodeURIComponent(token)}`, { cache: 'no-store' })
+      .then(async (res) => {
+        if (cancelled || res.ok || res.status !== 400) return
+        const body = await res.json().catch(() => ({}))
+        if (cancelled) return
+        setDeadLink(
+          typeof body?.error === 'string' && body.error
+            ? body.error
+            : 'Tautan reset password tidak valid atau sudah kedaluwarsa. Minta tautan baru.',
+        )
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [token])
 
   useLayoutEffect(() => {
     if (errorBoxRef.current) {
@@ -80,11 +122,11 @@ export function ResetPasswordForm() {
   }
 
   if (!token) {
-    return (
-      <div className="text-center text-sm text-destructive">
-        Token reset password tidak valid atau sudah kedaluwarsa.
-      </div>
-    )
+    return <DeadLink message="Tautan reset password tidak lengkap. Pastikan Anda membuka tautan lengkap dari email, atau minta tautan baru." />
+  }
+
+  if (deadLink) {
+    return <DeadLink message={deadLink} />
   }
 
   return (

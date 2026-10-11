@@ -321,7 +321,7 @@ export function PrintLPNLabel({ lpnDetail, companyProfile, onClose }: PrintLPNLa
 
           {/* Bottom Footer */}
           <div className="pt-2 border-t-2 border-zinc-900 flex justify-between items-center text-[8px] text-zinc-500 font-mono">
-            <span>ISO-28219 PALLET STANDARD</span>
+            <span>PALLET CONTAINER STANDARD</span>
             <span className="font-bold text-zinc-900">TAYOOLI WMS CONTAINER</span>
           </div>
         </div>

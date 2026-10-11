@@ -32,6 +32,14 @@ type mockAuthUsecase struct {
 	updateCompanyProfileFn func(ctx context.Context, tenantID uuid.UUID, p domain.TenantProfile) error
 	verifyEmailFn         func(ctx context.Context, token string) (*domain.User, error)
 	getUserByEmailFn      func(ctx context.Context, email string) (*domain.User, error)
+	validateResetTokenFn  func(ctx context.Context, token string) error
+}
+
+func (m *mockAuthUsecase) ValidateResetToken(ctx context.Context, token string) error {
+	if m.validateResetTokenFn != nil {
+		return m.validateResetTokenFn(ctx, token)
+	}
+	return nil
 }
 
 func (m *mockAuthUsecase) LoginByEmail(ctx context.Context, email, password string) (string, *domain.User, error) {
@@ -872,5 +880,51 @@ func TestAuthHandler_UpdateCompanyProfile_Success(t *testing.T) {
 	}
 	if updatedProfile.Name != "PT Makmur Abadi" || updatedProfile.Address != "Jl. Thamrin 88" {
 		t.Errorf("profile not passed correctly to usecase: %+v", updatedProfile)
+	}
+}
+
+func TestAuthHandler_ValidateResetToken(t *testing.T) {
+	cases := []struct {
+		name       string
+		query      string
+		ucErr      error
+		wantStatus int
+		wantReason string
+	}{
+		{"valid", "?token=good", nil, http.StatusOK, ""},
+		{"missing", "", nil, http.StatusBadRequest, "missing"},
+		{"unknown", "?token=bad", domain.ErrInvalidToken, http.StatusBadRequest, "invalid"},
+		{"expired", "?token=old", domain.ErrTokenExpired, http.StatusBadRequest, "expired"},
+		{"db error", "?token=x", errors.New("db down"), http.StatusInternalServerError, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			uc := &mockAuthUsecase{validateResetTokenFn: func(_ context.Context, _ string) error {
+				called = true
+				return tc.ucErr
+			}}
+			h := handler.NewAuthHandler(uc)
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/reset-password/validate"+tc.query, nil)
+			rr := httptest.NewRecorder()
+			h.ValidateResetToken(rr, req)
+
+			if rr.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d (%s)", rr.Code, tc.wantStatus, rr.Body.String())
+			}
+			if tc.query == "" && called {
+				t.Fatal("usecase must not be called without a token")
+			}
+			if rr.Header().Get("Cache-Control") != "no-store" {
+				t.Errorf("Cache-Control = %q, want no-store", rr.Header().Get("Cache-Control"))
+			}
+			if tc.wantReason != "" {
+				var body map[string]any
+				_ = json.Unmarshal(rr.Body.Bytes(), &body)
+				if body["reason"] != tc.wantReason {
+					t.Errorf("reason = %v, want %s (%s)", body["reason"], tc.wantReason, rr.Body.String())
+				}
+			}
+		})
 	}
 }

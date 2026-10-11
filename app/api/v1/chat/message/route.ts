@@ -132,7 +132,7 @@ async function queryExternalAI(prompt: string): Promise<string | null> {
   if (geminiKey) {
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`
-      const systemInstruction = `Anda adalah asisten AI resmi "Tayooli Support" untuk sistem Tayooli ERP Standalone di Indonesia.
+      const systemInstruction = `Anda adalah asisten AI resmi "Tayooli Support" untuk aplikasi Tayooli (manajemen gudang, stok, dan kasir) di Indonesia.
 Sistem ini memiliki 13 modul inti:
 1. Dashboard (/dashboard)
 2. Products (/products)

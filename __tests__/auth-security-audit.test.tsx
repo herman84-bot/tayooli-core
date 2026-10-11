@@ -211,13 +211,17 @@ describe('RED TEAM SECURITY AUDIT: Authentication Suite', () => {
       })
 
       it(`[ResetPasswordForm] safely neutralizes XSS payload #${idx + 1} using textContent`, async () => {
-        global.fetch = jest.fn().mockResolvedValue({
-          ok: false,
-          status: 400,
-          json: async () => ({
-            error: { code: 'Bad Request', message: payload },
-          }),
-        } as unknown as Response)
+        // 1st call: link check on page open succeeds; 2nd call: submit fails with the payload.
+        global.fetch = jest
+          .fn()
+          .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ valid: true }) } as unknown as Response)
+          .mockResolvedValue({
+            ok: false,
+            status: 400,
+            json: async () => ({
+              error: { code: 'Bad Request', message: payload },
+            }),
+          } as unknown as Response)
 
         render(<ResetPasswordForm />)
         const passwordInput = screen.getByLabelText(/^Kata Sandi Baru$/i)

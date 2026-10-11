@@ -287,16 +287,35 @@ func (u *Usecase) ForgotPassword(ctx context.Context, email string) error {
 	return nil
 }
 
+// lookupResetToken returns the user owning a usable reset token.
+// It returns ErrInvalidToken for unknown/used tokens and ErrTokenExpired
+// when the token exists but its 1-hour window has passed.
+func (u *Usecase) lookupResetToken(ctx context.Context, token string) (*domain.User, error) {
+	if token == "" {
+		return nil, domain.ErrInvalidToken
+	}
+	user, err := u.userRepo.GetUserByResetToken(ctx, token)
+	if err != nil || user == nil {
+		return nil, domain.ErrInvalidToken
+	}
+	if user.PasswordResetExpiresAt != nil && user.PasswordResetExpiresAt.Before(time.Now()) {
+		return nil, domain.ErrTokenExpired
+	}
+	return user, nil
+}
+
+// ValidateResetToken checks a reset token without consuming it, so the
+// reset page can reject dead links before the user types a new password.
+func (u *Usecase) ValidateResetToken(ctx context.Context, token string) error {
+	_, err := u.lookupResetToken(ctx, token)
+	return err
+}
+
 // ResetPassword resets the user's password using the reset token.
 func (u *Usecase) ResetPassword(ctx context.Context, token, newPassword string) error {
-	user, err := u.userRepo.GetUserByResetToken(ctx, token)
+	user, err := u.lookupResetToken(ctx, token)
 	if err != nil {
-		return domain.ErrInvalidToken
-	}
-
-	// Check if token is expired
-	if user.PasswordResetExpiresAt != nil && user.PasswordResetExpiresAt.Before(time.Now()) {
-		return domain.ErrTokenExpired
+		return err
 	}
 
 	// Hash new password

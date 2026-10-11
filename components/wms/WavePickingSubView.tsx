@@ -282,7 +282,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
             <p className="text-sm font-semibold text-slate-700">Belum ada gelombang picking</p>
             <p className="text-xs text-slate-400 max-w-sm mx-auto">
               Kelompokkan Surat Jalan berstatus DRAFT/CONFIRMED menjadi satu gelombang picking (Wave) untuk
-              memaksimalkan efisiensi rute penataan rak FEFO.
+              urutan ambil barang dimulai dari yang paling dekat kedaluwarsa.
             </p>
             <button
               onClick={() => setIsCreateModalOpen(true)}
@@ -408,7 +408,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3">
-              <h4 className="text-xs font-bold text-slate-700">Daftar Instruksi Picking (FE-06):</h4>
+              <h4 className="text-xs font-bold text-slate-700">Daftar Instruksi Picking:</h4>
               <div className="border border-slate-200 rounded-xl divide-y divide-slate-200 overflow-hidden">
                 {selectedWaveDetail.picking_tasks.map((pt) => (
                   <div key={pt.task.id} className="p-3 bg-white hover:bg-slate-50 transition flex items-center justify-between text-xs">

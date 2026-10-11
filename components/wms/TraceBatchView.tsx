@@ -35,11 +35,10 @@ export function TraceBatchView() {
       {/* Search Header */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h3 className="text-base font-semibold text-slate-900 mb-1">
-          Pelacakan Riwayat Mutasi & Audit Batch (Traceability KO-1c)
+          Lacak Riwayat Batch
         </h3>
         <p className="text-xs text-slate-500 mb-4">
-          Lacak alur perpindahan barang per batch dari penerimaan hingga pengeluaran dengan buku besar tak terubah
-          (immutable ledger) dan rantai hash SHA-256 (sentry-wms §3.2).
+          Lihat kapan batch ini diterima, dipindah ke rak mana saja, dan dikirim ke mana.
         </p>
 
         <form onSubmit={handleSearch} className="flex gap-2 max-w-xl">
@@ -47,7 +46,7 @@ export function TraceBatchView() {
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Masukkan UUID Batch ID untuk melacak..."
+              placeholder="Tempel ID batch, misalnya dari halaman penerimaan"
               value={batchIdInput}
               onChange={(e) => setBatchIdInput(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono"
@@ -96,7 +95,7 @@ export function TraceBatchView() {
                       : "bg-amber-50 text-amber-700 border border-amber-200"
                   }`}
                 >
-                  {trace.batch.status === "RELEASED" ? "RELEASED (Siap Jual)" : "ON_HOLD (Tertahan)"}
+                  {trace.batch.status === "RELEASED" ? "Siap Jual" : "Tertahan"}
                 </span>
               </div>
             </div>
@@ -157,7 +156,7 @@ export function TraceBatchView() {
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/60 font-semibold text-xs text-slate-700 uppercase tracking-wider flex items-center gap-2">
               <History className="h-4 w-4 text-slate-500" />
-              Riwayat Mutasi Buku Besar (Double-Entry Ledger)
+              Riwayat Keluar-Masuk Stok
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -217,10 +216,10 @@ export function TraceBatchView() {
               <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/60 font-semibold text-xs text-slate-700 uppercase tracking-wider flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  Jejak Audit Kriptografis (SHA-256 Hash Chain)
+                  Catatan Perubahan
                 </div>
                 <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  VERIFIED IMMUTABLE
+                  Tidak bisa diubah
                 </span>
               </div>
               <div className="p-4 space-y-3">

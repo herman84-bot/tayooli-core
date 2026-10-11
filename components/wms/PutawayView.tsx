@@ -219,7 +219,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                               : "bg-amber-50 text-amber-700 border border-amber-200"
                           }`}
                         >
-                          {line.batch_status === "RELEASED" ? "Dirilis" : "Tertahan (ON_HOLD)"}
+                          {line.batch_status === "RELEASED" ? "Dirilis" : "Tertahan"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-slate-900">
@@ -272,7 +272,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Konfirmasi Putaway ke Rak Internal</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Pindahkan barang dari area Staging Inbound ke rak penyimpanan tetap (sentry-wms §1.2 step 2).
+                Pindahkan barang dari area Staging Inbound ke rak penyimpanan tetap.
               </p>
             </div>
 
@@ -347,8 +347,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                       Penyimpangan dari Rak Default Produk Terdeteksi
                     </div>
                     <p className="text-[11px] text-amber-700">
-                      Sistem mencatat rak default produk ini berbeda dari rak yang Anda pilih. Sesuai kebijakan ISO &
-                      ADR-014 Invariant 4, Anda wajib menyertakan alasan penyimpangan rak.
+                      Sistem mencatat rak tujuan berbeda dari rak default produk ini. Anda wajib menyertakan alasan penempatan ke rak lain.
                     </p>
                     <div>
                       <label className="block text-xs font-medium text-amber-900 mb-1">

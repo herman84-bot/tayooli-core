@@ -49,6 +49,7 @@ import { DockBoardSubView } from "@/components/wms/DockBoardSubView"
 import DeliveryOrdersPanel from "@/components/wms/DeliveryOrdersPanel"
 import { WavePickingSubView } from "@/components/wms/WavePickingSubView"
 import { PackingStationSubView } from "@/components/wms/PackingStationSubView"
+import { ShippingManifestsPanel } from "@/components/wms/ShippingManifestsPanel"
 import { LPNManagementModal } from "@/components/wms/LPNManagementModal"
 
 // ---------------------------------------------------------------------------
@@ -192,7 +193,7 @@ export default function ArusBarangPage() {
           </h1>
           <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
             Pusat operasional aliran fisik barang. Terima barang ke Staging Inbound, kelola QC, lakukan Putaway ke rak,
-            dan terbitkan Surat Jalan (DO) dengan rotasi FEFO per batch.
+            dan terbitkan Surat Jalan (DO). Barang yang paling dekat kedaluwarsa dikeluarkan lebih dulu.
           </p>
         </div>
 
@@ -292,7 +293,7 @@ export default function ArusBarangPage() {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Lacak Batch (Traceability)
+              Lacak Batch
             </button>
             <button
               onClick={() => setMasukTab("qc")}
@@ -381,13 +382,7 @@ export default function ArusBarangPage() {
             <PackingStationSubView warehouseId={selectedWarehouseId} />
           )}
           {keluarTab === "manifest" && (
-            <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-400">
-              <Truck className="mx-auto h-12 w-12 text-slate-300 mb-2" />
-              <h3 className="text-base font-semibold text-slate-800">Manifest Ekspedisi & Serah Terima (Sprint 4)</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Pencatatan nomor kendaraan, TTD digital sopir ekspedisi, dan surat muatan akan diaktifkan pada Sprint 4.
-              </p>
-            </div>
+            <ShippingManifestsPanel warehouseId={selectedWarehouseId} />
           )}
         </div>
       )}
@@ -609,7 +604,7 @@ function InboundReceivingSubView({
                           {r.on_hold_batch_count && r.on_hold_batch_count > 0 ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                               <BadgeAlert className="h-3 w-3 text-amber-500" />
-                              ON_HOLD ({r.on_hold_batch_count})
+                              Tertahan ({r.on_hold_batch_count})
                             </span>
                           ) : r.status === "POSTED" ? (
                             <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -832,7 +827,7 @@ function InboundReceiptForm({
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Form Catat Penerimaan Barang</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Setiap baris barang otomatis diberikan Batch / Lot untuk memastikan keterlacakan FEFO (KO-1 Invariant 1).
+            Setiap baris barang otomatis diberi nomor Batch / Lot, supaya asal barang bisa dilacak dan yang paling dekat kedaluwarsa dikeluarkan lebih dulu.
           </p>
         </div>
         <button onClick={onCancel} className="text-xs text-slate-500 hover:text-slate-800">
@@ -1187,7 +1182,7 @@ function InboundReceiptDetail({
       await releaseMut.mutateAsync(r.id)
       onNotice({
         type: "success",
-        text: `Seluruh lot tertahan (ON_HOLD) pada penerimaan ${r.receipt_number} berhasil disetujui rilis (RELEASED) dan siap dijual!`,
+        text: `Semua lot dari penerimaan ${r.receipt_number} sudah disetujui dan siap dijual.`,
       })
       refetch()
     } catch (e) {
@@ -1252,7 +1247,7 @@ function InboundReceiptDetail({
               disabled={isProcessing}
               className="px-4 py-2 text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 rounded-lg shadow-sm"
             >
-              {isProcessing ? "Merilis..." : "Setujui Rilis (Release Approval PDF-06)"}
+              {isProcessing ? "Merilis..." : "Setujui Rilis Lot"}
             </button>
           ) : null}
 
@@ -1293,11 +1288,11 @@ function InboundReceiptDetail({
         <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
           <BadgeAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <div className="font-semibold">Lot Berstatus Tertahan (ON_HOLD)</div>
+            <div className="font-semibold">Lot Masih Tertahan</div>
             <p className="text-amber-800 leading-relaxed">
-              Penerimaan ini menghasilkan {r.on_hold_batch_count} lot berstatus <strong>ON_HOLD</strong> karena
-              kebijakan release approval aktif. Barang sudah berada di Staging Inbound tetapi tidak dapat dijual hingga
-              Supervisor menekan tombol <strong>Setujui Rilis</strong> di atas.
+              Penerimaan ini menghasilkan {r.on_hold_batch_count} lot yang masih <strong>tertahan</strong>, karena
+              pengaturan gudang mewajibkan persetujuan lot baru. Barang sudah ada di area penerimaan, tetapi belum bisa
+              dijual sampai Supervisor menekan tombol <strong>Setujui Rilis Lot</strong> di atas.
             </p>
           </div>
         </div>

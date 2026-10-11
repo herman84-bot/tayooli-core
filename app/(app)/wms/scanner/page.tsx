@@ -1344,7 +1344,7 @@ export default function BarcodeScannerPage() {
                 </div>
               </div>
               <div>
-                <div className="text-slate-500">Omnichannel SKU:</div>
+                <div className="text-slate-500">SKU Marketplace:</div>
                 <div className="font-semibold text-slate-800 mt-0.5">
                   {displayProduct.external_sku || "Tokopedia / Shopee Ready"}
                 </div>

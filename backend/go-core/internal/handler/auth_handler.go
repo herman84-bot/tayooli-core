@@ -31,6 +31,7 @@ type authUsecase interface {
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	ForgotPassword(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
+	ValidateResetToken(ctx context.Context, token string) error
 }
 
 // tokenRevoker persists a logged-out token so it is rejected server-side.
@@ -413,6 +414,38 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "password berhasil direset"})
+}
+
+// ValidateResetToken handles GET /api/v1/auth/reset-password/validate?token=...
+// It reports whether a reset link is still usable without consuming it.
+// 200 {"valid":true}; 400 {"valid":false,"reason":"missing|invalid|expired"}.
+func (h *AuthHandler) ValidateResetToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	token := r.URL.Query().Get("token")
+	if token == "" || len(token) > 256 {
+		respondJSON(w, http.StatusBadRequest, map[string]any{
+			"valid": false, "reason": "missing",
+			"error": "Tautan reset password tidak lengkap. Minta tautan baru.",
+		})
+		return
+	}
+	err := h.uc.ValidateResetToken(r.Context(), token)
+	switch {
+	case err == nil:
+		respondJSON(w, http.StatusOK, map[string]any{"valid": true})
+	case errors.Is(err, domain.ErrTokenExpired):
+		respondJSON(w, http.StatusBadRequest, map[string]any{
+			"valid": false, "reason": "expired",
+			"error": "Tautan reset password sudah kedaluwarsa (berlaku 1 jam). Minta tautan baru.",
+		})
+	case errors.Is(err, domain.ErrInvalidToken):
+		respondJSON(w, http.StatusBadRequest, map[string]any{
+			"valid": false, "reason": "invalid",
+			"error": "Tautan reset password tidak valid atau sudah pernah dipakai. Minta tautan baru.",
+		})
+	default:
+		respondError(w, r, http.StatusInternalServerError, "gagal memeriksa tautan reset password")
+	}
 }
 
 type createWorkspaceRequest struct {

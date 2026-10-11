@@ -168,7 +168,7 @@ export function PrintThermalAWB({ order, items, onClose }: PrintThermalAWBProps)
           {/* Bottom Footer */}
           <div className="pt-2 border-t-2 border-zinc-900 flex justify-between items-center text-[9px] text-zinc-500">
             <span>Disiapkan: {new Date().toLocaleDateString("id-ID")}</span>
-            <span className="font-bold text-zinc-900">TAYOOLI WMS SPRINT 3</span>
+            <span className="font-bold text-zinc-900">TAYOOLI LOGISTICS &amp; DISPATCH</span>
           </div>
         </div>
       </div>

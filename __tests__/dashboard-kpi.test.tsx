@@ -43,7 +43,7 @@ describe('DashboardPage 8 Enterprise WMS SOP KPIs', () => {
     mockKPIResult = { data: mockKPIs }
     render(<DashboardPage />)
 
-    expect(screen.getByText('8 Enterprise WMS SOP KPIs')).toBeInTheDocument()
+    expect(screen.getByText('Indikator Kinerja Pergudangan (KPI WMS)')).toBeInTheDocument()
     expect(screen.getByText('Dock-to-Stock Time')).toBeInTheDocument()
     expect(screen.getByText('38.5')).toBeInTheDocument()
     expect(screen.getByText('Receiving Accuracy')).toBeInTheDocument()

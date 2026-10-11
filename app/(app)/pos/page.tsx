@@ -608,7 +608,7 @@ export default function POSPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                Mode Penjualan Odoo/OCA pattern & Integrasi Master Produk & Stok Real-Time
+                Mode Penjualan Kasir &amp; Integrasi Stok Real-Time
               </p>
             </div>
           </div>

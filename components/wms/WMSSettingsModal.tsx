@@ -133,7 +133,7 @@ export function WMSSettingsModal({ isOpen, onClose }: WMSSettingsModalProps) {
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            Kebijakan Rilis Lot (Release Approval PDF-06)
+            Persetujuan Lot Baru
           </button>
           <button
             onClick={() => setActiveTab("default_racks")}
@@ -143,7 +143,7 @@ export function WMSSettingsModal({ isOpen, onClose }: WMSSettingsModalProps) {
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            Rak Default Produk (CR-03)
+            Validasi Rak Default Produk
           </button>
         </div>
 
@@ -169,11 +169,11 @@ export function WMSSettingsModal({ isOpen, onClose }: WMSSettingsModalProps) {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900">
-                      Wajib Persetujuan Rilis Lot (Release Approval)
+                      Lot baru harus disetujui sebelum bisa dijual
                     </h3>
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      Sesuai SOP Pergudangan ISO & PDF-06: Jika diaktifkan, setiap penerimaan barang yang diposting akan
-                      memasukkan lot ke status <strong>ON_HOLD (Tertahan)</strong>. Stok tidak dapat dialokasikan untuk
+                      Jika diaktifkan, setiap penerimaan barang yang diposting akan
+                      membuat lot berstatus <strong>Tertahan</strong>. Stok tidak dapat dialokasikan untuk
                       penjualan atau Surat Jalan sampai disetujui (Rilis) oleh Supervisor Warehouse.
                     </p>
                   </div>

@@ -713,9 +713,9 @@ function PaymentsTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">Integrasi Payment Gateway (BYO Settlement)</h2>
+        <h2 className="text-sm font-semibold text-foreground">Pembayaran QRIS (akun payment gateway Anda sendiri)</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Hubungkan akun payment gateway Anda sendiri. Dana penjualan kasir (QRIS) langsung disalurkan oleh gateway ke rekening bank toko Anda (ADR-008 Model B).
+          Hubungkan akun payment gateway Anda sendiri. Dana penjualan kasir (QRIS) langsung disalurkan oleh gateway ke rekening bank toko Anda.
         </p>
       </div>
 

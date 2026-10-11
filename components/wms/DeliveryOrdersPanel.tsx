@@ -571,10 +571,10 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                 <button
                   onClick={() => setIsWaveModalOpen(true)}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-lg font-semibold text-xs border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95 transition-all shadow-xs"
-                  title="Kelompokkan DO menjadi batch picking (Wave Release - PDF-05)"
+                  title="Gabungkan beberapa Surat Jalan menjadi satu daftar picking"
                 >
                   <Layers className="h-4 w-4 text-indigo-600" />
-                  <span>Wave Release (PDF-05)</span>
+                  <span>Gabung Picking</span>
                 </button>
 
                 <button
@@ -815,7 +815,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                           <div className="flex items-center justify-end gap-1 flex-wrap">
                             <button
                               onClick={() => setSelectedDoForAudit(order)}
-                              title="Lihat Riwayat Aktivitas & Jejak Audit (CR-05b)"
+                              title="Lihat Riwayat Aktivitas & Jejak Audit"
                               className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-[11px] font-medium shadow-2xs"
                             >
                               <History className="h-3 w-3 text-indigo-600" />
@@ -1080,7 +1080,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                   >
                     <option value="DIRECT_DO">Surat Jalan Langsung (DIRECT_DO)</option>
                     <option value="SALES_ORDER">Pesanan Penjualan B2B (SALES_ORDER)</option>
-                    <option value="MARKETPLACE">Pesanan Marketplace Omnichannel (MARKETPLACE)</option>
+                    <option value="MARKETPLACE">Pesanan Marketplace</option>
                     <option value="TRANSFER">Transfer Antar Gudang / Cabang (TRANSFER)</option>
                   </select>
                 </div>
@@ -1195,7 +1195,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                             }}
                             className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900 font-mono text-[11px]"
                           >
-                            <option value="">Auto FEFO (Semua Rak)</option>
+                            <option value="">Otomatis (ambil yang paling dekat kedaluwarsa)</option>
                             {modalLocations.map((loc) => (
                               <option key={loc.id} value={loc.id}>
                                 {loc.code} ({loc.name})

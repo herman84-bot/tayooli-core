@@ -60,7 +60,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/wms/arus-barang', label: 'Barang Masuk & Keluar', icon: ArrowLeftRight },
       { href: '/wms', label: 'Warehouse & Stock', icon: Warehouse, exact: true },
-      { href: '/wms/marketplace', label: 'Marketplace Omnichannel', icon: ShoppingBag },
+      { href: '/wms/marketplace', label: 'Marketplace', icon: ShoppingBag },
       { href: '/wms/transfers', label: 'Stock Transfers', icon: Truck },
       { href: '/wms/opname', label: 'Stock Opname', icon: ClipboardCheck },
       { href: '/wms/scrap', label: 'Barang Rusak / Scrap', icon: AlertTriangle },
@@ -157,7 +157,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                 Tayooli
               </span>
               <span className="block text-[11px] text-muted-foreground leading-tight">
-                ERP · Standalone
+                Gudang &amp; Kasir
               </span>
             </div>
             <button
@@ -254,7 +254,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                 Tayooli
               </span>
               <span className="block text-[11px] text-muted-foreground leading-tight">
-                ERP · Standalone
+                Gudang &amp; Kasir
               </span>
             </div>
           </>

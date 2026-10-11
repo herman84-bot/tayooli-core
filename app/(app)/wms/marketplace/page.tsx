@@ -640,7 +640,7 @@ export default function MarketplacePage() {
                   Warehouse & Stock
                 </Link>
                 <span>/</span>
-                <span className="text-slate-900 font-semibold">Omnichannel Marketplace</span>
+                <span className="text-slate-900 font-semibold">Marketplace</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/20">
@@ -987,7 +987,7 @@ export default function MarketplacePage() {
                     <option value="TOKOPEDIA">Tokopedia (Daftar Pesanan Tokopedia)</option>
                     <option value="TIKTOK">TikTok Shop (Order Export)</option>
                     <option value="LAZADA">Lazada (Lazada Seller Center)</option>
-                    <option value="BLIBLI">Blibli Omnichannel</option>
+                    <option value="BLIBLI">Blibli</option>
                     <option value="OTHER">Generic CSV / TSV Standar</option>
                   </select>
                   <p className="text-xs text-slate-500 mt-1">
@@ -1924,7 +1924,7 @@ export default function MarketplacePage() {
                       <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                       <div>
                         <h4 className="font-bold text-xs text-emerald-950 uppercase tracking-wider">
-                          Referensi Mutasi Stok Double-Entry: Pelanggan Tujuan
+                          Stok Keluar ke Pelanggan
                         </h4>
                         <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
                           Saat pesanan berstatus <span className="font-semibold">COMPLETED</span>, mutasi stok WMS diterbitkan secara otomatis dari gudang utama ke lokasi virtual <span className="font-semibold">Pelanggan Tujuan</span> dengan referensi <span className="font-mono font-bold">MARKETPLACE</span>.

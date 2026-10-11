@@ -144,7 +144,7 @@ export function WaveReleaseModal({
             </span>
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                Pelepasan Gelombang Picking (Wave Release - PDF-05)
+                Gabung Surat Jalan untuk Picking
               </h2>
               <p className="text-xs text-slate-500">
                 Kelompokkan pesanan berdasarkan jenis order & kurir untuk efisiensi pengambilan batch massal
@@ -239,7 +239,7 @@ export function WaveReleaseModal({
             /* Formulir Pembuatan Wave */
             <form onSubmit={handleCreateWave} className="space-y-4 max-w-xl mx-auto">
               <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 text-xs text-indigo-900 leading-relaxed">
-                <span className="font-bold">Logika Pengelompokan Otomatis (OCA §1.3):</span>
+                <span className="font-bold">Logika Pengelompokan Otomatis:</span>
                 <p className="mt-1">
                   Sistem akan mengumpulkan seluruh Surat Jalan berstatus DRAFT atau CONFIRMED di gudang terpilih yang
                   sesuai dengan kriteria di bawah, lalu mengikatnya ke dalam satu batch instruksi picking.
@@ -248,7 +248,7 @@ export function WaveReleaseModal({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tipe Pesanan / Saluran (Order Type) *
+                  Asal Pesanan *
                 </label>
                 <select
                   value={orderType}

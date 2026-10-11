@@ -415,7 +415,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-2xs transition"
                     >
                       <Printer className="h-3.5 w-3.5" />
-                      <span>Cetak Resi AWB (FE-08)</span>
+                      <span>Cetak Resi AWB</span>
                     </button>
                   )}
                 </div>

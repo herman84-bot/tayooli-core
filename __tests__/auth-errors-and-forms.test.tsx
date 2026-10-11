@@ -195,6 +195,8 @@ describe('Auth forms initial SSR/hydration hidden containers', () => {
   })
 
   it('ResetPasswordForm renders error and success boxes with style display: none initially', () => {
+    mockSearchParamsGet.mockReturnValue('tok')
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ valid: true }) } as unknown as Response)
     render(<ResetPasswordForm />)
     const errorBox = screen.getByTestId('reset-error')
     const successBox = screen.getByTestId('reset-success')

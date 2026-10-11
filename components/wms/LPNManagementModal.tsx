@@ -261,7 +261,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                 </span>
               </h2>
               <p className="text-xs text-slate-500">
-                Wadah palet penampung lot barang di staging & rak gudang (ISO-28219)
+                Wadah palet penampung lot barang di staging & rak gudang
               </p>
             </div>
           </div>
@@ -770,11 +770,11 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
               {/* Batch ID */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Batch ID (UUID) <span className="text-rose-500">*</span>
+                  Nomor Batch <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Masukkan UUID Batch atau pilih dari daftar cepat di atas"
+                  placeholder="Pilih batch dari daftar di atas, atau tempel ID batch"
                   value={itemBatchId}
                   onChange={(e) => setItemBatchId(e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg font-mono"

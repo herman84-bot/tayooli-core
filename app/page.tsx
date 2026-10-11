@@ -75,7 +75,7 @@ function HeroMockup() {
             app.tayooli.my.id/dashboard
           </div>
           <span className="hidden rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary sm:block">
-            Standalone ERP
+            Gudang &amp; Kasir
           </span>
         </div>
 
@@ -217,7 +217,7 @@ function StatsBand() {
   const stats = [
     { value: "Multi-Gudang", label: "pencatatan mutasi fisik antar gudang, rak, dan transit" },
     { value: "Kasir POS", label: "cetak nota thermal 58mm/80mm, QRIS, dan hitung kembalian" },
-    { value: "Omnichannel", label: "impor dan pemetaan pesanan marketplace ke stok fisik" },
+    { value: "Marketplace", label: "pesanan marketplace langsung memotong stok gudang" },
     { value: "13 Modul", label: "alur barang masuk, stok, kasir, hingga kirim dalam satu alur" },
   ]
   return (
@@ -344,7 +344,7 @@ function FeaturesSection() {
           </h2>
           <p className={`${sectionLead} mt-4`}>
             Tayooli dirancang khusus untuk toko ritel, grosir, dan distributor di Indonesia yang butuh
-            sistem cepat tanpa menu enterprise yang membingungkan.
+            sistem cepat tanpa menu yang tidak Anda perlukan.
           </p>
         </div>
 
@@ -473,7 +473,7 @@ function FeaturesSection() {
           />
 
           <FeatureRow
-            eyebrowLabel="Omnichannel Ritel"
+            eyebrowLabel="Jualan di Marketplace"
             title="Sinkronisasi stok dengan toko online"
             desc="Cegah overselling saat produk laku bersamaan di toko fisik dan marketplace. Saldo stok selalu termutakhirkan secara konsisten."
             bullets={[

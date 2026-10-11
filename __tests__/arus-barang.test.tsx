@@ -171,7 +171,7 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
     render(<ArusBarangPage />)
     expect(screen.getByRole('button', { name: /Penerimaan \(GR\)/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Putaway ke Rak/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Lacak Batch \(Traceability\)/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Lacak Batch/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /QC & Karantina/i })).toBeInTheDocument()
   })
 

@@ -119,7 +119,7 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
                       </td>
                       <td className="py-3 px-3">
                         <span className="inline-block px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-mono font-bold text-xs">
-                          {item.location_code || "RCK-DEFAULT"}
+                          {item.location_code || "Belum ditentukan"}
                         </span>
                       </td>
                       <td className="py-3 px-3">

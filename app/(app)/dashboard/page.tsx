@@ -388,7 +388,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <Gauge className="h-4 w-4 text-primary" />
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              8 Enterprise WMS SOP KPIs
+              Indikator Kinerja Pergudangan (KPI WMS)
             </h2>
           </div>
           <div className="flex items-center gap-2">

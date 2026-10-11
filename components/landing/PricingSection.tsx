@@ -40,7 +40,7 @@ const TIERS: Tier[] = [
       "Semua fitur Starter",
       "Manajemen multi-gudang & transfer stok",
       "Surat Jalan (DO) & Stock Opname berkala",
-      "Sinkronisasi marketplace omnichannel",
+      "Sinkron stok dengan pesanan marketplace",
       "Pencatatan barang rusak / scrap",
       "Multi-kasir & hak akses tim",
     ],

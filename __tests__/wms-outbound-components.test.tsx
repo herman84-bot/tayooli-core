@@ -355,7 +355,7 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
         )
       })
 
-      expect(screen.getByText(/Pelepasan Gelombang Picking/i)).toBeInTheDocument()
+      expect(screen.getByText(/Gabung Surat Jalan untuk Picking/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Daftar Wave Aktif/i })).toBeInTheDocument()
 
       const createTabBtn = screen.getByRole('button', { name: /\+ Buat Wave Baru/i })
@@ -363,7 +363,7 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
         fireEvent.click(createTabBtn)
       })
 
-      expect(screen.getByText(/Tipe Pesanan \/ Saluran \(Order Type\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/Asal Pesanan/i)).toBeInTheDocument()
       expect(screen.getByText(/Surat Jalan Langsung \(DIRECT_DO\)/i)).toBeInTheDocument()
     })
   })
@@ -469,7 +469,7 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
         />
       )
 
-      expect(screen.getByText(/Riwayat Aktivitas & Jejak Audit \(CR-05b\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/Riwayat Aktivitas & Jejak Audit/i)).toBeInTheDocument()
       expect(screen.getByText('DO-20261008-0001')).toBeInTheDocument()
       expect(screen.getAllByText('Staf Inbound/Outbound').length).toBeGreaterThanOrEqual(1)
       expect(screen.getAllByText('Bpk. Supervisor').length).toBeGreaterThanOrEqual(1)

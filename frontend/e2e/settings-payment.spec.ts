@@ -33,9 +33,9 @@ test.describe('Settings Payment Gateway Configuration', () => {
     // Switch to 'Metode Pembayaran' tab
     await paymentsTab.click()
 
-    // Verify section header and BYO Settlement context
+    // Verify section header (tenant uses its own payment gateway account)
     await expect(
-      page.getByRole('heading', { name: 'Integrasi Payment Gateway (BYO Settlement)' })
+      page.getByRole('heading', { name: 'Pembayaran QRIS (akun payment gateway Anda sendiri)' })
     ).toBeVisible()
     await expect(
       page.getByText('Hubungkan akun payment gateway Anda sendiri. Dana penjualan kasir (QRIS) langsung disalurkan')

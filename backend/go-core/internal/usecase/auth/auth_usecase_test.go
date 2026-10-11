@@ -704,6 +704,35 @@ func TestAuthUsecase_ResetPassword_InvalidToken(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrInvalidToken)
 }
 
+func TestAuthUsecase_ValidateResetToken(t *testing.T) {
+	user, _ := seedTestUser(t)
+	repo := newMockUserRepo()
+	repo.addUser(user)
+	uc := New(repo, "test-secret", time.Hour, nil, nil)
+
+	token := "valid-reset-token"
+	future := time.Now().Add(time.Hour)
+	user.PasswordResetToken = &token
+	user.PasswordResetExpiresAt = &future
+
+	require.NoError(t, uc.ValidateResetToken(context.Background(), token))
+	// Validation must not consume the token.
+	require.NotNil(t, user.PasswordResetToken)
+	require.NoError(t, uc.ValidateResetToken(context.Background(), token))
+
+	assert.ErrorIs(t, uc.ValidateResetToken(context.Background(), "unknown"), domain.ErrInvalidToken)
+	assert.ErrorIs(t, uc.ValidateResetToken(context.Background(), ""), domain.ErrInvalidToken)
+
+	past := time.Now().Add(-time.Minute)
+	user.PasswordResetExpiresAt = &past
+	assert.ErrorIs(t, uc.ValidateResetToken(context.Background(), token), domain.ErrTokenExpired)
+
+	// After a successful reset the token is gone.
+	user.PasswordResetExpiresAt = &future
+	require.NoError(t, uc.ResetPassword(context.Background(), token, "newpassword123"))
+	assert.ErrorIs(t, uc.ValidateResetToken(context.Background(), token), domain.ErrInvalidToken)
+}
+
 func TestAuthUsecase_CompanyProfile(t *testing.T) {
 	repo := newMockUserRepo()
 	tenantID := uuid.New()
