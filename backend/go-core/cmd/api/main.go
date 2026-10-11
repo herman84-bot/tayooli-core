@@ -120,10 +120,11 @@ func main() {
 	// The seed migrations create @test.com accounts with a public password.
 	// They are required by CI/E2E, so production locks them after migrating.
 	if cfg.AppEnv == "production" {
-		if err := postgres.LockSeedAccounts(context.Background(), db); err != nil {
+		n, err := postgres.LockSeedAccounts(context.Background(), db)
+		if err != nil {
 			log.Fatal().Err(err).Msg("failed to lock seed test accounts")
 		}
-		log.Info().Msg("seed test accounts locked (production)")
+		log.Info().Int64("changed", n).Msg("seed test accounts locked (production)")
 	}
 
 	// Kafka Producer: Decoupled with graceful fallback to no-op producer
