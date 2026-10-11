@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"strconv"
 	"time"
@@ -75,4 +76,26 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 // MetricsHandler returns an http.Handler that serves Prometheus metrics at /metrics.
 func MetricsHandler() http.Handler {
 	return promhttp.Handler()
+}
+
+// MetricsAuth guards the metrics endpoint. Metrics expose the Go version,
+// the full route inventory and traffic counters, so they must not be public.
+// With METRICS_TOKEN unset the endpoint answers 404 (fail closed); with it
+// set, a request must carry "Authorization: Bearer <METRICS_TOKEN>".
+func MetricsAuth(token string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if token == "" {
+				http.NotFound(w, r)
+				return
+			}
+			got := []byte(r.Header.Get("Authorization"))
+			want := []byte("Bearer " + token)
+			if subtle.ConstantTimeCompare(got, want) != 1 {
+				http.NotFound(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

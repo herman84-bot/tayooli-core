@@ -617,7 +617,7 @@ function Faq() {
     },
     {
       q: "Bisa dicoba tanpa kartu kredit?",
-      a: "Tentu. 14 hari gratis tanpa kartu kredit. Anda juga dapat masuk ke akun demo pengujian menggunakan admin@test.com / password123.",
+      a: "Tentu. 14 hari gratis tanpa kartu kredit. Cukup daftar dengan email Anda dan workspace langsung siap dipakai.",
     },
     {
       q: "Apakah data antar toko atau cabang terpisah aman?",
@@ -809,8 +809,7 @@ export default async function LandingPage() {
               </Link>
             </div>
             <p className="mt-5 text-xs text-muted-foreground">
-              Tanpa kartu kredit · Batalkan kapan saja · Akun demo pengujian:{" "}
-              <span className="font-mono text-foreground/80">admin@test.com</span>
+              Tanpa kartu kredit · Batalkan kapan saja
             </p>
           </div>
 

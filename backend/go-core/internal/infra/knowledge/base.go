@@ -221,8 +221,8 @@ Proses: Customer order → Sales Order → Sales Invoice → Payment → Selesai
 1. Email atau password salah: pastikan email dan password benar
 2. Akun tidak ditemukan: hubungi admin untuk membuat akun
 3. Session expired: login ulang dengan email dan password
-4. Lupa password: hubungi admin untuk reset password
-Demo account: admin@test.com / password123`,
+4. Lupa password: gunakan tautan "Lupa password" di halaman login
+5. Belum punya akun: daftar gratis di halaman Daftar`,
 			Tags: []string{"login", "gagal", "password", "email", "session", "akun"},
 		},
 		{

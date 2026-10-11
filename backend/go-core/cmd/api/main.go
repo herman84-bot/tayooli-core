@@ -117,6 +117,15 @@ func main() {
 	}
 	log.Info().Msg("database migrations completed successfully")
 
+	// The seed migrations create @test.com accounts with a public password.
+	// They are required by CI/E2E, so production locks them after migrating.
+	if cfg.AppEnv == "production" {
+		if err := postgres.LockSeedAccounts(context.Background(), db); err != nil {
+			log.Fatal().Err(err).Msg("failed to lock seed test accounts")
+		}
+		log.Info().Msg("seed test accounts locked (production)")
+	}
+
 	// Kafka Producer: Decoupled with graceful fallback to no-op producer
 	var producer kafka.Producer
 	kafkaConfigured := false
@@ -346,9 +355,12 @@ func main() {
 	r.Use(tenantMiddleware.RequestID)
 	r.Use(tenantMiddleware.MetricsMiddleware)
 	r.Use(tenantMiddleware.CORSEnv())
+	r.Use(tenantMiddleware.SecurityHeaders)
 
-	// Prometheus metrics endpoint
-	r.Handle("/metrics", tenantMiddleware.MetricsHandler())
+	// Prometheus metrics endpoint. Not public: requires METRICS_TOKEN
+	// (Bearer) and answers 404 when the token is not configured.
+	r.With(tenantMiddleware.MetricsAuth(os.Getenv("METRICS_TOKEN"))).
+		Handle("/metrics", tenantMiddleware.MetricsHandler())
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		checks := make(map[string]string)
@@ -744,13 +756,18 @@ func main() {
 			respondJSON(w, http.StatusCreated, a)
 		}
 
+		// Ledger access is limited to finance roles. Before this gate any
+		// authenticated role (cashier, warehouse) could write journal entries.
+		accountingRead := tenantMiddleware.RequireRole("owner", "admin", "accountant", "auditor")
+		accountingWrite := tenantMiddleware.RequireRole("owner", "admin", "accountant")
+
 		// /accounting/* routes
 		r.Route("/accounting", func(r chi.Router) {
-			r.Get("/accounts", listAccountsHandler)
-			r.Get("/accounts/{id}", getAccountHandler)
-			r.Post("/accounts", createAccountHandler)
+			r.With(accountingRead).Get("/accounts", listAccountsHandler)
+			r.With(accountingRead).Get("/accounts/{id}", getAccountHandler)
+			r.With(accountingWrite).Post("/accounts", createAccountHandler)
 
-			r.Get("/journal-entries", func(w http.ResponseWriter, r *http.Request) {
+			r.With(accountingRead).Get("/journal-entries", func(w http.ResponseWriter, r *http.Request) {
 				tenantID, ok := tenantMiddleware.GetTenantID(r.Context())
 				if !ok {
 					respondError(w, r, http.StatusUnauthorized, "unauthorized")
@@ -768,7 +785,7 @@ func main() {
 				respondJSON(w, http.StatusOK, entries)
 			})
 
-			r.Post("/journal-entries", func(w http.ResponseWriter, r *http.Request) {
+			r.With(accountingWrite).Post("/journal-entries", func(w http.ResponseWriter, r *http.Request) {
 				tenantID, ok := tenantMiddleware.GetTenantID(r.Context())
 				if !ok {
 					respondError(w, r, http.StatusUnauthorized, "unauthorized")
@@ -794,9 +811,9 @@ func main() {
 		})
 
 		// Backwards-compatible /accounts
-		r.Get("/accounts", listAccountsHandler)
-		r.Get("/accounts/{id}", getAccountHandler)
-		r.Post("/accounts", createAccountHandler)
+		r.With(accountingRead).Get("/accounts", listAccountsHandler)
+		r.With(accountingRead).Get("/accounts/{id}", getAccountHandler)
+		r.With(accountingWrite).Post("/accounts", createAccountHandler)
 	})
 
 	srv := &http.Server{
