@@ -114,16 +114,27 @@ func (r *DispatchShippingManifestRequest) Validate() error {
 	return nil
 }
 
-// WMSOutboundKPISummary carries 8 operational SLA and quality metrics.
+// WMSOutboundKPISummary carries 8 operational metrics over the last
+// KPIWindowDays. Rate/average metrics are nil when there is no sample in the
+// window (JSON null, shown as "belum ada data"), never a fabricated 100%.
+// *Samples report how many records each metric is based on.
+// Backlogs are current counts (no window), where 0 is a real value.
 type WMSOutboundKPISummary struct {
-	DockToStockAvgMinutes   float64 `json:"dock_to_stock_avg_minutes"`
-	ReceivingAccuracyPct    float64 `json:"receiving_accuracy_pct"`
-	POCompliancePct         float64 `json:"po_compliance_pct"`
-	BacklogInboundCount     int     `json:"backlog_inbound_count"`
-	OrderToDispatchAvgHours float64 `json:"order_to_dispatch_avg_hours"`
-	PickingAccuracyPct      float64 `json:"picking_accuracy_pct"`
-	OnTimeShipmentPct       float64 `json:"on_time_shipment_pct"`
-	BacklogOutboundCount    int     `json:"backlog_outbound_count"`
+	WindowDays              int      `json:"window_days"`
+	DockToStockAvgMinutes   *float64 `json:"dock_to_stock_avg_minutes"`
+	DockToStockSamples      int      `json:"dock_to_stock_samples"`
+	ReceivingAccuracyPct    *float64 `json:"receiving_accuracy_pct"`
+	ReceivingSamples        int      `json:"receiving_samples"`
+	POCompliancePct         *float64 `json:"po_compliance_pct"`
+	POComplianceSamples     int      `json:"po_compliance_samples"`
+	BacklogInboundCount     int      `json:"backlog_inbound_count"`
+	OrderToDispatchAvgHours *float64 `json:"order_to_dispatch_avg_hours"`
+	OrderToDispatchSamples  int      `json:"order_to_dispatch_samples"`
+	PickingAccuracyPct      *float64 `json:"picking_accuracy_pct"`
+	PickingSamples          int      `json:"picking_samples"`
+	OnTimeShipmentPct       *float64 `json:"on_time_shipment_pct"`
+	ShipmentSamples         int      `json:"shipment_samples"`
+	BacklogOutboundCount    int      `json:"backlog_outbound_count"`
 }
 
 // Domain sentinel errors for shipping manifests.

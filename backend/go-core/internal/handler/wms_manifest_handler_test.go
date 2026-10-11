@@ -300,13 +300,13 @@ func TestWMSManifestEndpoints(t *testing.T) {
 		mock := &mockWMSUsecase{
 			getWMSOutboundKPIsFn: func(ctx context.Context, tid, uid uuid.UUID, r string, whID *uuid.UUID) (*domain.WMSOutboundKPISummary, error) {
 				return &domain.WMSOutboundKPISummary{
-					DockToStockAvgMinutes:   42.5,
-					ReceivingAccuracyPct:    99.2,
-					POCompliancePct:         97.8,
+					DockToStockAvgMinutes:   domain.KPIAvg(85, 2),
+					ReceivingAccuracyPct:    domain.KPIRatioPct(992, 1000),
+					POCompliancePct:         domain.KPIRatioPct(978, 1000),
 					BacklogInboundCount:     3,
-					OrderToDispatchAvgHours: 2.8,
-					PickingAccuracyPct:      99.9,
-					OnTimeShipmentPct:       98.1,
+					OrderToDispatchAvgHours: domain.KPIAvg(5.6, 2),
+					PickingAccuracyPct:      domain.KPIRatioPct(999, 1000),
+					OnTimeShipmentPct:       domain.KPIRatioPct(981, 1000),
 					BacklogOutboundCount:    4,
 				}, nil
 			},
@@ -324,9 +324,44 @@ func TestWMSManifestEndpoints(t *testing.T) {
 		}
 		err := json.NewDecoder(w.Body).Decode(&resp)
 		require.NoError(t, err)
-		assert.Equal(t, 42.5, resp.Data.DockToStockAvgMinutes)
-		assert.Equal(t, 99.9, resp.Data.PickingAccuracyPct)
-		assert.Equal(t, 98.1, resp.Data.OnTimeShipmentPct)
+		require.NotNil(t, resp.Data.DockToStockAvgMinutes)
+		assert.Equal(t, 42.5, *resp.Data.DockToStockAvgMinutes)
+		assert.Equal(t, 99.9, *resp.Data.PickingAccuracyPct)
+		assert.Equal(t, 98.1, *resp.Data.OnTimeShipmentPct)
+	})
+
+	// Contract: a tenant with no transactions must get JSON null for every
+	// rate/average KPI (rendered "belum ada data"), never 100 or 0.
+	t.Run("GET /api/v1/wms/kpi with no data returns null rates", func(t *testing.T) {
+		mock := &mockWMSUsecase{
+			getWMSOutboundKPIsFn: func(ctx context.Context, tid, uid uuid.UUID, r string, whID *uuid.UUID) (*domain.WMSOutboundKPISummary, error) {
+				return &domain.WMSOutboundKPISummary{
+					WindowDays:              domain.KPIWindowDays,
+					DockToStockAvgMinutes:   domain.KPIAvg(0, 0),
+					ReceivingAccuracyPct:    domain.KPIRatioPct(0, 0),
+					POCompliancePct:         domain.KPIRatioPct(0, 0),
+					OrderToDispatchAvgHours: domain.KPIAvg(0, 0),
+					PickingAccuracyPct:      domain.KPIRatioPct(0, 0),
+					OnTimeShipmentPct:       domain.KPIRatioPct(0, 0),
+				}, nil
+			},
+		}
+		router := setupWMSTestRouter(mock)
+		req := withWMSAuth(httptest.NewRequest(http.MethodGet, "/api/v1/wms/kpi", nil), tenantID, userID, role)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+		var raw struct {
+			Data map[string]any `json:"data"`
+		}
+		require.NoError(t, json.NewDecoder(w.Body).Decode(&raw))
+		for _, k := range []string{"dock_to_stock_avg_minutes", "receiving_accuracy_pct", "po_compliance_pct", "order_to_dispatch_avg_hours", "picking_accuracy_pct", "on_time_shipment_pct"} {
+			v, present := raw.Data[k]
+			assert.True(t, present, "%s must be present", k)
+			assert.Nil(t, v, "%s must be null when there is no data", k)
+		}
+		assert.EqualValues(t, 0, raw.Data["backlog_inbound_count"])
+		assert.EqualValues(t, 30, raw.Data["window_days"])
 	})
 
 	t.Run("Alias endpoints /delivery-orders/manifests work identically", func(t *testing.T) {

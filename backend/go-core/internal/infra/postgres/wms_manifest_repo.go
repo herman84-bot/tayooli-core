@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -840,52 +839,59 @@ func (r *WMSRepo) GetWMSOutboundKPIs(ctx context.Context, tenantID uuid.UUID, wa
 		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: set tenant: %w", err)
 	}
 
-	var summary domain.WMSOutboundKPISummary
-	summary.ReceivingAccuracyPct = 100.0
-	summary.POCompliancePct = 100.0
-	summary.PickingAccuracyPct = 100.0
-	summary.OnTimeShipmentPct = 100.0
+	// Rate/average metrics: SQL returns raw numerator/denominator (or
+	// sum/count) over the last KPIWindowDays; domain.KPIRatioPct/KPIAvg turn
+	// a zero sample into nil instead of a fabricated 100%/0.
+	summary := domain.WMSOutboundKPISummary{WindowDays: domain.KPIWindowDays}
+	window := fmt.Sprintf("%d days", domain.KPIWindowDays)
+	var num, den, sum float64
+	var n int
 
-	// 1. DockToStockAvgMinutes: avg time from stock_receipts created_at to posted_at (minutes)
-	q1 := `SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (posted_at - created_at)) / 60.0), 0.0)
+	// 1. Dock-to-stock: avg minutes from receipt created_at to posted_at.
+	q1 := `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (posted_at - created_at)) / 60.0), 0), COUNT(*)
 	       FROM stock_receipts
-	       WHERE tenant_id = $1 AND status = 'POSTED' AND posted_at IS NOT NULL`
-	args1 := []any{tenantID}
+	       WHERE tenant_id = $1 AND status = 'POSTED' AND posted_at IS NOT NULL AND posted_at >= created_at
+	         AND posted_at >= NOW() - $2::interval`
+	args1 := []any{tenantID, window}
 	if warehouseID != nil {
-		q1 += ` AND warehouse_id = $2`
+		q1 += ` AND warehouse_id = $3`
 		args1 = append(args1, *warehouseID)
 	}
-	if err := tx.QueryRowContext(ctx, q1, args1...).Scan(&summary.DockToStockAvgMinutes); err != nil {
+	if err := tx.QueryRowContext(ctx, q1, args1...).Scan(&sum, &n); err != nil {
 		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: dock to stock: %w", err)
 	}
+	summary.DockToStockAvgMinutes, summary.DockToStockSamples = domain.KPIAvg(sum, n), n
 
-	// 2. ReceivingAccuracyPct: accepted / (accepted + rejected) * 100
-	q2 := `SELECT COALESCE(SUM(sri.accepted_qty) / NULLIF(SUM(sri.accepted_qty + sri.rejected_qty), 0) * 100.0, 100.0)
+	// 2. Receiving accuracy: accepted / (accepted + rejected) qty on posted receipts.
+	q2 := `SELECT COALESCE(SUM(sri.accepted_qty), 0), COALESCE(SUM(sri.accepted_qty + sri.rejected_qty), 0), COUNT(*)
 	       FROM stock_receipt_items sri
 	       JOIN stock_receipts sr ON sr.id = sri.receipt_id AND sr.tenant_id = sri.tenant_id
-	       WHERE sri.tenant_id = $1 AND sr.status = 'POSTED'`
-	args2 := []any{tenantID}
+	       WHERE sri.tenant_id = $1 AND sr.status = 'POSTED' AND sr.posted_at >= NOW() - $2::interval`
+	args2 := []any{tenantID, window}
 	if warehouseID != nil {
-		q2 += ` AND sr.warehouse_id = $2`
+		q2 += ` AND sr.warehouse_id = $3`
 		args2 = append(args2, *warehouseID)
 	}
-	if err := tx.QueryRowContext(ctx, q2, args2...).Scan(&summary.ReceivingAccuracyPct); err != nil {
+	if err := tx.QueryRowContext(ctx, q2, args2...).Scan(&num, &den, &n); err != nil {
 		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: receiving accuracy: %w", err)
 	}
+	summary.ReceivingAccuracyPct, summary.ReceivingSamples = domain.KPIRatioPct(num, den), n
 
-	// 3. POCompliancePct: accepted vs expected
-	q3 := `SELECT COALESCE(SUM(LEAST(sri.accepted_qty, sri.expected_qty)) / NULLIF(SUM(sri.expected_qty), 0) * 100.0, 100.0)
+	// 3. PO compliance: accepted (capped at expected) / expected qty.
+	q3 := `SELECT COALESCE(SUM(LEAST(sri.accepted_qty, sri.expected_qty)), 0), COALESCE(SUM(sri.expected_qty), 0), COUNT(*)
 	       FROM stock_receipt_items sri
 	       JOIN stock_receipts sr ON sr.id = sri.receipt_id AND sr.tenant_id = sri.tenant_id
-	       WHERE sri.tenant_id = $1 AND sr.status = 'POSTED' AND sri.expected_qty IS NOT NULL AND sri.expected_qty > 0`
-	args3 := []any{tenantID}
+	       WHERE sri.tenant_id = $1 AND sr.status = 'POSTED' AND sr.posted_at >= NOW() - $2::interval
+	         AND sri.expected_qty IS NOT NULL AND sri.expected_qty > 0`
+	args3 := []any{tenantID, window}
 	if warehouseID != nil {
-		q3 += ` AND sr.warehouse_id = $2`
+		q3 += ` AND sr.warehouse_id = $3`
 		args3 = append(args3, *warehouseID)
 	}
-	if err := tx.QueryRowContext(ctx, q3, args3...).Scan(&summary.POCompliancePct); err != nil {
+	if err := tx.QueryRowContext(ctx, q3, args3...).Scan(&num, &den, &n); err != nil {
 		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: po compliance: %w", err)
 	}
+	summary.POCompliancePct, summary.POComplianceSamples = domain.KPIRatioPct(num, den), n
 
 	// 4. BacklogInboundCount: count DRAFT stock_receipts
 	q4 := `SELECT COUNT(*) FROM stock_receipts WHERE tenant_id = $1 AND status = 'DRAFT'`
@@ -898,46 +904,51 @@ func (r *WMSRepo) GetWMSOutboundKPIs(ctx context.Context, tenantID uuid.UUID, wa
 		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: backlog inbound: %w", err)
 	}
 
-	// 5. OrderToDispatchAvgHours: avg time from DO created_at to dispatched_at (hours)
-	q5 := `SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (dispatched_at - created_at)) / 3600.0), 0.0)
+	// 5. Order-to-dispatch: avg hours from DO created_at to dispatched_at.
+	q5 := `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (dispatched_at - created_at)) / 3600.0), 0), COUNT(*)
 	       FROM delivery_orders
-	       WHERE tenant_id = $1 AND dispatched_at IS NOT NULL`
-	args5 := []any{tenantID}
+	       WHERE tenant_id = $1 AND dispatched_at IS NOT NULL AND dispatched_at >= created_at AND dispatched_at >= NOW() - $2::interval`
+	args5 := []any{tenantID, window}
 	if warehouseID != nil {
-		q5 += ` AND warehouse_id = $2`
+		q5 += ` AND warehouse_id = $3`
 		args5 = append(args5, *warehouseID)
 	}
-	if err := tx.QueryRowContext(ctx, q5, args5...).Scan(&summary.OrderToDispatchAvgHours); err != nil {
+	if err := tx.QueryRowContext(ctx, q5, args5...).Scan(&sum, &n); err != nil {
 		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: order to dispatch: %w", err)
 	}
+	summary.OrderToDispatchAvgHours, summary.OrderToDispatchSamples = domain.KPIAvg(sum, n), n
 
-	// 6. PickingAccuracyPct: picking tasks lines with damaged_qty == 0 vs total
-	q6 := `SELECT COALESCE(SUM(CASE WHEN pti.damaged_qty = 0 THEN 1.0 ELSE 0.0 END) / NULLIF(COUNT(*), 0) * 100.0, 100.0)
+	// 6. Damage-free picking: processed lines (not PENDING) with damaged_qty = 0.
+	// Measures damage only, not SKU/qty correctness (no pick verification data).
+	q6 := `SELECT COALESCE(SUM(CASE WHEN pti.damaged_qty = 0 THEN 1 ELSE 0 END), 0), COUNT(*)
 	       FROM picking_task_items pti
 	       JOIN picking_tasks pt ON pt.id = pti.task_id AND pt.tenant_id = pti.tenant_id
 	       JOIN delivery_orders dord ON dord.id = pt.delivery_order_id AND dord.tenant_id = pt.tenant_id
-	       WHERE pti.tenant_id = $1`
-	args6 := []any{tenantID}
+	       WHERE pti.tenant_id = $1 AND pti.status <> 'PENDING' AND pti.created_at >= NOW() - $2::interval`
+	args6 := []any{tenantID, window}
 	if warehouseID != nil {
-		q6 += ` AND dord.warehouse_id = $2`
+		q6 += ` AND dord.warehouse_id = $3`
 		args6 = append(args6, *warehouseID)
 	}
-	if err := tx.QueryRowContext(ctx, q6, args6...).Scan(&summary.PickingAccuracyPct); err != nil {
-		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: picking accuracy: %w", err)
+	if err := tx.QueryRowContext(ctx, q6, args6...).Scan(&num, &n); err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: picking: %w", err)
 	}
+	summary.PickingAccuracyPct, summary.PickingSamples = domain.KPIRatioPct(num, float64(n)), n
 
-	// 7. OnTimeShipmentPct: shipped / delivered DOs vs total non-cancelled
-	q7 := `SELECT COALESCE(SUM(CASE WHEN status IN ('SHIPPED', 'DELIVERED') THEN 1.0 ELSE 0.0 END) / NULLIF(COUNT(*), 0) * 100.0, 100.0)
+	// 7. Shipped share: SHIPPED/DELIVERED DOs over non-cancelled DOs created in
+	// the window. Not on-time (no promised date is recorded).
+	q7 := `SELECT COALESCE(SUM(CASE WHEN status IN ('SHIPPED', 'DELIVERED') THEN 1 ELSE 0 END), 0), COUNT(*)
 	       FROM delivery_orders
-	       WHERE tenant_id = $1 AND status != 'CANCELLED'`
-	args7 := []any{tenantID}
+	       WHERE tenant_id = $1 AND status <> 'CANCELLED' AND created_at >= NOW() - $2::interval`
+	args7 := []any{tenantID, window}
 	if warehouseID != nil {
-		q7 += ` AND warehouse_id = $2`
+		q7 += ` AND warehouse_id = $3`
 		args7 = append(args7, *warehouseID)
 	}
-	if err := tx.QueryRowContext(ctx, q7, args7...).Scan(&summary.OnTimeShipmentPct); err != nil {
-		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: on time shipment: %w", err)
+	if err := tx.QueryRowContext(ctx, q7, args7...).Scan(&num, &n); err != nil {
+		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: shipped share: %w", err)
 	}
+	summary.OnTimeShipmentPct, summary.ShipmentSamples = domain.KPIRatioPct(num, float64(n)), n
 
 	// 8. BacklogOutboundCount: DOs in DRAFT, CONFIRMED, PICKED, PACKED, STAGED
 	q8 := `SELECT COUNT(*) FROM delivery_orders WHERE tenant_id = $1 AND status IN ('DRAFT', 'CONFIRMED', 'PICKED', 'PACKED', 'STAGED')`
@@ -953,14 +964,6 @@ func (r *WMSRepo) GetWMSOutboundKPIs(ctx context.Context, tenantID uuid.UUID, wa
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("WMSRepo.GetWMSOutboundKPIs: commit: %w", err)
 	}
-
-	// Safe rounding
-	summary.DockToStockAvgMinutes = math.Round(summary.DockToStockAvgMinutes*10) / 10
-	summary.ReceivingAccuracyPct = math.Round(summary.ReceivingAccuracyPct*10) / 10
-	summary.POCompliancePct = math.Round(summary.POCompliancePct*10) / 10
-	summary.OrderToDispatchAvgHours = math.Round(summary.OrderToDispatchAvgHours*10) / 10
-	summary.PickingAccuracyPct = math.Round(summary.PickingAccuracyPct*10) / 10
-	summary.OnTimeShipmentPct = math.Round(summary.OnTimeShipmentPct*10) / 10
 
 	return &summary, nil
 }

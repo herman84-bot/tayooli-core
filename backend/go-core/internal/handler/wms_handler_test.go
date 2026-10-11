@@ -456,7 +456,7 @@ func (m *mockWMSUsecase) GetWMSOutboundKPIs(ctx context.Context, tenantID, userI
 	if m.getWMSOutboundKPIsFn != nil {
 		return m.getWMSOutboundKPIsFn(ctx, tenantID, userID, role, warehouseID)
 	}
-	return &domain.WMSOutboundKPISummary{DockToStockAvgMinutes: 30.0, PickingAccuracyPct: 99.0}, nil
+	return &domain.WMSOutboundKPISummary{DockToStockAvgMinutes: domain.KPIAvg(30, 1), PickingAccuracyPct: domain.KPIRatioPct(99, 100)}, nil
 }
 
 func (m *mockWMSUsecase) CreateDock(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreateDockRequest) (*domain.InboundDock, error) {

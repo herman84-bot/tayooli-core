@@ -650,14 +650,23 @@ export interface DispatchShippingManifestInput {
   notes?: string
 }
 
+// Rate/average KPIs are null when there is no data in the window (never a
+// fabricated 100 or 0). *_samples = records each metric is based on.
 export interface WMSOutboundKPISummary {
-  dock_to_stock_avg_minutes: number
-  receiving_accuracy_pct: number
-  po_compliance_pct: number
+  window_days?: number
+  dock_to_stock_avg_minutes: number | null
+  dock_to_stock_samples?: number
+  receiving_accuracy_pct: number | null
+  receiving_samples?: number
+  po_compliance_pct: number | null
+  po_compliance_samples?: number
   backlog_inbound_count: number
-  order_to_dispatch_avg_hours: number
-  picking_accuracy_pct: number
-  on_time_shipment_pct: number
+  order_to_dispatch_avg_hours: number | null
+  order_to_dispatch_samples?: number
+  picking_accuracy_pct: number | null
+  picking_samples?: number
+  on_time_shipment_pct: number | null
+  shipment_samples?: number
   backlog_outbound_count: number
 }
 

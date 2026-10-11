@@ -107,14 +107,17 @@ function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
 
 interface SOPKPICardProps {
   label: string
-  value: string | number
+  /** null/undefined = no data yet: shows "â€”", no pass/fail verdict. */
+  value: number | null | undefined
   unit: string
   target: string
   subtext: string
   icon: React.ElementType
   iconClass: string
   bg: string
-  passed: boolean
+  /** Pass rule, evaluated only when value is a real number. */
+  pass: (v: number) => boolean
+  samples?: number
 }
 
 function SOPKPICard({
@@ -126,8 +129,11 @@ function SOPKPICard({
   icon: Icon,
   iconClass,
   bg,
-  passed,
+  pass,
+  samples,
 }: SOPKPICardProps) {
+  const hasValue = typeof value === 'number' && Number.isFinite(value)
+  const passed = hasValue ? pass(value) : null
   return (
     <div className="border border-border/60 rounded-lg p-3.5 bg-card hover:border-border transition-colors">
       <div className="flex items-start justify-between gap-2">
@@ -137,20 +143,32 @@ function SOPKPICard({
           </div>
           <div className="text-xs font-semibold text-foreground leading-tight truncate">{label}</div>
         </div>
-        <span
-          className={`text-[10px] font-medium px-1.5 py-0.5 rounded border font-mono tabular-nums shrink-0 ${
-            passed
-              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
-              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800/40'
-          }`}
-        >
-          {passed ? 'Memenuhi' : 'Perhatian'}
-        </span>
+        {passed !== null && (
+          <span
+            className={`text-[10px] font-medium px-1.5 py-0.5 rounded border font-mono tabular-nums shrink-0 ${
+              passed
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40'
+                : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border-amber-200 dark:border-amber-800/40'
+            }`}
+          >
+            {passed ? 'Memenuhi' : 'Perhatian'}
+          </span>
+        )}
       </div>
       <div className="mt-2.5 flex items-baseline justify-between gap-2">
-        <div className="text-lg font-bold font-mono tracking-tight text-foreground tabular-nums">
-          {value} <span className="text-xs font-normal text-muted-foreground">{unit}</span>
-        </div>
+        {hasValue ? (
+          <div className="text-lg font-bold font-mono tracking-tight text-foreground tabular-nums">
+            {value} <span className="text-xs font-normal text-muted-foreground">{unit}</span>
+            {typeof samples === 'number' && (
+              <span className="ml-1 text-[10px] font-normal text-muted-foreground">dari {samples} data</span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-baseline gap-1.5">
+            <span aria-hidden className="text-lg font-bold font-mono text-muted-foreground">â€”</span>
+            <span className="text-[11px] text-muted-foreground">Belum ada data</span>
+          </div>
+        )}
         <div className="text-[10px] font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded border border-border/30 shrink-0">
           {target}
         </div>
@@ -170,14 +188,8 @@ export default function DashboardPage() {
   const status = (error as { response?: { status?: number } } | null)?.response?.status
   const needsLogin = status === 401
 
-  const dockToStock = kpis?.dock_to_stock_avg_minutes ?? 0
-  const receivingAcc = kpis?.receiving_accuracy_pct ?? 0
-  const poCompliance = kpis?.po_compliance_pct ?? 0
-  const inboundBacklog = kpis?.backlog_inbound_count ?? 0
-  const orderToDispatch = kpis?.order_to_dispatch_avg_hours ?? 0
-  const pickingAcc = kpis?.picking_accuracy_pct ?? 0
-  const onTimeShipment = kpis?.on_time_shipment_pct ?? 0
-  const outboundBacklog = kpis?.backlog_outbound_count ?? 0
+  // No fallback numbers: missing data stays null and renders "Belum ada data".
+  const kpiWindowDays = kpis?.window_days ?? 30
 
   return (
     <div className="px-6 py-6 space-y-6">
@@ -280,7 +292,7 @@ export default function DashboardPage() {
 
       <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${loading ? 'opacity-50' : ''}`}>
         <section className="border border-border/60 rounded-lg bg-card">
-          <SectionHeader icon={Store} title="POS Kasir & Penjualan" href="/pos" linkLabel="Buka POS Kasir →" />
+          <SectionHeader icon={Store} title="POS Kasir & Penjualan" href="/pos" linkLabel="Buka POS Kasir â†’" />
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-3 gap-2.5">
               <MiniStat label="Omzet Hari Ini" value={formatCurrency(s.pos.today_revenue, { compact: true })} />
@@ -347,10 +359,10 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" /> Stok Menipis (≤ 5 unit)
+                  <AlertTriangle className="h-3 w-3" /> Stok Menipis (â‰¤ 5 unit)
                 </span>
                 <Link href="/products" className="text-[10px] font-medium text-muted-foreground hover:text-primary">
-                  Master Produk →
+                  Master Produk â†’
                 </Link>
               </div>
               {s.wms.low_stock_items.length > 0 ? (
@@ -363,7 +375,7 @@ export default function DashboardPage() {
                       <div className="min-w-0">
                         <div className="font-medium text-foreground truncate">{item.name}</div>
                         <div className="font-mono text-[10px] text-muted-foreground">
-                          {item.sku} • Min: {item.min_threshold}
+                          {item.sku} â€¢ Min: {item.min_threshold}
                         </div>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 tabular-nums shrink-0">
@@ -393,7 +405,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground bg-muted/40 px-2 py-0.5 rounded border border-border/40 font-mono">
-              Standar Operasional Pergudangan
+              {kpiWindowDays} hari terakhir
             </span>
             <Link
               href="/wms/arus-barang"
@@ -416,47 +428,50 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <SOPKPICard
                 label="Dock-to-Stock Time"
-                value={dockToStock}
+                value={kpis?.dock_to_stock_avg_minutes}
                 unit="menit"
-                target="Target: ≤ 120 menit"
+                target="Target: â‰¤ 120 menit"
                 subtext="Waktu bongkar s/d penataan rak"
                 icon={Clock}
                 iconClass="text-blue-600"
                 bg="bg-blue-50 dark:bg-blue-950/30"
-                passed={dockToStock <= 120}
+                pass={(v) => v <= 120}
+                samples={kpis?.dock_to_stock_samples}
               />
               <SOPKPICard
                 label="Receiving Accuracy"
-                value={receivingAcc}
+                value={kpis?.receiving_accuracy_pct}
                 unit="%"
-                target="Target: ≥ 99.5%"
+                target="Target: â‰¥ 99.5%"
                 subtext="Akurasi fisik vs PO/SJ penerimaan"
                 icon={CheckCircle2}
                 iconClass="text-emerald-600"
                 bg="bg-emerald-50 dark:bg-emerald-950/30"
-                passed={receivingAcc >= 99.5}
+                pass={(v) => v >= 99.5}
+                samples={kpis?.receiving_samples}
               />
               <SOPKPICard
                 label="PO Compliance"
-                value={poCompliance}
+                value={kpis?.po_compliance_pct}
                 unit="%"
-                target="Target: ≥ 95%"
+                target="Target: â‰¥ 95%"
                 subtext="Kepatuhan dokumen & ASN vendor"
                 icon={FileCheck2}
                 iconClass="text-teal-600"
                 bg="bg-teal-50 dark:bg-teal-950/30"
-                passed={poCompliance >= 95}
+                pass={(v) => v >= 95}
+                samples={kpis?.po_compliance_samples}
               />
               <SOPKPICard
                 label="Inbound Backlog"
-                value={inboundBacklog}
+                value={kpis?.backlog_inbound_count}
                 unit="berkas"
                 target="Unposted Receipts"
                 subtext="Penerimaan unposted di staging"
                 icon={Inbox}
                 iconClass="text-amber-600"
                 bg="bg-amber-50 dark:bg-amber-950/30"
-                passed={inboundBacklog === 0}
+                pass={(v) => v === 0}
               />
             </div>
           </div>
@@ -472,47 +487,50 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <SOPKPICard
                 label="Order-to-Dispatch Time"
-                value={orderToDispatch}
+                value={kpis?.order_to_dispatch_avg_hours}
                 unit="jam"
-                target="Target: ≤ 4 jam"
+                target="Target: â‰¤ 4 jam"
                 subtext="Siklus rilis pesanan s/d muat armada"
                 icon={Zap}
                 iconClass="text-indigo-600"
                 bg="bg-indigo-50 dark:bg-indigo-950/30"
-                passed={orderToDispatch <= 4}
+                pass={(v) => v <= 4}
+                samples={kpis?.order_to_dispatch_samples}
               />
               <SOPKPICard
-                label="Picking Accuracy"
-                value={pickingAcc}
+                label="Picking Tanpa Kerusakan"
+                value={kpis?.picking_accuracy_pct}
                 unit="%"
-                target="Target: ≥ 99.8%"
-                subtext="Akurasi scan barcode item di bin"
+                target="Target: â‰¥ 99.8%"
+                subtext="Baris picking selesai tanpa barang rusak"
                 icon={ScanBarcode}
                 iconClass="text-emerald-600"
                 bg="bg-emerald-50 dark:bg-emerald-950/30"
-                passed={pickingAcc >= 99.8}
+                pass={(v) => v >= 99.8}
+                samples={kpis?.picking_samples}
               />
               <SOPKPICard
-                label="On-Time Shipment"
-                value={onTimeShipment}
+                label="Surat Jalan Terkirim"
+                value={kpis?.on_time_shipment_pct}
                 unit="%"
-                target="Target: ≥ 98%"
-                subtext="Pengiriman berangkat sesuai jadwal"
+                target="Target: â‰¥ 98%"
+                subtext="Surat jalan berstatus dikirim/diterima"
                 icon={Truck}
                 iconClass="text-blue-600"
                 bg="bg-blue-50 dark:bg-blue-950/30"
-                passed={onTimeShipment >= 98}
+                pass={(v) => v >= 98}
+                samples={kpis?.shipment_samples}
               />
               <SOPKPICard
                 label="Outbound Backlog"
-                value={outboundBacklog}
+                value={kpis?.backlog_outbound_count}
                 unit="pesanan"
                 target="Undispatched DOs"
                 subtext="Surat jalan menunggu ekspedisi"
                 icon={AlertCircle}
                 iconClass="text-amber-600"
                 bg="bg-amber-50 dark:bg-amber-950/30"
-                passed={outboundBacklog === 0}
+                pass={(v) => v === 0}
               />
             </div>
           </div>
@@ -548,7 +566,7 @@ export default function DashboardPage() {
               href="/wms/arus-barang"
               className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
             >
-              Buka Arus Barang →
+              Buka Arus Barang â†’
             </Link>
           </div>
         </div>

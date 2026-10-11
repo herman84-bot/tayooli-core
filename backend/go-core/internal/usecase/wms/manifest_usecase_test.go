@@ -103,13 +103,13 @@ func (m *mockWMSRepo) DispatchShippingManifest(ctx context.Context, tenantID, ma
 
 func (m *mockWMSRepo) GetWMSOutboundKPIs(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID) (*domain.WMSOutboundKPISummary, error) {
 	return &domain.WMSOutboundKPISummary{
-		DockToStockAvgMinutes:   45.2,
-		ReceivingAccuracyPct:    99.5,
-		POCompliancePct:         98.0,
+		DockToStockAvgMinutes:   ptrF(45.2),
+		ReceivingAccuracyPct:    ptrF(99.5),
+		POCompliancePct:         ptrF(98.0),
 		BacklogInboundCount:     2,
-		OrderToDispatchAvgHours: 3.5,
-		PickingAccuracyPct:      99.8,
-		OnTimeShipmentPct:       97.5,
+		OrderToDispatchAvgHours: ptrF(3.5),
+		PickingAccuracyPct:      ptrF(99.8),
+		OnTimeShipmentPct:       ptrF(97.5),
 		BacklogOutboundCount:    5,
 	}, nil
 }
@@ -221,7 +221,11 @@ func TestManifestUsecase(t *testing.T) {
 	t.Run("GetWMSOutboundKPIs", func(t *testing.T) {
 		kpi, err := usecase.GetWMSOutboundKPIs(ctx, tenantID, adminID, "admin", &whID)
 		require.NoError(t, err)
-		assert.Equal(t, 99.8, kpi.PickingAccuracyPct)
-		assert.Equal(t, 8, int(kpi.OrderToDispatchAvgHours)+kpi.BacklogOutboundCount)
+		require.NotNil(t, kpi.PickingAccuracyPct)
+		assert.Equal(t, 99.8, *kpi.PickingAccuracyPct)
+		require.NotNil(t, kpi.OrderToDispatchAvgHours)
+		assert.Equal(t, 8, int(*kpi.OrderToDispatchAvgHours)+kpi.BacklogOutboundCount)
 	})
 }
+
+func ptrF(v float64) *float64 { return &v }
