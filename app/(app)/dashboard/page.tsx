@@ -300,8 +300,8 @@ export default function DashboardPage() {
               <MiniStat label="Rata-rata Keranjang" value={formatCurrency(s.pos.average_basket_size, { compact: true })} />
             </div>
             <div className="grid grid-cols-3 gap-2.5">
-              <MiniStat label="Sales Order" value={s.sales_orders.total} />
-              <MiniStat label="Order Pending" value={s.sales_orders.pending} />
+              <MiniStat label="Pesanan Penjualan" value={s.sales_orders.total} />
+              <MiniStat label="Pesanan Tertunda" value={s.sales_orders.pending} />
               <MiniStat label="Pelanggan" value={s.customers.active} />
             </div>
             <div>
@@ -400,7 +400,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <Gauge className="h-4 w-4 text-primary" />
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Indikator Kinerja Pergudangan (KPI WMS)
+              Indikator Kinerja Pergudangan
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -417,17 +417,17 @@ export default function DashboardPage() {
         </div>
 
         <div className="p-5 space-y-5">
-          {/* Inbound Operations */}
+          {/* Operasi Barang Masuk */}
           <div>
             <div className="flex items-center gap-2 mb-2.5">
               <ArrowDownToLine className="h-3.5 w-3.5 text-blue-600" />
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Inbound Operations (Penerimaan &amp; Putaway)
+                Operasi Barang Masuk (Penerimaan &amp; Penataan Rak)
               </h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <SOPKPICard
-                label="Dock-to-Stock Time"
+                label="Waktu Bongkar ke Rak"
                 value={kpis?.dock_to_stock_avg_minutes}
                 unit="menit"
                 target="Target: ≤ 120 menit"
@@ -439,11 +439,11 @@ export default function DashboardPage() {
                 samples={kpis?.dock_to_stock_samples}
               />
               <SOPKPICard
-                label="Receiving Accuracy"
+                label="Akurasi Penerimaan"
                 value={kpis?.receiving_accuracy_pct}
                 unit="%"
                 target="Target: ≥ 99.5%"
-                subtext="Akurasi fisik vs PO/SJ penerimaan"
+                subtext="Akurasi fisik vs surat jalan penerimaan"
                 icon={CheckCircle2}
                 iconClass="text-emerald-600"
                 bg="bg-emerald-50 dark:bg-emerald-950/30"
@@ -451,11 +451,11 @@ export default function DashboardPage() {
                 samples={kpis?.receiving_samples}
               />
               <SOPKPICard
-                label="PO Compliance"
+                label="Kepatuhan Pesanan (PO)"
                 value={kpis?.po_compliance_pct}
                 unit="%"
                 target="Target: ≥ 95%"
-                subtext="Kepatuhan dokumen & ASN vendor"
+                subtext="Kesesuaian fisik vs dokumen pesanan"
                 icon={FileCheck2}
                 iconClass="text-teal-600"
                 bg="bg-teal-50 dark:bg-teal-950/30"
@@ -463,11 +463,11 @@ export default function DashboardPage() {
                 samples={kpis?.po_compliance_samples}
               />
               <SOPKPICard
-                label="Inbound Backlog"
+                label="Antrean Barang Masuk"
                 value={kpis?.backlog_inbound_count}
                 unit="berkas"
-                target="Unposted Receipts"
-                subtext="Penerimaan unposted di staging"
+                target="Target: 0 berkas"
+                subtext="Penerimaan belum diposting di area transit"
                 icon={Inbox}
                 iconClass="text-amber-600"
                 bg="bg-amber-50 dark:bg-amber-950/30"
@@ -476,17 +476,17 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Outbound Operations */}
+          {/* Operasi Barang Keluar */}
           <div>
             <div className="flex items-center gap-2 mb-2.5">
               <ArrowUpFromLine className="h-3.5 w-3.5 text-indigo-600" />
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Outbound Operations (Picking, Packing &amp; Dispatch)
+                Operasi Barang Keluar (Pengambilan &amp; Pengiriman)
               </h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <SOPKPICard
-                label="Order-to-Dispatch Time"
+                label="Waktu Pesanan ke Kirim"
                 value={kpis?.order_to_dispatch_avg_hours}
                 unit="jam"
                 target="Target: ≤ 4 jam"
@@ -502,7 +502,7 @@ export default function DashboardPage() {
                 value={kpis?.picking_accuracy_pct}
                 unit="%"
                 target="Target: ≥ 99.8%"
-                subtext="Baris picking selesai tanpa barang rusak"
+                subtext="Baris barang selesai tanpa rusak"
                 icon={ScanBarcode}
                 iconClass="text-emerald-600"
                 bg="bg-emerald-50 dark:bg-emerald-950/30"
@@ -522,10 +522,10 @@ export default function DashboardPage() {
                 samples={kpis?.shipment_samples}
               />
               <SOPKPICard
-                label="Outbound Backlog"
+                label="Antrean Barang Keluar"
                 value={kpis?.backlog_outbound_count}
                 unit="pesanan"
-                target="Undispatched DOs"
+                target="Target: 0 pesanan"
                 subtext="Surat jalan menunggu ekspedisi"
                 icon={AlertCircle}
                 iconClass="text-amber-600"
@@ -542,7 +542,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <Truck className="h-4 w-4 text-indigo-600" />
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Aktivitas Barang Keluar & Pemenuhan (WMS Outbound)
+              Aktivitas Barang Keluar &amp; Pemenuhan
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -576,8 +576,8 @@ export default function DashboardPage() {
             <MiniStat label="Keluar Hari Ini" value={`${s.outbound.qty_today} unit`} />
             <MiniStat label="Keluar Bulan Ini" value={`${s.outbound.qty_month} unit`} />
             <MiniStat label="Total Surat Jalan" value={s.sales_orders.total} />
-            <MiniStat label="DO Dikonfirmasi" value={s.outbound.confirmed_do_count} />
-            <MiniStat label="DO Pending" value={s.sales_orders.pending} />
+            <MiniStat label="Surat Jalan Dikonfirmasi" value={s.outbound.confirmed_do_count} />
+            <MiniStat label="Surat Jalan Tertunda" value={s.sales_orders.pending} />
             <MiniStat label="Pelanggan Aktif" value={s.customers.active} />
           </div>
 

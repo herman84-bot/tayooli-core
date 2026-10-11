@@ -43,19 +43,19 @@ describe('DashboardPage 8 Enterprise WMS SOP KPIs', () => {
     mockKPIResult = { data: mockKPIs }
     render(<DashboardPage />)
 
-    expect(screen.getByText('Indikator Kinerja Pergudangan (KPI WMS)')).toBeInTheDocument()
-    expect(screen.getByText('Dock-to-Stock Time')).toBeInTheDocument()
+    expect(screen.getByText('Indikator Kinerja Pergudangan')).toBeInTheDocument()
+    expect(screen.getByText('Waktu Bongkar ke Rak')).toBeInTheDocument()
     expect(screen.getByText('38.5')).toBeInTheDocument()
-    expect(screen.getByText('Receiving Accuracy')).toBeInTheDocument()
+    expect(screen.getByText('Akurasi Penerimaan')).toBeInTheDocument()
     expect(screen.getByText('99.9')).toBeInTheDocument()
-    expect(screen.getByText('PO Compliance')).toBeInTheDocument()
+    expect(screen.getByText('Kepatuhan Pesanan (PO)')).toBeInTheDocument()
     expect(screen.getByText('98.2')).toBeInTheDocument()
-    expect(screen.getByText('Inbound Backlog')).toBeInTheDocument()
-    expect(screen.getByText('Order-to-Dispatch Time')).toBeInTheDocument()
+    expect(screen.getByText('Antrean Barang Masuk')).toBeInTheDocument()
+    expect(screen.getByText('Waktu Pesanan ke Kirim')).toBeInTheDocument()
     expect(screen.getByText('1.8')).toBeInTheDocument()
     expect(screen.getByText('100')).toBeInTheDocument()
     expect(screen.getByText('99.2')).toBeInTheDocument()
-    expect(screen.getByText('Outbound Backlog')).toBeInTheDocument()
+    expect(screen.getByText('Antrean Barang Keluar')).toBeInTheDocument()
   })
 
   it('new tenant (all rates null): shows "Belum ada data", never 100 or a pass badge', () => {
@@ -100,10 +100,10 @@ describe('DashboardPage 8 Enterprise WMS SOP KPIs', () => {
     mockKPIResult = { data: undefined }
     render(<DashboardPage />)
 
-    expect(screen.getByText('Dock-to-Stock Time')).toBeInTheDocument()
-    expect(screen.getByText('Receiving Accuracy')).toBeInTheDocument()
-    expect(screen.getByText('PO Compliance')).toBeInTheDocument()
-    expect(screen.getByText('Order-to-Dispatch Time')).toBeInTheDocument()
+    expect(screen.getByText('Waktu Bongkar ke Rak')).toBeInTheDocument()
+    expect(screen.getByText('Akurasi Penerimaan')).toBeInTheDocument()
+    expect(screen.getByText('Kepatuhan Pesanan (PO)')).toBeInTheDocument()
+    expect(screen.getByText('Waktu Pesanan ke Kirim')).toBeInTheDocument()
     // still loading/failed: no fabricated values, no pass/fail verdicts
     expect(screen.queryByText('Memenuhi')).not.toBeInTheDocument()
     expect(screen.queryByText('Perhatian')).not.toBeInTheDocument()
