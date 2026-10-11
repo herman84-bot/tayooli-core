@@ -432,6 +432,9 @@ func (r *UserRepo) CreateUserWithWarehouses(ctx context.Context, user *domain.Us
 	if _, err := tx.ExecContext(ctx, q,
 		user.ID, user.TenantID, user.Email, user.PasswordHash, user.Role,
 		user.CreatedAt, user.UpdatedAt); err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrConflict // users.email is globally UNIQUE
+		}
 		return err
 	}
 	if err := replaceUserWarehousesTx(ctx, tx, user.TenantID, user.ID, warehouseIDs); err != nil {

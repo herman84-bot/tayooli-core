@@ -3,6 +3,7 @@ package team
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ type fakeRepo struct {
 	users         map[uuid.UUID]*domain.User
 	warehouses    map[uuid.UUID][]uuid.UUID
 	failWarehouse bool
+	createErr     error
 }
 
 func newFakeRepo() *fakeRepo {
@@ -59,6 +61,9 @@ func (f *fakeRepo) DeleteUser(_ context.Context, id, _ uuid.UUID) error {
 	return nil
 }
 func (f *fakeRepo) CreateUserWithWarehouses(_ context.Context, u *domain.User, ids []uuid.UUID) error {
+	if f.createErr != nil {
+		return f.createErr
+	}
 	if f.failWarehouse {
 		return domain.ErrInvalidInput // simulasi FK gagal: tx di-rollback, user tidak tersimpan
 	}
@@ -206,6 +211,28 @@ func TestInviteMember_NonWarehouseRoleDropsWarehouses(t *testing.T) {
 		t.Fatal("cashier must not keep warehouse assignments")
 	}
 }
+// Email is globally unique (users.email UNIQUE), but the duplicate pre-check
+// is tenant-scoped. An address already used in ANOTHER workspace passes the
+// pre-check and then hits the unique index; the owner must get a clear
+// message, not a raw database error.
+func TestInviteMember_EmailUsedInOtherWorkspace_ClearMessage(t *testing.T) {
+	repo := newFakeRepo()
+	repo.createErr = domain.ErrConflict
+	uc := New(repo)
+	_, err := uc.InviteMember(context.Background(), uuid.New(), "dipakai@x.com", "cashier", nil, uuid.New())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, ErrEmailTaken) {
+		t.Fatalf("want ErrEmailTaken, got %v", err)
+	}
+	for _, leak := range []string{"pq:", "duplicate key", "23505", "create user"} {
+		if strings.Contains(err.Error(), leak) {
+			t.Fatalf("message leaks internals (%q): %v", leak, err)
+		}
+	}
+}
+
 type fakeInviter struct {
 	tokens map[uuid.UUID]string
 	sent   []string

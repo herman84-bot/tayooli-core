@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm'
 
@@ -69,6 +69,32 @@ describe('ResetPasswordForm token check on page open', () => {
     render(<ResetPasswordForm />)
     await waitFor(() => expect(global.fetch).toHaveBeenCalled())
     expect(screen.getByLabelText('Kata Sandi Baru')).toBeInTheDocument()
+  })
+
+  it('invite link: activation wording, success points to login, dead link tells user to ask the admin', async () => {
+    mockGet.mockImplementation((k: string) => (k === 'token' ? 'inv' : k === 'invite' ? '1' : null))
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(respond(200, { valid: true }))
+      .mockResolvedValueOnce(respond(200, { message: 'ok' }))
+    render(<ResetPasswordForm />)
+    const submit = await screen.findByRole('button', { name: /Aktifkan Akun/i })
+    fireEvent.change(screen.getByLabelText('Kata Sandi Baru'), { target: { value: 'rahasia123' } })
+    fireEvent.change(screen.getByLabelText('Konfirmasi Kata Sandi'), { target: { value: 'rahasia123' } })
+    fireEvent.click(submit)
+    await waitFor(() =>
+      expect(screen.getByTestId('reset-success-text').textContent).toMatch(/Akun Anda aktif/),
+    )
+    expect(screen.getByRole('link', { name: /Masuk sekarang/i })).toHaveAttribute('href', '/login')
+  })
+
+  it('expired invite link asks the employee to contact the admin, not to use forgot-password', async () => {
+    mockGet.mockImplementation((k: string) => (k === 'token' ? 'old' : k === 'invite' ? '1' : null))
+    global.fetch = jest.fn().mockResolvedValue(respond(400, { valid: false, reason: 'expired', error: 'x' }))
+    render(<ResetPasswordForm />)
+    expect(await screen.findByText(/Undangan ini sudah kedaluwarsa/)).toBeInTheDocument()
+    expect(screen.getByText(/Kirim Ulang Undangan/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Minta tautan baru/i })).not.toBeInTheDocument()
   })
 
   it('does not call the API and shows a request-new-link message when the token is missing', () => {

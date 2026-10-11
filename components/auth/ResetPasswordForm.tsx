@@ -20,19 +20,37 @@ const resetPasswordSchema = z.object({
 })
 type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>
 
-function DeadLink({ message }: { message: string }) {
+const INVITE_DEAD: Record<string, string> = {
+  expired:
+    'Undangan ini sudah kedaluwarsa (berlaku 72 jam). Minta admin atau pemilik toko menekan "Kirim Ulang Undangan" di Pengaturan › Tim, lalu buka email terbaru.',
+  invalid:
+    'Undangan ini sudah dipakai atau sudah diganti dengan undangan yang lebih baru. Jika akun Anda sudah aktif, silakan masuk. Jika belum, minta admin menekan "Kirim Ulang Undangan".',
+  missing:
+    'Tautan undangan tidak lengkap. Buka tombol "Aktifkan Akun" langsung dari email undangan, atau minta admin mengirim ulang undangan.',
+}
+
+function DeadLink({ message, invite }: { message: string; invite?: boolean }) {
   return (
     <div role="alert" className="space-y-4 text-center">
       <div className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-left text-sm text-destructive">
         <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
         <span>{message}</span>
       </div>
-      <Link
-        href="/forgot-password"
-        className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-      >
-        Minta tautan baru
-      </Link>
+      {invite ? (
+        <Link
+          href="/login"
+          className="inline-flex w-full items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+        >
+          Ke halaman masuk
+        </Link>
+      ) : (
+        <Link
+          href="/forgot-password"
+          className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          Minta tautan baru
+        </Link>
+      )}
     </div>
   )
 }
@@ -40,6 +58,7 @@ function DeadLink({ message }: { message: string }) {
 export function ResetPasswordForm() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
+  const isInvite = searchParams.get('invite') === '1'
 
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -64,6 +83,11 @@ export function ResetPasswordForm() {
         if (cancelled || res.ok || res.status !== 400) return
         const body = await res.json().catch(() => ({}))
         if (cancelled) return
+        const reason = typeof body?.reason === 'string' ? body.reason : 'invalid'
+        if (isInvite) {
+          setDeadLink(INVITE_DEAD[reason] ?? INVITE_DEAD.invalid)
+          return
+        }
         setDeadLink(
           typeof body?.error === 'string' && body.error
             ? body.error
@@ -74,7 +98,9 @@ export function ResetPasswordForm() {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, isInvite])
+
+  const [done, setDone] = useState(false)
 
   useLayoutEffect(() => {
     if (errorBoxRef.current) {
@@ -112,7 +138,12 @@ export function ResetPasswordForm() {
         const msg = await extractApiErrorMessage(res, 'Gagal reset password')
         throw new Error(msg)
       }
-      setSuccess('Password berhasil direset. Silakan login dengan password baru.')
+      setSuccess(
+        isInvite
+          ? 'Akun Anda aktif. Masuk dengan email undangan dan kata sandi yang baru saja Anda buat.'
+          : 'Kata sandi berhasil diubah. Silakan masuk dengan kata sandi baru.',
+      )
+      setDone(true)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Gagal reset password'
       setError(msg)
@@ -122,11 +153,13 @@ export function ResetPasswordForm() {
   }
 
   if (!token) {
-    return <DeadLink message="Tautan reset password tidak lengkap. Pastikan Anda membuka tautan lengkap dari email, atau minta tautan baru." />
+    return isInvite
+      ? <DeadLink invite message={INVITE_DEAD.missing} />
+      : <DeadLink message="Tautan reset password tidak lengkap. Pastikan Anda membuka tautan lengkap dari email, atau minta tautan baru." />
   }
 
   if (deadLink) {
-    return <DeadLink message={deadLink} />
+    return <DeadLink invite={isInvite} message={deadLink} />
   }
 
   return (
@@ -207,9 +240,18 @@ export function ResetPasswordForm() {
         )}
       </div>
 
-      <Button type="submit" className="w-full font-semibold" disabled={isLoading}>
-        {isLoading ? 'Meriset...' : 'Reset Password'}
-      </Button>
+      {done ? (
+        <Link
+          href="/login"
+          className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          Masuk sekarang
+        </Link>
+      ) : (
+        <Button type="submit" className="w-full font-semibold" disabled={isLoading}>
+          {isLoading ? 'Menyimpan...' : isInvite ? 'Aktifkan Akun' : 'Reset Password'}
+        </Button>
+      )}
     </form>
   )
 }

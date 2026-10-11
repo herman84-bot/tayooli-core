@@ -2,6 +2,7 @@ package team
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -50,6 +51,10 @@ type InvitationSender interface {
 	SendInvitationEmail(toEmail, token string) error
 	IsConfigured() bool
 }
+
+// ErrEmailTaken: the address already belongs to an account (possibly in
+// another workspace; one email = one account).
+var ErrEmailTaken = errors.New("email ini sudah terdaftar di Tayooli (bisa jadi di workspace lain). Gunakan email lain untuk anggota ini")
 
 // InviteTokenTTL is how long an invitation link stays valid.
 const InviteTokenTTL = 72 * time.Hour
@@ -180,6 +185,9 @@ func (u *Usecase) InviteMember(ctx context.Context, tenantID uuid.UUID, email, r
 		warehouseIDs = nil
 	}
 	if err := u.repo.CreateUserWithWarehouses(ctx, newUser, warehouseIDs); err != nil {
+		if errors.Is(err, domain.ErrConflict) {
+			return nil, ErrEmailTaken
+		}
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 
