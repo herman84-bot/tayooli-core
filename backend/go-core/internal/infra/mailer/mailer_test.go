@@ -285,3 +285,49 @@ func TestMailer_Brevo_SendInvitationEmail(t *testing.T) {
 		t.Errorf("HTMLContent missing escaped invite link")
 	}
 }
+// Every link a user receives must start with APP_URL and never point to
+// localhost (regression: production emails linked to http://localhost:3000).
+func TestMailer_LinksUseAppURLNeverLocalhost(t *testing.T) {
+	var payloads []brevoEmailPayload
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var p brevoEmailPayload
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &p)
+		payloads = append(payloads, p)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer ts.Close()
+
+	const appURL = "https://tayooli.my.id"
+	m := New("k", "noreply@tayooli.com", "", "", "", "", "", "", appURL+"/")
+	m.brevoBaseURL = ts.URL
+	m.httpClient = ts.Client()
+
+	if err := m.SendPasswordResetEmail("u@example.com", "11111111-2222-3333-4444-555555555555"); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SendVerificationEmail("u@example.com", "verify-tok"); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SendInvitationEmail("u@example.com", "invite-tok"); err != nil {
+		t.Fatal(err)
+	}
+	wantPrefixes := []string{
+		appURL + "/reset-password?token=11111111-2222-3333-4444-555555555555",
+		appURL + "/verify-email?token=verify-tok",
+		appURL + "/reset-password?token=invite-tok&invite=1",
+	}
+	if len(payloads) != len(wantPrefixes) {
+		t.Fatalf("sent %d emails, want %d", len(payloads), len(wantPrefixes))
+	}
+	for i, p := range payloads {
+		for _, body := range []string{p.TextContent, p.HTMLContent} {
+			if strings.Contains(body, "localhost") {
+				t.Errorf("email %d contains localhost", i)
+			}
+		}
+		if !strings.Contains(p.TextContent, wantPrefixes[i]) {
+			t.Errorf("email %d text missing link %q:\n%s", i, wantPrefixes[i], p.TextContent)
+		}
+	}
+}

@@ -13,10 +13,12 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/config"
 )
 
 // DefaultAppURL is the fallback public URL of Tayooli ERP when APP_URL is not configured.
-const DefaultAppURL = "https://tayooli.my.id"
+const DefaultAppURL = config.ProductionAppURL
 
 // DefaultBrevoSenderName is the fallback sender name when BREVO_SENDER_NAME is empty.
 const DefaultBrevoSenderName = "Tayooli ERP"
@@ -48,6 +50,7 @@ type Mailer struct {
 // brevoAPIKey and brevoSenderEmail are provided. If not provided, it falls back to
 // standard SMTP if host is set. Otherwise, it operates in no-op logging mode.
 func New(brevoAPIKey, brevoSenderEmail, brevoSenderName, host, port, username, password, from, appURL string) *Mailer {
+	appURL = strings.TrimRight(strings.TrimSpace(appURL), "/")
 	if appURL == "" {
 		appURL = DefaultAppURL
 	}
@@ -101,13 +104,18 @@ type brevoEmailPayload struct {
 	TextContent string           `json:"textContent,omitempty"`
 }
 
+// link builds an absolute link on the configured app URL.
+func (m *Mailer) link(path, rawQuery string) (string, error) {
+	return config.BuildAppLink(m.appURL, path, rawQuery)
+}
+
 // SendPasswordResetEmail sends a password reset link to the user with a responsive HTML template.
 func (m *Mailer) SendPasswordResetEmail(toEmail, resetToken string) error {
-	baseURL := strings.TrimRight(m.appURL, "/")
-	if baseURL == "" {
-		baseURL = DefaultAppURL
+	baseURL := m.appURL
+	resetLink, err := m.link("/reset-password", "token="+url.QueryEscape(resetToken))
+	if err != nil {
+		return fmt.Errorf("mailer: build reset link: %w", err)
 	}
-	resetLink := fmt.Sprintf("%s/reset-password?token=%s", baseURL, url.QueryEscape(resetToken))
 	escapedLink := html.EscapeString(resetLink)
 
 	subject := "Tayooli ERP - Reset Password"
@@ -195,11 +203,11 @@ Tim Tayooli ERP
 
 // SendVerificationEmail sends an email verification link to the user with a responsive HTML template.
 func (m *Mailer) SendVerificationEmail(toEmail, verificationToken string) error {
-	baseURL := strings.TrimRight(m.appURL, "/")
-	if baseURL == "" {
-		baseURL = DefaultAppURL
+	baseURL := m.appURL
+	verifyLink, err := m.link("/verify-email", "token="+url.QueryEscape(verificationToken))
+	if err != nil {
+		return fmt.Errorf("mailer: build verification link: %w", err)
 	}
-	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", baseURL, url.QueryEscape(verificationToken))
 	escapedLink := html.EscapeString(verifyLink)
 
 	subject := "Tayooli ERP - Verifikasi Email"
@@ -281,11 +289,11 @@ Tim Tayooli ERP
 // SendInvitationEmail sends a team invitation with a link to set the account
 // password. The token reuses the password-reset mechanism (/reset-password).
 func (m *Mailer) SendInvitationEmail(toEmail, token string) error {
-	baseURL := strings.TrimRight(m.appURL, "/")
-	if baseURL == "" {
-		baseURL = DefaultAppURL
+	baseURL := m.appURL
+	link, err := m.link("/reset-password", "token="+url.QueryEscape(token)+"&invite=1")
+	if err != nil {
+		return fmt.Errorf("mailer: build invitation link: %w", err)
 	}
-	link := fmt.Sprintf("%s/reset-password?token=%s&invite=1", baseURL, url.QueryEscape(token))
 	escapedLink := html.EscapeString(link)
 	escapedEmail := html.EscapeString(toEmail)
 

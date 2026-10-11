@@ -111,9 +111,7 @@ func Load() (*Config, error) {
 	if cfg.SMTPFrom == "" {
 		cfg.SMTPFrom = "noreply@tayooli.com"
 	}
-	if cfg.AppURL == "" {
-		cfg.AppURL = "http://localhost:3000"
-	}
+	cfg.AppURL = ResolveAppURL(cfg.AppEnv, cfg.AppURL)
 	if cfg.BrevoSenderName == "" {
 		cfg.BrevoSenderName = "Tayooli ERP"
 	}

@@ -253,10 +253,8 @@ func main() {
 
 	// Auth
 	userRepo := postgres.NewUserRepo(db)
+	// cfg.AppURL comes from config.ResolveAppURL: never localhost in production.
 	appURL := cfg.AppURL
-	if appURL == "" {
-		appURL = "https://tayooli.my.id"
-	}
 	emailMailer := mailer.New(
 		cfg.BrevoAPIKey,
 		cfg.BrevoSenderEmail,

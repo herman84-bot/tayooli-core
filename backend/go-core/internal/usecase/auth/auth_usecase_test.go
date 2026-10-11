@@ -748,3 +748,19 @@ func TestAuthUsecase_CompanyProfile(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 
+
+// A reset token works once: after a successful reset it is cleared, so the
+// same link cannot be replayed.
+func TestAuthUsecase_ResetPassword_TokenIsSingleUse(t *testing.T) {
+	user, _ := seedTestUser(t)
+	repo := newMockUserRepo()
+	repo.addUser(user)
+	token := "single-use-token"
+	expiresAt := time.Now().Add(time.Hour)
+	user.PasswordResetToken = &token
+	user.PasswordResetExpiresAt = &expiresAt
+	uc := New(repo, "test-secret", time.Hour, nil, nil)
+
+	require.NoError(t, uc.ResetPassword(context.Background(), token, "firstpassword1"))
+	assert.ErrorIs(t, uc.ResetPassword(context.Background(), token, "secondpassword2"), domain.ErrInvalidToken)
+}

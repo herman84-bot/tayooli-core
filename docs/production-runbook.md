@@ -52,6 +52,7 @@ Alur inti: Frontend memproksi `/api/v1/*` server-side ke Go API → Go publish e
 | `MATCH_AMOUNT_TOLERANCE_PCT` | Opsional | Toleransi 3-way match (default 2.0) |
 | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` | **WAJIB untuk reset-password** di produksi | Pengiriman email transaksional via Brevo HTTP API (`internal/infra/mailer`). Tanpa keduanya, mailer jalan dalam mode no-op (hanya log) dan tidak ada email yang dikirim — sementara endpoint tetap balas HTTP 200 |
 | `BREVO_SENDER_NAME` | Opsional | Nama pengirim tampilan (default `Tayooli ERP`) |
+| `APP_URL` | **WAJIB** (`https://tayooli.my.id`) | Base URL semua tautan email (reset password, verifikasi, undangan) dan return URL pembayaran. Dibaca via `config.ResolveAppURL`: di `APP_ENV=production` nilai kosong/`localhost`/`http` ditolak, dicatat `[CONFIG] ERROR: APP_URL ...` di log, lalu diganti `https://tayooli.my.id`. Dibaca saat runtime (bukan build), cukup redeploy backend |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Alternatif jika tidak pakai Brevo | Fallback SMTP standar bila Brevo tidak dikonfigurasi |
 
 ### 2.3 AI Worker (Python)

@@ -49,7 +49,8 @@
 - [ ] `NEXT_PUBLIC_API_URL` **dan/atau** `BACKEND_URL` → URL backend produksi (pastikan **bukan** `localhost:8081`)
 - [ ] `AUTH_DEMO` **tidak diset** (atau `false`) di produksi asli — demo auth hanya untuk preview
 - [ ] `GEMINI_API_KEY` — asisten AI "Nara" (opsional; tanpa ini Nara pesan ramah)
-- [ ] `APP_URL` → URL publik frontend
+- [ ] `APP_URL=https://tayooli.my.id` di service **backend** (tautan email reset/verifikasi/undangan). Cek log startup tidak ada `[CONFIG] ERROR: APP_URL`
+- [ ] Brevo: matikan click tracking transaksional (dashboard Brevo → Transactional → Settings → Tracking) agar token reset tidak lewat domain pelacak Brevo
 
 ### AI Worker (Python)
 - [ ] `KAFKA_BROKERS` — consumer `invoice.created` / producer `invoice.ocr_completed`
