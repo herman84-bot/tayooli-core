@@ -2,6 +2,8 @@ package product
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -15,10 +17,24 @@ import (
 type Usecase struct {
 	productRepo   domain.ProductRepository
 	inventoryRepo domain.InventoryRepository
+	categoryRepo  domain.ProductCategoryRepository
 }
 
-func New(productRepo domain.ProductRepository, inventoryRepo domain.InventoryRepository) *Usecase {
-	return &Usecase{productRepo: productRepo, inventoryRepo: inventoryRepo}
+// Option configures optional Usecase dependencies.
+type Option func(*Usecase)
+
+// WithCategories enables product categories. Without it, any request that
+// sets a category is rejected with ErrInvalidInput.
+func WithCategories(repo domain.ProductCategoryRepository) Option {
+	return func(u *Usecase) { u.categoryRepo = repo }
+}
+
+func New(productRepo domain.ProductRepository, inventoryRepo domain.InventoryRepository, opts ...Option) *Usecase {
+	u := &Usecase{productRepo: productRepo, inventoryRepo: inventoryRepo}
+	for _, opt := range opts {
+		opt(u)
+	}
+	return u
 }
 
 type CreateProductRequest struct {
@@ -27,6 +43,28 @@ type CreateProductRequest struct {
 	SKU         string  `json:"sku"`
 	Price       float64 `json:"price"`
 	CostPrice   float64 `json:"cost_price"`
+	// CategoryID is optional; nil = uncategorized.
+	CategoryID *uuid.UUID `json:"category_id"`
+}
+
+// resolveCategory checks that id (when set) is a category of this tenant and
+// returns its name. A foreign or unknown id is ErrInvalidInput, never a 404,
+// so callers cannot probe other tenants' category ids.
+func (u *Usecase) resolveCategory(ctx context.Context, tenantID uuid.UUID, id *uuid.UUID) (string, error) {
+	if id == nil {
+		return "", nil
+	}
+	if u.categoryRepo == nil {
+		return "", domain.ErrInvalidInput
+	}
+	c, err := u.categoryRepo.GetByID(ctx, tenantID, *id)
+	if errors.Is(err, domain.ErrNotFound) {
+		return "", domain.ErrInvalidInput
+	}
+	if err != nil {
+		return "", err
+	}
+	return c.Name, nil
 }
 
 func (u *Usecase) CreateProduct(ctx context.Context, tenantID uuid.UUID, req CreateProductRequest) (*domain.Product, error) {
@@ -37,6 +75,10 @@ func (u *Usecase) CreateProduct(ctx context.Context, tenantID uuid.UUID, req Cre
 	}
 	if req.Price <= 0 || !validCost(req.CostPrice) {
 		return nil, domain.ErrInvalidInput
+	}
+	categoryName, err := u.resolveCategory(ctx, tenantID, req.CategoryID)
+	if err != nil {
+		return nil, err
 	}
 	// Check SKU uniqueness per-tenant among active products
 	if existing, err := u.productRepo.GetBySKU(ctx, tenantID, sku); err == nil && existing != nil {
@@ -49,9 +91,11 @@ func (u *Usecase) CreateProduct(ctx context.Context, tenantID uuid.UUID, req Cre
 		Description: req.Description,
 		SKU:         sku,
 		Price:       req.Price,
-		CostPrice:   req.CostPrice,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		CostPrice:    req.CostPrice,
+		CategoryID:   req.CategoryID,
+		CategoryName: categoryName,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 	if err := u.productRepo.Create(ctx, p); err != nil {
 		return nil, err
@@ -79,6 +123,29 @@ type UpdateProductRequest struct {
 	Price       float64 `json:"price"`
 	// CostPrice is optional on update: nil keeps the stored value.
 	CostPrice *float64 `json:"cost_price,omitempty"`
+	// CategoryID: field absent keeps the stored category, null clears it,
+	// a UUID sets it.
+	CategoryID OptionalUUID `json:"category_id"`
+}
+
+// OptionalUUID distinguishes an absent JSON field from an explicit null.
+type OptionalUUID struct {
+	Set   bool
+	Value *uuid.UUID
+}
+
+func (o *OptionalUUID) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	if string(b) == "null" {
+		o.Value = nil
+		return nil
+	}
+	var id uuid.UUID
+	if err := json.Unmarshal(b, &id); err != nil {
+		return err
+	}
+	o.Value = &id
+	return nil
 }
 
 // validCost rejects negative, NaN and infinite costs.
@@ -110,6 +177,15 @@ func (u *Usecase) UpdateProduct(ctx context.Context, tenantID, id uuid.UUID, req
 		if err == nil && other != nil && other.ID != id {
 			return nil, domain.ErrConflict
 		}
+	}
+
+	if req.CategoryID.Set {
+		categoryName, err := u.resolveCategory(ctx, tenantID, req.CategoryID.Value)
+		if err != nil {
+			return nil, err
+		}
+		existing.CategoryID = req.CategoryID.Value
+		existing.CategoryName = categoryName
 	}
 
 	existing.Name = name

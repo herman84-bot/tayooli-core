@@ -42,6 +42,8 @@ type POSOrder struct {
 	SalesOrderID   *uuid.UUID      `json:"sales_order_id,omitempty"`
 	SalesInvoiceID *uuid.UUID      `json:"sales_invoice_id,omitempty"`
 	CashierID      *uuid.UUID      `json:"cashier_id,omitempty"`
+	// CashierName is read-only, joined from users (full_name or email).
+	CashierName    string          `json:"cashier_name,omitempty"`
 	Items          []POSOrderItem  `json:"items,omitempty"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`

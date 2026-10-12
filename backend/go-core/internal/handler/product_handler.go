@@ -69,7 +69,7 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	qv := r.URL.Query()
 	// Legacy shape (no paging params): full list. Kept until every caller is
 	// migrated to server-side search; see SearchProducts below.
-	if !qv.Has("page") && !qv.Has("per_page") && !qv.Has("q") {
+	if !qv.Has("page") && !qv.Has("per_page") && !qv.Has("q") && !qv.Has("category") {
 		res, err := h.uc.ListProducts(r.Context(), tenantID)
 		if err != nil {
 			writeError(w, err)
@@ -90,10 +90,15 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid input: page/per_page harus angka >= 1, q maksimal 100 karakter", http.StatusBadRequest)
 		return
 	}
+	category, ok3 := parseCategoryFilter(qv.Get("category"))
+	if !ok3 {
+		http.Error(w, "invalid input: category harus UUID kategori atau 'none'", http.StatusBadRequest)
+		return
+	}
 	perPage = min(perPage, maxProductsPerPage)
 
 	res, total, err := h.uc.SearchProducts(r.Context(), tenantID, domain.ProductFilter{
-		Query: q, Limit: perPage, Offset: (page - 1) * perPage,
+		Query: q, Category: category, Limit: perPage, Offset: (page - 1) * perPage,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -112,6 +117,26 @@ const (
 	maxProductsPerPage = 100 // Shopify-style hard cap on page size
 	maxProductQueryLen = 100
 )
+
+// categoryNone selects products without a category in ?category=.
+const categoryNone = "none"
+
+// parseCategoryFilter parses ?category=: empty = any, "none" = uncategorized,
+// otherwise a category UUID. Tenant scoping happens in the repo query, so a
+// foreign UUID simply matches nothing.
+func parseCategoryFilter(raw string) (domain.CategoryFilter, bool) {
+	switch raw = strings.TrimSpace(raw); raw {
+	case "":
+		return domain.CategoryFilter{}, true
+	case categoryNone:
+		return domain.CategoryFilter{Uncategorized: true}, true
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return domain.CategoryFilter{}, false
+	}
+	return domain.CategoryFilter{ID: &id}, true
+}
 
 // positiveIntParam parses an optional positive integer; empty uses def.
 func positiveIntParam(raw string, def int) (int, bool) {

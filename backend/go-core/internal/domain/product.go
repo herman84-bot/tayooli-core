@@ -17,8 +17,12 @@ type Product struct {
 	// CostPrice is the purchase/standard cost used as unit_cost on stock
 	// movements (M6). 0 means not set.
 	CostPrice float64 `json:"cost_price"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	// CategoryID is optional; nil means uncategorized.
+	CategoryID *uuid.UUID `json:"category_id"`
+	// CategoryName is read-only, joined from product_categories.
+	CategoryName string    `json:"category_name,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // InventoryItemWithProduct is returned by ListInventoryFromWMS repo method.
@@ -32,11 +36,19 @@ type InventoryItemWithProduct struct {
 }
 
 // ProductFilter selects one page of products. Query matches name or SKU
-// (case-insensitive substring).
+// (case-insensitive substring). Category narrows by category.
 type ProductFilter struct {
-	Query  string
-	Limit  int
-	Offset int
+	Query    string
+	Category CategoryFilter
+	Limit    int
+	Offset   int
+}
+
+// CategoryFilter: zero value = any category; Uncategorized = only products
+// without a category; otherwise ID selects one category.
+type CategoryFilter struct {
+	ID            *uuid.UUID
+	Uncategorized bool
 }
 
 type ProductRepository interface {

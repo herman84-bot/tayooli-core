@@ -41,6 +41,7 @@ import { useProducts } from "@/hooks/useProducts"
 import { usePOSOrders, usePOSCheckout, usePOSCreatePayment, usePOSPaymentStatus, usePOSSimulatePayment } from "@/hooks/usePOS"
 import { useWMSStock } from "@/hooks/useWMSLedger"
 import { useCompanyProfile } from "@/hooks/useCompanyProfile"
+import { useAuthStore } from "@/hooks/useAuth"
 import type { POSOrder, POSPaymentCharge } from "@/lib/api"
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 import type { ExportColumn } from "@/lib/export"
@@ -132,6 +133,14 @@ export default function POSPage() {
   const posStoreAddress = (companyProfile?.address || "Kav. Logistik Pergudangan No. 42").trim()
   const posStorePhone = (companyProfile?.phone || "021-555-1234").trim()
 
+  // Cashier Identity from Session
+  const currentUser = useAuthStore((s) => s.user)
+  const currentCashierName =
+    currentUser?.full_name?.trim() ||
+    currentUser?.fullName?.trim() ||
+    currentUser?.email?.trim() ||
+    "Kasir"
+
   // Customer & Cart State
   const [customerName, setCustomerName] = useState<string>("Pelanggan Umum")
   const [cart, setCart] = useState<CartItem[]>([])
@@ -160,6 +169,7 @@ export default function POSPage() {
       width: 20,
     },
     { header: "Pelanggan", value: (o) => o.customer_name || "Pelanggan Umum", width: 22 },
+    { header: "Kasir", value: (o) => o.cashier_name || "Kasir", width: 18 },
     { header: "Metode Bayar", value: (o) => paymentMethodLabel(o.payment_method), width: 18 },
     { header: "Subtotal (Rp)", value: (o) => Math.round(Number(o.subtotal) || 0), width: 16, align: "right" },
     { header: "Pajak (Rp)", value: (o) => Math.round(Number(o.tax_amount) || 0), width: 14, align: "right" },
@@ -192,6 +202,7 @@ export default function POSPage() {
     change: number
     method: string
     saleMode: SaleMode
+    cashierName?: string
     salesOrderId?: string | null
     salesInvoiceId?: string | null
   } | null>(null)
@@ -321,6 +332,7 @@ export default function POSPage() {
       change: Number(order.change_amount),
       method: order.payment_method,
       saleMode: (order.sale_mode as SaleMode) || "JUAL_PUTUS",
+      cashierName: order.cashier_name || "Kasir",
       salesOrderId: order.sales_order_id,
       salesInvoiceId: order.sales_invoice_id,
     }
@@ -493,6 +505,7 @@ export default function POSPage() {
         change: Number(res.change) || (paymentMethod === "CASH" ? changeAmount : 0),
         method: paymentMethod,
         saleMode: globalSaleMode,
+        cashierName: currentCashierName,
         salesOrderId: res.sales_order_id,
         salesInvoiceId: res.sales_invoice_id,
       }
@@ -579,6 +592,7 @@ export default function POSPage() {
     const text =
       `*STRUK PEMBAYARAN ${posStoreName.toUpperCase()}*\n` +
       `No. Transaksi: ${receiptData.orderNumber}\n` +
+      `Kasir: ${receiptData.cashierName || currentCashierName}\n` +
       `Waktu: ${receiptData.date}\n` +
       `Metode: ${paymentMethodLabel(receiptData.method)}\n` +
       `--------------------------------\n` +
@@ -1362,7 +1376,7 @@ export default function POSPage() {
                     <span>{receiptData?.date}</span>
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    Kasir: Budi | Mode: {saleModeLabel(receiptData?.saleMode)}
+                    Kasir: {receiptData?.cashierName || currentCashierName} | Mode: {saleModeLabel(receiptData?.saleMode)}
                   </div>
                   {receiptData?.salesOrderId && (
                     <div className="text-[10px] text-slate-500 font-mono truncate">
@@ -1538,8 +1552,10 @@ export default function POSPage() {
                           {paymentMethodLabel(order.payment_method)}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
                         <span>{order.customer_name || "Pelanggan Umum"}</span>
+                        <span>•</span>
+                        <span className="font-medium text-slate-700">Kasir: {order.cashier_name || "Kasir"}</span>
                         <span>•</span>
                         <span>{new Date(order.created_at).toLocaleString("id-ID")}</span>
                       </div>

@@ -9,6 +9,8 @@ interface User {
   email: string
   role: string
   tenantId: string
+  full_name?: string
+  fullName?: string
 }
 
 interface AuthState {

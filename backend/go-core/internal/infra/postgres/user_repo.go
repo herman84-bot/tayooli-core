@@ -141,6 +141,20 @@ func (r *UserRepo) CreateTenantAndUser(ctx context.Context, tenant *domain.Tenan
 		return err
 	}
 
+	// 6. Default product categories (Makanan, Minuman, Kemasan, Bahan Baku, Alat Tulis)
+	const qDefaultCategories = `
+	INSERT INTO product_categories (id, tenant_id, name, created_at)
+	VALUES
+		(gen_random_uuid(), $1, 'Makanan', NOW()),
+		(gen_random_uuid(), $1, 'Minuman', NOW()),
+		(gen_random_uuid(), $1, 'Kemasan', NOW()),
+		(gen_random_uuid(), $1, 'Bahan Baku', NOW()),
+		(gen_random_uuid(), $1, 'Alat Tulis', NOW())
+	ON CONFLICT DO NOTHING`
+	if _, err := tx.ExecContext(ctx, qDefaultCategories, tenant.ID); err != nil {
+		return err
+	}
+
 	return tx.Commit()
 }
 

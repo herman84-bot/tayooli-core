@@ -29,11 +29,17 @@ export function useProductsPaged(params: ProductSearchParams) {
   const page = params.page ?? 1
   const perPage = params.per_page ?? 20
   const q = params.q?.trim() ?? ""
+  const category = params.category?.trim() ?? ""
 
   return useQuery<PaginatedResponse<Product>>({
-    queryKey: ["products", "paged", { page, perPage, q }],
+    queryKey: ["products", "paged", { page, perPage, q, category }],
     queryFn: async (): Promise<PaginatedResponse<Product>> => {
-      const res = await api.products.list({ page, per_page: perPage, q: q || undefined })
+      const res = await api.products.list({
+        page,
+        per_page: perPage,
+        q: q || undefined,
+        category: category || undefined,
+      })
       if (res && Array.isArray(res.data)) {
         return {
           data: res.data,

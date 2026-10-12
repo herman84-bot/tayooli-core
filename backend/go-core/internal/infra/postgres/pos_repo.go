@@ -97,10 +97,12 @@ SELECT
     o.subtotal, o.tax_amount, o.discount_amount, o.total_amount,
     o.payment_method, o.payment_amount, o.change_amount,
     o.sale_mode, o.status, o.sales_order_id, o.sales_invoice_id, o.cashier_id,
+    COALESCE(NULLIF(u.full_name, ''), u.email, ''),
     o.created_at, o.updated_at
 FROM pos_orders o
 LEFT JOIN customers c ON c.id = o.customer_id AND c.tenant_id = o.tenant_id
 LEFT JOIN warehouses w ON w.id = o.warehouse_id AND w.tenant_id = o.tenant_id
+LEFT JOIN users u ON u.id = o.cashier_id AND u.tenant_id = o.tenant_id
 WHERE o.id = $1 AND o.tenant_id = $2`
 
 	var o domain.POSOrder
@@ -110,7 +112,7 @@ WHERE o.id = $1 AND o.tenant_id = $2`
 		&whID, &o.WarehouseName,
 		&o.Subtotal, &o.TaxAmount, &o.DiscountAmount, &o.TotalAmount,
 		&o.PaymentMethod, &o.PaymentAmount, &o.ChangeAmount,
-		&o.SaleMode, &o.Status, &soID, &siID, &cashierID,
+		&o.SaleMode, &o.Status, &soID, &siID, &cashierID, &o.CashierName,
 		&o.CreatedAt, &o.UpdatedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
@@ -175,10 +177,12 @@ SELECT
     o.subtotal, o.tax_amount, o.discount_amount, o.total_amount,
     o.payment_method, o.payment_amount, o.change_amount,
     o.sale_mode, o.status, o.sales_order_id, o.sales_invoice_id, o.cashier_id,
+    COALESCE(NULLIF(u.full_name, ''), u.email, ''),
     o.created_at, o.updated_at
 FROM pos_orders o
 LEFT JOIN customers c ON c.id = o.customer_id AND c.tenant_id = o.tenant_id
 LEFT JOIN warehouses w ON w.id = o.warehouse_id AND w.tenant_id = o.tenant_id
+LEFT JOIN users u ON u.id = o.cashier_id AND u.tenant_id = o.tenant_id
 WHERE o.tenant_id = $1
 ORDER BY o.created_at DESC
 LIMIT $2`
@@ -198,7 +202,7 @@ LIMIT $2`
 			&whID, &o.WarehouseName,
 			&o.Subtotal, &o.TaxAmount, &o.DiscountAmount, &o.TotalAmount,
 			&o.PaymentMethod, &o.PaymentAmount, &o.ChangeAmount,
-			&o.SaleMode, &o.Status, &soID, &siID, &cashierID,
+			&o.SaleMode, &o.Status, &soID, &siID, &cashierID, &o.CashierName,
 			&o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("POSRepo.ListOrders: scan: %w", err)

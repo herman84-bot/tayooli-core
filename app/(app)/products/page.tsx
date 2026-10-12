@@ -38,6 +38,8 @@ import {
   DrawerContent,
   DrawerFooter,
 } from "@/components/ui/drawer"
+import { CategoryCombobox } from "@/components/products/CategoryCombobox"
+import { useProductCategories } from "@/hooks/useProductCategories"
 
 function fmtExportDate(iso?: string): string {
   if (!iso) return ""
@@ -53,6 +55,7 @@ const productSchema = z.object({
   description: z.string().trim().max(2000, "Deskripsi maksimal 2000 karakter").optional(),
   price: z.coerce.number().gt(0, "Harga harus lebih dari 0"),
   cost_price: z.coerce.number().min(0, "Harga pokok tidak boleh negatif"),
+  category_id: z.string().nullable().optional(),
 })
 
 export default function ProductsPage() {
@@ -60,6 +63,9 @@ export default function ProductsPage() {
   const [perPage, setPerPage] = useState(20)
   const [searchInput, setSearchInput] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("")
+
+  const { data: categories = [] } = useProductCategories()
 
   const prevQueryRef = React.useRef(debouncedQuery)
 
@@ -83,7 +89,12 @@ export default function ProductsPage() {
     error,
     refetch,
     isFetching,
-  } = useProductsPaged({ page, per_page: perPage, q: debouncedQuery })
+  } = useProductsPaged({
+    page,
+    per_page: perPage,
+    q: debouncedQuery,
+    category: categoryFilter || undefined,
+  })
 
   // Full list for export and catalog-wide metrics (cached by TanStack Query)
   const { data: allProducts = [] } = useProducts()
@@ -107,6 +118,7 @@ export default function ProductsPage() {
     description: "",
     price: "",
     cost_price: "",
+    category_id: null as string | null,
   })
   const [editFormError, setEditFormError] = useState<string | null>(null)
 
@@ -121,6 +133,7 @@ export default function ProductsPage() {
     description: "",
     price: "",
     cost_price: "",
+    category_id: null as string | null,
   })
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -131,7 +144,7 @@ export default function ProductsPage() {
   const adjustInventory = useAdjustInventory(selectedProduct?.id ?? null)
 
   const resetForm = () => {
-    setFormData({ name: "", sku: "", description: "", price: "", cost_price: "" })
+    setFormData({ name: "", sku: "", description: "", price: "", cost_price: "", category_id: null })
     setFormError(null)
   }
 
@@ -144,6 +157,7 @@ export default function ProductsPage() {
       description: p.description || "",
       price: String(p.price),
       cost_price: String(p.cost_price ?? 0),
+      category_id: p.category_id || null,
     })
     setEditFormError(null)
   }
@@ -168,19 +182,16 @@ export default function ProductsPage() {
           description: parsed.data.description || undefined,
           price: parsed.data.price,
           cost_price: parsed.data.cost_price,
+          category_id: parsed.data.category_id?.trim() || null,
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (updated) => {
           setEditingProduct(null)
           if (selectedProduct?.id === editingProduct.id) {
             setSelectedProduct({
               ...selectedProduct,
-              name: parsed.data.name,
-              sku: parsed.data.sku,
-              description: parsed.data.description || "",
-              price: parsed.data.price,
-              cost_price: parsed.data.cost_price,
+              ...updated,
             })
           }
         },
@@ -233,6 +244,7 @@ export default function ProductsPage() {
     () => [
       { header: "SKU", value: (p) => p.sku, width: 16 },
       { header: "Nama Produk", value: (p) => p.name, width: 32 },
+      { header: "Kategori", value: (p) => p.category_name || "Tanpa Kategori", width: 20 },
       { header: "Deskripsi", value: (p) => p.description ?? "", width: 40 },
       { header: "Harga (Rp)", value: (p) => Number(p.price) || 0, width: 16, align: "right" },
       { header: "Dibuat", value: (p) => fmtExportDate(p.created_at), width: 18 },
@@ -243,6 +255,16 @@ export default function ProductsPage() {
   const productExportFilters = useMemo<ExportFilter<Product>[]>(
     () => [
       { type: "dateRange", id: "created", label: "Tanggal dibuat", getDate: (p) => p.created_at },
+      {
+        type: "select",
+        id: "category",
+        label: "Kategori",
+        options: [
+          { value: "none", label: "Tanpa Kategori" },
+          ...categories.map((c) => ({ value: c.id, label: c.name })),
+        ],
+        match: (p, v) => (v === "none" ? !p.category_id : p.category_id === v),
+      },
       {
         type: "select",
         id: "price",
@@ -258,7 +280,7 @@ export default function ProductsPage() {
         },
       },
     ],
-    []
+    [categories]
   )
 
   // Submit product creation
@@ -279,6 +301,7 @@ export default function ProductsPage() {
         description: parsed.data.description || undefined,
         price: parsed.data.price,
         cost_price: parsed.data.cost_price,
+        category_id: parsed.data.category_id?.trim() || null,
       },
       {
         onSuccess: () => {
@@ -382,14 +405,36 @@ export default function ProductsPage() {
               className="w-full pl-10 pr-4 min-h-[44px] text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white transition-all"
             />
           </div>
-          {searchInput && (
+
+          <div className="sm:w-56 shrink-0">
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value)
+                setPage(1)
+              }}
+              aria-label="Filter kategori"
+              className="w-full min-h-[44px] px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white transition-all text-slate-700"
+            >
+              <option value="">Semua Kategori</option>
+              <option value="none">-- Belum Berkategori --</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {(searchInput || categoryFilter) && (
             <button
               onClick={() => {
                 setSearchInput("")
                 setDebouncedQuery("")
+                setCategoryFilter("")
                 setPage(1)
               }}
-              className="text-xs text-slate-500 hover:text-slate-800 px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+              className="text-xs text-slate-500 hover:text-slate-800 px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition shrink-0"
             >
               Atur Ulang Filter
             </button>
@@ -459,6 +504,9 @@ export default function ProductsPage() {
                       Nama Produk
                     </th>
                     <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      Kategori
+                    </th>
+                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       Deskripsi
                     </th>
                     <th className="px-6 py-3.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -488,6 +536,15 @@ export default function ProductsPage() {
                         <span className="font-semibold text-sm text-slate-900 group-hover:text-[#2563EB] transition-colors">
                           {p.name}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {p.category_name ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            {p.category_name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Tanpa Kategori</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-xs text-slate-500 line-clamp-1 max-w-[280px]">
@@ -600,6 +657,15 @@ export default function ProductsPage() {
               </div>
 
               <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Kategori Produk</label>
+                <CategoryCombobox
+                  value={formData.category_id}
+                  onChange={(id) => setFormData({ ...formData, category_id: id })}
+                  placeholder="Pilih atau buat kategori..."
+                />
+              </div>
+
+              <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">Harga Satuan (IDR) *</label>
                 <Input
                   type="number"
@@ -698,6 +764,15 @@ export default function ProductsPage() {
                   onChange={(e) => setEditFormData({ ...editFormData, sku: e.target.value.toUpperCase() })}
                   placeholder="Contoh: SKU-KOPI-250"
                   className="min-h-[42px] font-mono uppercase"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Kategori Produk</label>
+                <CategoryCombobox
+                  value={editFormData.category_id}
+                  onChange={(id) => setEditFormData({ ...editFormData, category_id: id })}
+                  placeholder="Pilih atau buat kategori..."
                 />
               </div>
 
@@ -834,6 +909,18 @@ export default function ProductsPage() {
                     <p className="text-xs font-medium text-slate-500">Harga Satuan</p>
                     <p className="font-mono text-sm font-semibold text-slate-900 mt-0.5">
                       {formatCurrency(selectedProduct.price)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Kategori</p>
+                    <p className="text-sm font-semibold text-slate-900 mt-0.5">
+                      {selectedProduct.category_name || "Tanpa Kategori"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Harga Pokok (HPP)</p>
+                    <p className="font-mono text-sm font-semibold text-slate-900 mt-0.5">
+                      {formatCurrency(selectedProduct.cost_price ?? 0)}
                     </p>
                   </div>
                   <div className="col-span-2 pt-2 border-t border-slate-200">

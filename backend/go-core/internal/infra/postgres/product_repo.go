@@ -29,9 +29,15 @@ func NewProductRepo(db *sql.DB) *ProductRepo {
 	return &ProductRepo{db: db}
 }
 
+// createProduct / updateProduct store category_id only when it belongs to the
+// same tenant: the FK alone (category_id -> product_categories.id) would accept
+// another tenant's category. A foreign or unknown id matches no row, so the
+// statement affects 0 rows and the repo returns ErrInvalidInput (defense in
+// depth; the usecase validates the category first for a clear message).
 const createProduct = `
-INSERT INTO products (id, tenant_id, name, description, sku, price, cost_price, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+INSERT INTO products (id, tenant_id, name, description, sku, price, cost_price, category_id, created_at, updated_at)
+SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+WHERE $8::uuid IS NULL OR EXISTS (SELECT 1 FROM product_categories WHERE id = $8 AND tenant_id = $2)`
 
 func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -44,11 +50,18 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 		return fmt.Errorf("ProductRepo.Create: set tenant: %w", err)
 	}
 
-	if _, err := tx.ExecContext(ctx, createProduct, p.ID, p.TenantID, p.Name, p.Description, p.SKU, p.Price, p.CostPrice, p.CreatedAt, p.UpdatedAt); err != nil {
+	res, err := tx.ExecContext(ctx, createProduct, p.ID, p.TenantID, p.Name, p.Description, p.SKU, p.Price, p.CostPrice,
+		ptrToNullUUID(p.CategoryID), p.CreatedAt, p.UpdatedAt)
+	if err != nil {
 		if isUniqueViolation(err) {
 			return domain.ErrConflict
 		}
 		return fmt.Errorf("ProductRepo.Create: exec: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("ProductRepo.Create: rows affected: %w", err)
+	} else if n == 0 {
+		return domain.ErrInvalidInput // category not found in this tenant
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -57,9 +70,25 @@ func (r *ProductRepo) Create(ctx context.Context, p *domain.Product) error {
 	return nil
 }
 
+// productColumns / productFrom are shared by every product read so the column
+// order always matches scanProduct. The category join is tenant-scoped (and
+// product_categories is under RLS) so a foreign category name never leaks.
+const productColumns = `p.id, p.tenant_id, p.name, COALESCE(p.description, ''), p.sku, p.price, p.cost_price,
+       p.category_id, COALESCE(c.name, ''), p.created_at, p.updated_at`
+
+const productFrom = `products p
+LEFT JOIN product_categories c ON c.id = p.category_id AND c.tenant_id = p.tenant_id`
+
+// productScanDest returns the scan targets matching productColumns.
+func productScanDest(p *domain.Product) []any {
+	return []any{&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice,
+		&p.CategoryID, &p.CategoryName, &p.CreatedAt, &p.UpdatedAt}
+}
+
 const getProductByID = `
-SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
-FROM products WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`
+SELECT ` + productColumns + `
+FROM ` + productFrom + `
+WHERE p.id = $1 AND p.tenant_id = $2 AND p.deleted_at IS NULL`
 
 func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*domain.Product, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -75,7 +104,7 @@ func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dom
 	row := tx.QueryRowContext(ctx, getProductByID, id, tenantID)
 
 	var p domain.Product
-	if err := row.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt); err != nil {
+	if err := row.Scan(productScanDest(&p)...); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
@@ -89,9 +118,10 @@ func (r *ProductRepo) GetByID(ctx context.Context, tenantID, id uuid.UUID) (*dom
 }
 
 const listProductsByTenantPaged = `
-SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
-FROM products WHERE tenant_id = $1 AND deleted_at IS NULL
-ORDER BY created_at DESC
+SELECT ` + productColumns + `
+FROM ` + productFrom + `
+WHERE p.tenant_id = $1 AND p.deleted_at IS NULL
+ORDER BY p.created_at DESC
 LIMIT $2 OFFSET $3`
 
 func (r *ProductRepo) List(ctx context.Context, tenantID uuid.UUID) ([]domain.Product, error) {
@@ -114,7 +144,7 @@ func (r *ProductRepo) List(ctx context.Context, tenantID uuid.UUID) ([]domain.Pr
 	var products []domain.Product
 	for rows.Next() {
 		var p domain.Product
-		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(productScanDest(&p)...); err != nil {
 			return nil, fmt.Errorf("ProductRepo.List: scan row: %w", err)
 		}
 		products = append(products, p)
@@ -133,17 +163,23 @@ func (r *ProductRepo) List(ctx context.Context, tenantID uuid.UUID) ([]domain.Pr
 	return products, nil
 }
 
+// searchProductsWhere is shared by the page query and the fallback count.
+// $2 is an escaped ILIKE pattern or NULL; $3 a category id or NULL;
+// $4 = true restricts to uncategorized products.
+const searchProductsWhere = `
+WHERE p.tenant_id = $1 AND p.deleted_at IS NULL
+  AND ($2::text IS NULL OR p.name ILIKE $2 ESCAPE '\' OR p.sku ILIKE $2 ESCAPE '\')
+  AND ($3::uuid IS NULL OR p.category_id = $3)
+  AND (NOT $4::boolean OR p.category_id IS NULL)`
+
 // searchProductsPaged returns one page plus the total match count in a single
-// round trip (COUNT(*) OVER ()). $2 is an escaped ILIKE pattern or NULL.
-// Ordered by created_at, id so paging is stable even with equal timestamps.
+// round trip (COUNT(*) OVER ()). Ordered by created_at, id so paging is stable
+// even with equal timestamps.
 const searchProductsPaged = `
-SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at,
-       COUNT(*) OVER () AS total
-FROM products
-WHERE tenant_id = $1 AND deleted_at IS NULL
-  AND ($2::text IS NULL OR name ILIKE $2 ESCAPE '\' OR sku ILIKE $2 ESCAPE '\')
-ORDER BY created_at DESC, id DESC
-LIMIT $3 OFFSET $4`
+SELECT ` + productColumns + `, COUNT(*) OVER () AS total
+FROM ` + productFrom + searchProductsWhere + `
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT $5 OFFSET $6`
 
 // likeContains builds a case-insensitive "contains" pattern, escaping the
 // LIKE metacharacters so user input is matched literally.
@@ -167,7 +203,9 @@ func (r *ProductRepo) Search(ctx context.Context, tenantID uuid.UUID, f domain.P
 	if f.Query != "" {
 		pattern = likeContains(f.Query)
 	}
-	rows, err := tx.QueryContext(ctx, searchProductsPaged, tenantID, pattern, f.Limit, f.Offset)
+	catArgs := []any{ptrToNullUUID(f.Category.ID), f.Category.Uncategorized}
+	args := append([]any{tenantID, pattern}, catArgs...)
+	rows, err := tx.QueryContext(ctx, searchProductsPaged, append(args, f.Limit, f.Offset)...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("ProductRepo.Search: query: %w", err)
 	}
@@ -177,7 +215,7 @@ func (r *ProductRepo) Search(ctx context.Context, tenantID uuid.UUID, f domain.P
 	total := 0
 	for rows.Next() {
 		var p domain.Product
-		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt, &total); err != nil {
+		if err := rows.Scan(append(productScanDest(&p), &total)...); err != nil {
 			return nil, 0, fmt.Errorf("ProductRepo.Search: scan row: %w", err)
 		}
 		products = append(products, p)
@@ -188,11 +226,8 @@ func (r *ProductRepo) Search(ctx context.Context, tenantID uuid.UUID, f domain.P
 	// A page past the end returns no rows, so the window total is unknown:
 	// count separately so the client can still render the pager.
 	if len(products) == 0 && f.Offset > 0 {
-		if err := tx.QueryRowContext(ctx, `
-			SELECT COUNT(*) FROM products
-			WHERE tenant_id = $1 AND deleted_at IS NULL
-			  AND ($2::text IS NULL OR name ILIKE $2 ESCAPE '\' OR sku ILIKE $2 ESCAPE '\')`,
-			tenantID, pattern).Scan(&total); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM products p`+searchProductsWhere,
+			args...).Scan(&total); err != nil {
 			return nil, 0, fmt.Errorf("ProductRepo.Search: count: %w", err)
 		}
 	}
@@ -215,9 +250,8 @@ func (r *ProductRepo) ListByIDs(ctx context.Context, tenantID uuid.UUID, ids []u
 		args = append(args, id)
 	}
 
-	query := fmt.Sprintf(`
-SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
-FROM products WHERE tenant_id = $1 AND id IN (%s) AND deleted_at IS NULL`, strings.Join(placeholders, ", "))
+	query := `SELECT ` + productColumns + ` FROM ` + productFrom +
+		fmt.Sprintf(` WHERE p.tenant_id = $1 AND p.id IN (%s) AND p.deleted_at IS NULL`, strings.Join(placeholders, ", "))
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -238,7 +272,7 @@ FROM products WHERE tenant_id = $1 AND id IN (%s) AND deleted_at IS NULL`, strin
 	var products []domain.Product
 	for rows.Next() {
 		var p domain.Product
-		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(productScanDest(&p)...); err != nil {
 			return nil, fmt.Errorf("ProductRepo.ListByIDs: scan row: %w", err)
 		}
 		products = append(products, p)
@@ -258,8 +292,9 @@ FROM products WHERE tenant_id = $1 AND id IN (%s) AND deleted_at IS NULL`, strin
 }
 
 const getProductBySKU = `
-SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at
-FROM products WHERE tenant_id = $1 AND LOWER(TRIM(sku)) = LOWER(TRIM($2)) AND deleted_at IS NULL`
+SELECT ` + productColumns + `
+FROM ` + productFrom + `
+WHERE p.tenant_id = $1 AND LOWER(TRIM(p.sku)) = LOWER(TRIM($2)) AND p.deleted_at IS NULL`
 
 func (r *ProductRepo) GetBySKU(ctx context.Context, tenantID uuid.UUID, sku string) (*domain.Product, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -274,7 +309,7 @@ func (r *ProductRepo) GetBySKU(ctx context.Context, tenantID uuid.UUID, sku stri
 
 	row := tx.QueryRowContext(ctx, getProductBySKU, tenantID, sku)
 	var p domain.Product
-	if err := row.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt); err != nil {
+	if err := row.Scan(productScanDest(&p)...); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
@@ -289,8 +324,9 @@ func (r *ProductRepo) GetBySKU(ctx context.Context, tenantID uuid.UUID, sku stri
 
 const updateProduct = `
 UPDATE products
-SET name = $1, description = $2, sku = $3, price = $4, updated_at = $5, cost_price = $8
-WHERE id = $6 AND tenant_id = $7 AND deleted_at IS NULL`
+SET name = $1, description = $2, sku = $3, price = $4, updated_at = $5, cost_price = $8, category_id = $9
+WHERE id = $6 AND tenant_id = $7 AND deleted_at IS NULL
+  AND ($9::uuid IS NULL OR EXISTS (SELECT 1 FROM product_categories WHERE id = $9 AND tenant_id = $7))`
 
 func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) error {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -303,7 +339,7 @@ func (r *ProductRepo) Update(ctx context.Context, p *domain.Product) error {
 		return fmt.Errorf("ProductRepo.Update: set tenant: %w", err)
 	}
 
-	res, err := tx.ExecContext(ctx, updateProduct, p.Name, p.Description, p.SKU, p.Price, p.UpdatedAt, p.ID, p.TenantID, p.CostPrice)
+	res, err := tx.ExecContext(ctx, updateProduct, p.Name, p.Description, p.SKU, p.Price, p.UpdatedAt, p.ID, p.TenantID, p.CostPrice, ptrToNullUUID(p.CategoryID))
 	if err != nil {
 		if isUniqueViolation(err) {
 			return domain.ErrConflict

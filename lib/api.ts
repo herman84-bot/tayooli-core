@@ -92,6 +92,8 @@ export interface PaginationParams {
 export interface ProductSearchParams extends PaginationParams {
   /** Case-insensitive substring on name and SKU. Max 100 chars. */
   q?: string
+  /** Category UUID or "none" for uncategorized products. */
+  category?: string
 }
 
 export interface Invoice {
@@ -186,8 +188,18 @@ export interface Product {
   price: number
   /** Cost of goods (HPP); used as unit_cost on stock movements. */
   cost_price?: number
+  category_id?: string | null
+  category_name?: string
   created_at: string
   updated_at: string
+}
+
+export interface ProductCategory {
+  id: string
+  tenant_id: string
+  name: string
+  created_at: string
+  product_count?: number
 }
 
 export interface CreateProductInput {
@@ -196,6 +208,7 @@ export interface CreateProductInput {
   description?: string
   price: number
   cost_price?: number
+  category_id?: string | null
 }
 
 export interface InventoryItem {
@@ -837,6 +850,8 @@ export interface POSOrder {
   status: string
   sales_order_id?: string | null
   sales_invoice_id?: string | null
+  cashier_id?: string | null
+  cashier_name?: string
   items?: POSOrderItem[]
   created_at: string
 }
@@ -1551,6 +1566,23 @@ export const api = {
       request<InventoryItem[]>(`/products/${productId}/inventory`, {
         method: "PATCH",
         body: JSON.stringify({ inventory_id: inventoryId, delta }),
+      }),
+  },
+  productCategories: {
+    list: () => request<{ data: ProductCategory[] }>("/product-categories"),
+    create: (data: { name: string }) =>
+      request<ProductCategory>("/product-categories", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    rename: (id: string, name: string) =>
+      request<ProductCategory>(`/product-categories/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ name }),
+      }),
+    delete: (id: string) =>
+      request<void>(`/product-categories/${id}`, {
+        method: "DELETE",
       }),
   },
   inference: {

@@ -226,7 +226,8 @@ func main() {
 	// Products & Inventory
 	productRepo := postgres.NewProductRepo(db)
 	inventoryRepo := postgres.NewInventoryRepo(db)
-	productUsecase := productUC.New(productRepo, inventoryRepo)
+	productCategoryRepo := postgres.NewProductCategoryRepo(db)
+	productUsecase := productUC.New(productRepo, inventoryRepo, productUC.WithCategories(productCategoryRepo))
 	productHandler := handler.NewProductHandler(productUsecase)
 
 	// Idempotency store for write endpoints (POS, WMS stock mutations)
@@ -671,6 +672,16 @@ func main() {
 			r.Put("/products/{id}", productHandler.UpdateProduct)
 			r.Patch("/products/{id}", productHandler.UpdateProduct)
 			r.Delete("/products/{id}", productHandler.DeleteProduct)
+		})
+
+		// Product Categories
+		r.Get("/product-categories", productHandler.ListCategories)
+		r.Group(func(r chi.Router) {
+			r.Use(tenantMiddleware.RequireRole("owner", "admin", "accountant"))
+			r.Post("/product-categories", productHandler.CreateCategory)
+			r.Put("/product-categories/{id}", productHandler.RenameCategory)
+			r.Patch("/product-categories/{id}", productHandler.RenameCategory)
+			r.Delete("/product-categories/{id}", productHandler.DeleteCategory)
 		})
 
 		r.Get("/inventory", productHandler.ListInventory)
