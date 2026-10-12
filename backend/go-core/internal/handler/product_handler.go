@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -63,7 +66,35 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	res, err := h.uc.ListProducts(r.Context(), tenantID)
+	qv := r.URL.Query()
+	// Legacy shape (no paging params): full list. Kept until every caller is
+	// migrated to server-side search; see SearchProducts below.
+	if !qv.Has("page") && !qv.Has("per_page") && !qv.Has("q") {
+		res, err := h.uc.ListProducts(r.Context(), tenantID)
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		if res == nil {
+			res = []domain.Product{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"data": res})
+		return
+	}
+
+	page, ok1 := positiveIntParam(qv.Get("page"), 1)
+	perPage, ok2 := positiveIntParam(qv.Get("per_page"), 20)
+	q := strings.TrimSpace(qv.Get("q"))
+	if !ok1 || !ok2 || utf8.RuneCountInString(q) > maxProductQueryLen {
+		http.Error(w, "invalid input: page/per_page harus angka >= 1, q maksimal 100 karakter", http.StatusBadRequest)
+		return
+	}
+	perPage = min(perPage, maxProductsPerPage)
+
+	res, total, err := h.uc.SearchProducts(r.Context(), tenantID, domain.ProductFilter{
+		Query: q, Limit: perPage, Offset: (page - 1) * perPage,
+	})
 	if err != nil {
 		writeError(w, err)
 		return
@@ -73,8 +104,25 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"data": res,
+		"data": res, "total": total, "page": page, "per_page": perPage,
 	})
+}
+
+const (
+	maxProductsPerPage = 100 // Shopify-style hard cap on page size
+	maxProductQueryLen = 100
+)
+
+// positiveIntParam parses an optional positive integer; empty uses def.
+func positiveIntParam(raw string, def int) (int, bool) {
+	if raw == "" {
+		return def, true
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 {
+		return 0, false
+	}
+	return n, true
 }
 
 func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {

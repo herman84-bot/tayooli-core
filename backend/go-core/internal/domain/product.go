@@ -31,11 +31,21 @@ type InventoryItemWithProduct struct {
 	TotalQuantity float64
 }
 
+// ProductFilter selects one page of products. Query matches name or SKU
+// (case-insensitive substring).
+type ProductFilter struct {
+	Query  string
+	Limit  int
+	Offset int
+}
+
 type ProductRepository interface {
 	Create(ctx context.Context, p *Product) error
 	GetByID(ctx context.Context, tenantID, id uuid.UUID) (*Product, error)
 	GetBySKU(ctx context.Context, tenantID uuid.UUID, sku string) (*Product, error)
 	List(ctx context.Context, tenantID uuid.UUID) ([]Product, error)
+	// Search returns one page of products matching f plus the total match count.
+	Search(ctx context.Context, tenantID uuid.UUID, f ProductFilter) ([]Product, int, error)
 	// ListByIDs returns the products whose IDs are in the given set — used by
 	// the inventory listing to enrich inventory rows with product details.
 	ListByIDs(ctx context.Context, tenantID uuid.UUID, ids []uuid.UUID) ([]Product, error)

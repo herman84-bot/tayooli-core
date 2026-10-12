@@ -689,3 +689,7 @@ func TestPOSE2E_UnsignedWebhookIsRejected(t *testing.T) {
 		t.Errorf("status = %q, want pending after a rejected webhook", got)
 	}
 }
+
+func (m *e2eProductRepo) Search(ctx context.Context, tenantID uuid.UUID, f domain.ProductFilter) ([]domain.Product, int, error) {
+	return nil, 0, nil
+}

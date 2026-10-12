@@ -321,3 +321,7 @@ func TestListInventoryFromWMS(t *testing.T) {
 		t.Errorf("unexpected item values: %+v", items[0])
 	}
 }
+
+func (m *mockProductRepo) Search(ctx context.Context, tenantID uuid.UUID, f domain.ProductFilter) ([]domain.Product, int, error) {
+	return nil, 0, nil
+}

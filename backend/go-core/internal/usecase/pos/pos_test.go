@@ -247,3 +247,7 @@ func TestPOSCheckout_SuccessAndStockDeduction(t *testing.T) {
 		t.Errorf("expected stock to remain 8, got %.2f", iRepo.stocks[invID].Quantity)
 	}
 }
+
+func (m *mockProductRepo) Search(ctx context.Context, tenantID uuid.UUID, f domain.ProductFilter) ([]domain.Product, int, error) {
+	return nil, 0, nil
+}

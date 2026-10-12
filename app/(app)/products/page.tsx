@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import {
   useProducts,
+  useProductsPaged,
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
@@ -27,6 +28,7 @@ import type { Product } from "@/lib/api"
 import { formatCurrency } from "@/lib/currency"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Pagination } from "@/components/ui/pagination"
 import { ExportModal, ExportButton, type ExportFilter } from "@/components/ui/ExportModal"
 import type { ExportColumn } from "@/lib/export"
 import {
@@ -54,12 +56,46 @@ const productSchema = z.object({
 })
 
 export default function ProductsPage() {
-  const { data: products = [], isLoading, isError, error, refetch, isFetching } = useProducts()
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(20)
+  const [searchInput, setSearchInput] = useState("")
+  const [debouncedQuery, setDebouncedQuery] = useState("")
+
+  const prevQueryRef = React.useRef(debouncedQuery)
+
+  // Debounce search input (300ms) before hitting server
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      const next = searchInput.trim()
+      setDebouncedQuery(next)
+      if (prevQueryRef.current !== next) {
+        prevQueryRef.current = next
+        setPage(1)
+      }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  const {
+    data: pagedData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useProductsPaged({ page, per_page: perPage, q: debouncedQuery })
+
+  // Full list for export and catalog-wide metrics (cached by TanStack Query)
+  const { data: allProducts = [] } = useProducts()
+
+  const products = pagedData?.data ?? []
+  const totalItems = pagedData?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalItems / perPage))
+
   const createProduct = useCreateProduct()
   const updateProduct = useUpdateProduct()
   const deleteProduct = useDeleteProduct()
 
-  const [searchQuery, setSearchQuery] = useState("")
   const [creating, setCreating] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
 
@@ -184,17 +220,13 @@ export default function ProductsPage() {
     })
   }
 
-  // Filter products by search query
-  const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products
-    const q = searchQuery.toLowerCase()
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q) ||
-        (p.description && p.description.toLowerCase().includes(q))
-    )
-  }, [products, searchQuery])
+  // Metrics calculate over the whole catalog
+  const metrics = useMemo(() => {
+    const totalCount = allProducts.length
+    const totalPrice = allProducts.reduce((acc, p) => acc + (Number(p.price) || 0), 0)
+    const avgPrice = totalCount > 0 ? totalPrice / totalCount : 0
+    return { totalCount, totalPrice, avgPrice }
+  }, [allProducts])
 
   const [exporting, setExporting] = useState(false)
   const productExportColumns = useMemo<ExportColumn<Product>[]>(
@@ -228,14 +260,6 @@ export default function ProductsPage() {
     ],
     []
   )
-
-  // Metrics
-  const metrics = useMemo(() => {
-    const totalCount = products.length
-    const totalPrice = products.reduce((acc, p) => acc + (Number(p.price) || 0), 0)
-    const avgPrice = totalCount > 0 ? totalPrice / totalCount : 0
-    return { totalCount, totalPrice, avgPrice }
-  }, [products])
 
   // Submit product creation
   const handleCreateSubmit = (e: React.FormEvent) => {
@@ -297,7 +321,7 @@ export default function ProductsPage() {
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </button>
 
-            <ExportButton onClick={() => setExporting(true)} disabled={products.length === 0} />
+            <ExportButton onClick={() => setExporting(true)} disabled={allProducts.length === 0} />
 
             <button
               type="button"
@@ -352,15 +376,19 @@ export default function ProductsPage() {
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari berdasarkan nama produk, SKU, atau deskripsi..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Cari berdasarkan nama produk atau SKU (pencarian server)..."
               className="w-full pl-10 pr-4 min-h-[44px] text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white transition-all"
             />
           </div>
-          {searchQuery && (
+          {searchInput && (
             <button
-              onClick={() => setSearchQuery("")}
+              onClick={() => {
+                setSearchInput("")
+                setDebouncedQuery("")
+                setPage(1)
+              }}
               className="text-xs text-slate-500 hover:text-slate-800 px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition"
             >
               Atur Ulang Filter
@@ -386,19 +414,26 @@ export default function ProductsPage() {
               Coba Lagi
             </Button>
           </div>
-        ) : filteredProducts.length === 0 ? (
+        ) : products.length === 0 ? (
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center shadow-xs">
             <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <h3 className="text-base font-bold text-slate-900">
-              {searchQuery ? "Tidak ada produk yang cocok" : "Belum ada produk terdaftar"}
+              {debouncedQuery ? "Tidak ada produk yang cocok" : "Belum ada produk terdaftar"}
             </h3>
             <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-5">
-              {searchQuery
-                ? `Tidak ditemukan produk yang cocok dengan pencarian "${searchQuery}".`
+              {debouncedQuery
+                ? `Tidak ditemukan produk yang cocok dengan pencarian "${debouncedQuery}".`
                 : "Mulai bangun katalog inventaris Anda dengan menambahkan produk pertama."}
             </p>
-            {searchQuery ? (
-              <Button variant="outline" onClick={() => setSearchQuery("")}>
+            {debouncedQuery ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchInput("")
+                  setDebouncedQuery("")
+                  setPage(1)
+                }}
+              >
                 Hapus Pencarian
               </Button>
             ) : (
@@ -438,7 +473,7 @@ export default function ProductsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {filteredProducts.map((p) => (
+                  {products.map((p) => (
                     <tr
                       key={p.id}
                       onClick={() => setSelectedProduct(p)}
@@ -502,9 +537,22 @@ export default function ProductsPage() {
               </table>
             </div>
 
-            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs text-slate-500">
-              <span>Menampilkan {filteredProducts.length} dari {products.length} produk</span>
-              <span>Klik baris produk untuk mengelola stok & detail</span>
+            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+              <span>
+                Menampilkan {products.length > 0 ? (page - 1) * perPage + 1 : 0}–
+                {Math.min(page * perPage, totalItems)} dari {totalItems} produk
+              </span>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                perPage={perPage}
+                onPerPageChange={(n) => {
+                  setPerPage(n)
+                  setPage(1)
+                }}
+                perPageOptions={[10, 20, 50]}
+              />
             </div>
           </div>
         )}
@@ -874,9 +922,9 @@ export default function ProductsPage() {
         title="Katalog Produk"
         filename="katalog-produk"
         columns={productExportColumns}
-        allRows={products}
-        visibleRows={filteredProducts}
-        visibleSummary={searchQuery.trim() ? [`Pencarian: "${searchQuery.trim()}"`] : []}
+        allRows={allProducts}
+        visibleRows={products}
+        visibleSummary={debouncedQuery ? [`Pencarian: "${debouncedQuery}"`] : []}
         filters={productExportFilters}
       />
     </div>

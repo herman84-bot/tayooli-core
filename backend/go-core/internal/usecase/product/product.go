@@ -67,6 +67,11 @@ func (u *Usecase) ListProducts(ctx context.Context, tenantID uuid.UUID) ([]domai
 	return u.productRepo.List(ctx, tenantID)
 }
 
+// SearchProducts returns one page of products and the total match count.
+func (u *Usecase) SearchProducts(ctx context.Context, tenantID uuid.UUID, f domain.ProductFilter) ([]domain.Product, int, error) {
+	return u.productRepo.Search(ctx, tenantID, f)
+}
+
 type UpdateProductRequest struct {
 	Name        string  `json:"name"`
 	Description string  `json:"description"`

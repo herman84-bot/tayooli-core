@@ -43,6 +43,7 @@ import {
   useCancelTransfer,
 } from "@/hooks/useWMS"
 import { useProducts } from "@/hooks/useProducts"
+import { ProductCombobox } from "@/components/products/ProductCombobox"
 import { useAuthStore } from "@/hooks/useAuth"
 import { StockTransfer, TransferStatus } from "@/lib/api"
 
@@ -984,17 +985,27 @@ export default function TransfersPage() {
                       >
                         {/* Product selection */}
                         <div className="flex-1 w-full">
-                          <select
-                            value={item.productId}
-                            onChange={(e) => handleUpdateLineItem(idx, "productId", e.target.value)}
-                            className="w-full px-2.5 py-1.5 text-xs font-semibold rounded border border-slate-300 min-h-[40px]"
-                          >
-                            {products.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                [{p.sku}] {p.name}
-                              </option>
-                            ))}
-                          </select>
+                          <ProductCombobox
+                            value={
+                              products.find((p) => p.id === item.productId) ??
+                              (item.productId
+                                ? {
+                                    id: item.productId,
+                                    name: item.productName || "Produk",
+                                    sku: item.sku || "",
+                                    tenant_id: "",
+                                    price: 0,
+                                    created_at: "",
+                                    updated_at: "",
+                                  }
+                                : null)
+                            }
+                            onSelect={(p) => {
+                              if (!p) return
+                              handleUpdateLineItem(idx, "productId", p.id)
+                            }}
+                            placeholder="Pilih atau cari produk..."
+                          />
                         </div>
 
                         {/* Source Location selection */}

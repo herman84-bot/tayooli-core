@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -19,6 +20,7 @@ import (
 type mockProductRepo struct {
 	products     map[uuid.UUID]*domain.Product
 	hasMovements bool
+	lastFilter   domain.ProductFilter
 }
 
 func (m *mockProductRepo) Create(ctx context.Context, p *domain.Product) error {
@@ -51,6 +53,22 @@ func (m *mockProductRepo) List(ctx context.Context, tenantID uuid.UUID) ([]domai
 		}
 	}
 	return list, nil
+}
+
+func (m *mockProductRepo) Search(ctx context.Context, tenantID uuid.UUID, f domain.ProductFilter) ([]domain.Product, int, error) {
+	m.lastFilter = f
+	var all []domain.Product
+	for _, p := range m.products {
+		if p.TenantID == tenantID {
+			all = append(all, *p)
+		}
+	}
+	total := len(all)
+	if f.Offset >= total {
+		return []domain.Product{}, total, nil
+	}
+	end := min(f.Offset+f.Limit, total)
+	return all[f.Offset:end], total, nil
 }
 
 func (m *mockProductRepo) ListByIDs(ctx context.Context, tenantID uuid.UUID, ids []uuid.UUID) ([]domain.Product, error) {
@@ -173,5 +191,84 @@ func TestProductHandler_ListAndMutations(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("expected 204 no content, got %d", w.Code)
+	}
+}
+
+func newProductRouter(t *testing.T, tenantID uuid.UUID, n int) (*chi.Mux, *mockProductRepo) {
+	t.Helper()
+	pRepo := &mockProductRepo{products: make(map[uuid.UUID]*domain.Product)}
+	for i := 0; i < n; i++ {
+		id := uuid.New()
+		pRepo.products[id] = &domain.Product{ID: id, TenantID: tenantID, Name: "P", SKU: id.String()}
+	}
+	h := handler.NewProductHandler(uc.New(pRepo, &mockInventoryRepo{}))
+	r := chi.NewRouter()
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			next.ServeHTTP(w, req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, tenantID)))
+		})
+	})
+	r.Get("/products", h.ListProducts)
+	return r, pRepo
+}
+
+type pagedResp struct {
+	Data    []domain.Product `json:"data"`
+	Total   int              `json:"total"`
+	Page    int              `json:"page"`
+	PerPage int              `json:"per_page"`
+}
+
+func getPaged(t *testing.T, r http.Handler, url string) (int, pagedResp) {
+	t.Helper()
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, url, nil))
+	var p pagedResp
+	if w.Code == http.StatusOK {
+		if err := json.Unmarshal(w.Body.Bytes(), &p); err != nil {
+			t.Fatalf("decode: %v (%s)", err, w.Body.String())
+		}
+	}
+	return w.Code, p
+}
+
+func TestListProducts_PaginatedEnvelope(t *testing.T) {
+	r, repo := newProductRouter(t, uuid.New(), 25)
+	code, p := getPaged(t, r, "/products?page=2&per_page=10&q=kopi")
+	if code != http.StatusOK {
+		t.Fatalf("status %d", code)
+	}
+	if p.Total != 25 || p.Page != 2 || p.PerPage != 10 || len(p.Data) != 10 {
+		t.Fatalf("unexpected envelope: total=%d page=%d per_page=%d len=%d", p.Total, p.Page, p.PerPage, len(p.Data))
+	}
+	if repo.lastFilter.Query != "kopi" || repo.lastFilter.Offset != 10 || repo.lastFilter.Limit != 10 {
+		t.Fatalf("filter not passed to repo: %+v", repo.lastFilter)
+	}
+}
+
+func TestListProducts_PerPageIsCapped(t *testing.T) {
+	r, repo := newProductRouter(t, uuid.New(), 1)
+	if code, p := getPaged(t, r, "/products?per_page=100000"); code != http.StatusOK || p.PerPage != 100 {
+		t.Fatalf("per_page must be capped at 100, got status=%d per_page=%d", code, p.PerPage)
+	}
+	if repo.lastFilter.Limit != 100 {
+		t.Fatalf("repo limit not capped: %d", repo.lastFilter.Limit)
+	}
+}
+
+func TestListProducts_RejectsInvalidPaging(t *testing.T) {
+	r, _ := newProductRouter(t, uuid.New(), 1)
+	for _, u := range []string{"/products?page=0", "/products?page=-1", "/products?per_page=0", "/products?page=abc"} {
+		if code, _ := getPaged(t, r, u); code != http.StatusBadRequest {
+			t.Fatalf("%s: expected 400, got %d", u, code)
+		}
+	}
+}
+
+func TestListProducts_QueryTooLongRejected(t *testing.T) {
+	r, _ := newProductRouter(t, uuid.New(), 1)
+	long := strings.Repeat("a", 101)
+	if code, _ := getPaged(t, r, "/products?q="+long); code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for q > 100 chars, got %d", code)
 	}
 }

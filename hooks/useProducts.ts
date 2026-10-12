@@ -1,8 +1,12 @@
 "use client"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { api, type Product } from "@/lib/api"
+import { api, type PaginatedResponse, type Product, type ProductSearchParams } from "@/lib/api"
 
+/**
+ * useProducts loads the default un-paged product list (capped at 1000 by backend).
+ * Maintained for existing picker/lookup callers that operate on the full list.
+ */
 export function useProducts() {
   return useQuery<Product[]>({
     queryKey: ["products"],
@@ -13,6 +17,33 @@ export function useProducts() {
       return []
     },
     retry: 1,
+  })
+}
+
+/**
+ * useProductsPaged powers server-paginated tables and views.
+ * placeholderData keeps the previous page visible while the next loads.
+ */
+export function useProductsPaged(params: ProductSearchParams) {
+  const page = params.page ?? 1
+  const perPage = params.per_page ?? 20
+  const q = params.q?.trim() ?? ""
+
+  return useQuery<PaginatedResponse<Product>>({
+    queryKey: ["products", "paged", { page, perPage, q }],
+    queryFn: async (): Promise<PaginatedResponse<Product>> => {
+      const res = await api.products.list({ page, per_page: perPage, q: q || undefined })
+      if (res && Array.isArray(res.data)) {
+        return {
+          data: res.data,
+          total: typeof res.total === "number" ? res.total : res.data.length,
+          page: typeof res.page === "number" ? res.page : page,
+          per_page: typeof res.per_page === "number" ? res.per_page : perPage,
+        }
+      }
+      return { data: [], total: 0, page, per_page: perPage }
+    },
+    placeholderData: (prev) => prev,
   })
 }
 

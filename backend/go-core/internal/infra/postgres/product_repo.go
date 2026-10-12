@@ -133,6 +133,72 @@ func (r *ProductRepo) List(ctx context.Context, tenantID uuid.UUID) ([]domain.Pr
 	return products, nil
 }
 
+// searchProductsPaged returns one page plus the total match count in a single
+// round trip (COUNT(*) OVER ()). $2 is an escaped ILIKE pattern or NULL.
+// Ordered by created_at, id so paging is stable even with equal timestamps.
+const searchProductsPaged = `
+SELECT id, tenant_id, name, COALESCE(description, ''), sku, price, cost_price, created_at, updated_at,
+       COUNT(*) OVER () AS total
+FROM products
+WHERE tenant_id = $1 AND deleted_at IS NULL
+  AND ($2::text IS NULL OR name ILIKE $2 ESCAPE '\' OR sku ILIKE $2 ESCAPE '\')
+ORDER BY created_at DESC, id DESC
+LIMIT $3 OFFSET $4`
+
+// likeContains builds a case-insensitive "contains" pattern, escaping the
+// LIKE metacharacters so user input is matched literally.
+func likeContains(q string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return "%" + r.Replace(q) + "%"
+}
+
+func (r *ProductRepo) Search(ctx context.Context, tenantID uuid.UUID, f domain.ProductFilter) ([]domain.Product, int, error) {
+	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, 0, fmt.Errorf("ProductRepo.Search: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, 0, fmt.Errorf("ProductRepo.Search: set tenant: %w", err)
+	}
+
+	var pattern any // NULL = no filter
+	if f.Query != "" {
+		pattern = likeContains(f.Query)
+	}
+	rows, err := tx.QueryContext(ctx, searchProductsPaged, tenantID, pattern, f.Limit, f.Offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("ProductRepo.Search: query: %w", err)
+	}
+	defer rows.Close()
+
+	products := []domain.Product{}
+	total := 0
+	for rows.Next() {
+		var p domain.Product
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Description, &p.SKU, &p.Price, &p.CostPrice, &p.CreatedAt, &p.UpdatedAt, &total); err != nil {
+			return nil, 0, fmt.Errorf("ProductRepo.Search: scan row: %w", err)
+		}
+		products = append(products, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("ProductRepo.Search: rows err: %w", err)
+	}
+	// A page past the end returns no rows, so the window total is unknown:
+	// count separately so the client can still render the pager.
+	if len(products) == 0 && f.Offset > 0 {
+		if err := tx.QueryRowContext(ctx, `
+			SELECT COUNT(*) FROM products
+			WHERE tenant_id = $1 AND deleted_at IS NULL
+			  AND ($2::text IS NULL OR name ILIKE $2 ESCAPE '\' OR sku ILIKE $2 ESCAPE '\')`,
+			tenantID, pattern).Scan(&total); err != nil {
+			return nil, 0, fmt.Errorf("ProductRepo.Search: count: %w", err)
+		}
+	}
+	return products, total, nil
+}
+
 // listProductsByIDs uses a single IN (...) query to fetch the product details
 // for a set of inventory rows. The placeholder list is built dynamically, but
 // all values are bound as parameters — no string interpolation of user input.

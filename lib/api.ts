@@ -89,6 +89,11 @@ export interface PaginationParams {
   per_page?: number
 }
 
+export interface ProductSearchParams extends PaginationParams {
+  /** Case-insensitive substring on name and SKU. Max 100 chars. */
+  q?: string
+}
+
 export interface Invoice {
   id: string
   tenant_id: string
@@ -1505,7 +1510,7 @@ export const api = {
       }),
   },
   products: {
-    list: (p?: PaginationParams) => request<PaginatedResponse<Product>>(`/products${p ? qs(p) : ""}`),
+    list: (p?: ProductSearchParams) => request<PaginatedResponse<Product>>(`/products${p ? qs(p) : ""}`),
     get: (id: string) => request<Product>(`/products/${id}`),
     create: (input: CreateProductInput) =>
       request<Product>("/products", {
