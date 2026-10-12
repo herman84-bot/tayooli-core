@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm'
 import { Logo } from '@/components/brand/Logo'
 
-export const metadata: Metadata = { title: 'Reset Password | Tayooli ERP' }
+export const metadata: Metadata = { title: 'Atur Ulang Kata Sandi | Tayooli ERP' }
 
 export default async function ResetPasswordPage({
   searchParams,
@@ -25,7 +25,7 @@ export default async function ResetPasswordPage({
         {/* Card */}
         <div className="rounded-xl border border-border/70 bg-card p-6 shadow-sm sm:p-7">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            {isInvite ? 'Aktifkan Akun' : 'Reset Kata Sandi'}
+            {isInvite ? 'Aktifkan Akun' : 'Atur Ulang Kata Sandi'}
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
             {isInvite ? 'Buat kata sandi untuk akun undangan Anda.' : 'Masukkan kata sandi baru Anda.'}
@@ -38,7 +38,7 @@ export default async function ResetPasswordPage({
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           <Link href="/login" className="font-medium text-primary hover:text-primary/80 transition-colors">
-            Kembali ke login
+            Kembali ke Masuk
           </Link>
         </p>
 

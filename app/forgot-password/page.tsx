@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm'
 import { Logo } from '@/components/brand/Logo'
 
-export const metadata: Metadata = { title: 'Lupa Password | Tayooli ERP' }
+export const metadata: Metadata = { title: 'Lupa Kata Sandi | Tayooli ERP' }
 
 export default function ForgotPasswordPage() {
   return (
@@ -23,7 +23,7 @@ export default function ForgotPasswordPage() {
             Lupa Kata Sandi
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            Masukkan email Anda dan kami akan mengirimkan link untuk reset password.
+            Masukkan email Anda dan kami akan mengirimkan tautan untuk atur ulang kata sandi.
           </p>
 
           <div className="mt-6">

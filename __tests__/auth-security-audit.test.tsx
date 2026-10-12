@@ -196,7 +196,7 @@ describe('RED TEAM SECURITY AUDIT: Authentication Suite', () => {
 
         render(<ForgotPasswordForm />)
         const emailInput = screen.getByLabelText(/^Email$/i)
-        const submitBtn = screen.getByRole('button', { name: /Kirim Link Reset/i })
+        const submitBtn = screen.getByRole('button', { name: /Kirim Tautan Atur Ulang/i })
 
         fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
         fireEvent.click(submitBtn)
@@ -226,7 +226,7 @@ describe('RED TEAM SECURITY AUDIT: Authentication Suite', () => {
         render(<ResetPasswordForm />)
         const passwordInput = screen.getByLabelText(/^Kata Sandi Baru$/i)
         const confirmPasswordInput = screen.getByLabelText(/^Konfirmasi Kata Sandi$/i)
-        const submitBtn = screen.getByRole('button', { name: /Reset Password/i })
+        const submitBtn = screen.getByRole('button', { name: /Atur Ulang Kata Sandi/i })
 
         fireEvent.change(passwordInput, { target: { value: 'password123' } })
         fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } })

@@ -59,7 +59,11 @@ export function DrawerHeader({ title, icon }: { title: string; icon?: React.Reac
         {icon && <span className="text-gray-500">{icon}</span>}
         <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
       </div>
-      <button onClick={() => onOpenChange(false)} className="p-2 rounded-md hover:bg-gray-200 transition-colors">
+      <button
+        onClick={() => onOpenChange(false)}
+        aria-label="Tutup"
+        className="p-2 rounded-md hover:bg-gray-200 transition-colors"
+      >
         <X className="w-5 h-5 text-gray-500" />
       </button>
     </div>

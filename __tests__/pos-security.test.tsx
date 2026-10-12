@@ -71,7 +71,7 @@ describe('POS tenant data isolation', () => {
 
   it('unknown scanned code shows an error instead of inventing a product', () => {
     render(<POSPage />)
-    fireEvent.change(screen.getByPlaceholderText(/Scan barcode/i), { target: { value: 'UNKNOWN-12345' } })
+    fireEvent.change(screen.getByPlaceholderText(/Pindai barcode/i), { target: { value: 'UNKNOWN-12345' } })
     fireEvent.click(screen.getByRole('button', { name: /Masuk Keranjang/i }))
 
     expect(screen.getByText(/tidak ditemukan di master produk/i)).toBeInTheDocument()

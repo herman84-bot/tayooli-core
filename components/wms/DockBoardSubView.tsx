@@ -47,15 +47,15 @@ export interface DockBoardSubViewProps {
 
 const DOCK_STATUS_BADGE: Record<DockStatus, { label: string; cls: string }> = {
   AVAILABLE: {
-    label: "AVAILABLE",
+    label: "Tersedia",
     cls: "bg-emerald-50 text-emerald-700 border-emerald-200",
   },
   OCCUPIED: {
-    label: "OCCUPIED",
+    label: "Terisi",
     cls: "bg-amber-50 text-amber-700 border-amber-200",
   },
   MAINTENANCE: {
-    label: "MAINTENANCE",
+    label: "Perbaikan",
     cls: "bg-rose-50 text-rose-700 border-rose-200",
   },
 }
@@ -82,6 +82,16 @@ const APPOINTMENT_STATUS_BADGE: Record<AppointmentStatus, { label: string; cls: 
     cls: "bg-rose-50 text-rose-700 border-rose-200",
   },
 }
+
+const DOCK_TYPE_LABEL: Record<string, string> = {
+  INBOUND: "Barang Masuk",
+  OUTBOUND: "Barang Keluar",
+  CROSS_DOCK: "Lintas Dermaga",
+}
+
+const dockTypeLabel = (t: string) => DOCK_TYPE_LABEL[t] ?? t
+const dockStatusLabel = (s: string) => DOCK_STATUS_BADGE[s as DockStatus]?.label ?? s
+const apptStatusLabel = (s: string) => APPOINTMENT_STATUS_BADGE[s as AppointmentStatus]?.label ?? s
 
 function formatDate(iso?: string): string {
   if (!iso) return "-"
@@ -173,7 +183,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
         status: nextStatus,
       })
       setAlertSuccess(
-        `Status ${dock.dock_name} berhasil diubah ke ${nextStatus}`
+        `Status ${dock.dock_name} berhasil diubah ke ${dockStatusLabel(nextStatus)}`
       )
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Gagal mengubah status dermaga"
@@ -218,7 +228,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
         appointmentId,
         status: nextStatus,
       })
-      setAlertSuccess(`Status janji armada berhasil diperbarui ke ${nextStatus}`)
+      setAlertSuccess(`Status janji armada berhasil diperbarui ke ${apptStatusLabel(nextStatus)}`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Gagal memperbarui status janji"
       setAlertError(msg)
@@ -371,7 +381,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
           <button
             onClick={() => setAlertError(null)}
             className="rounded p-1 hover:bg-rose-100 text-rose-600"
-            aria-label="Tutup pesan error"
+            aria-label="Tutup pesan galat"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -399,10 +409,10 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <WarehouseIcon className="h-5 w-5 text-emerald-600" />
-            Papan Dermaga & Antrean Armada (Dock Management)
+            Papan Dermaga & Antrean Armada
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manajemen alokasi dermaga bongkar muat dan jadwal antrean armada pemasok masuk secara real-time.
+            Manajemen alokasi dermaga bongkar muat dan jadwal antrean armada pemasok masuk secara waktu nyata.
           </p>
         </div>
 
@@ -477,7 +487,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
           <div>
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <Anchor className="h-4 w-4 text-slate-500" />
-              Status Dermaga (Dock Bays)
+              Status Dermaga
             </h3>
             <p className="text-xs text-slate-500">Visual pemanfaatan setiap pintu dermaga gudang</p>
           </div>
@@ -543,10 +553,10 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
 
                       <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
                         <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
-                          {dock.dock_type}
+                          {dockTypeLabel(dock.dock_type)}
                         </span>
                         <span>•</span>
-                        <span>Max {dock.max_tonnage} Ton</span>
+                        <span>Maks {dock.max_tonnage} Ton</span>
                       </div>
 
                       {/* Active docked appointment info */}
@@ -562,7 +572,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                                 APPOINTMENT_STATUS_BADGE[activeAppt.status]?.cls || ""
                               }`}
                             >
-                              {activeAppt.status}
+                              {apptStatusLabel(activeAppt.status)}
                             </span>
                           </div>
                           <p className="mt-1 text-[11px] text-slate-600 truncate font-medium">
@@ -587,12 +597,12 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                         className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-slate-900 p-1 rounded hover:bg-slate-100 transition-colors"
                         title={
                           dock.status === "MAINTENANCE"
-                            ? "Selesai Maintenance & Aktifkan"
-                            : "Ubah ke Maintenance"
+                            ? "Selesai Perbaikan & Aktifkan"
+                            : "Ubah ke Perbaikan"
                         }
                       >
                         <Wrench className="h-3 w-3" />
-                        {dock.status === "MAINTENANCE" ? "Selesai Maint." : "Maintenance"}
+                        {dock.status === "MAINTENANCE" ? "Selesai Perbaikan" : "Perbaikan"}
                       </button>
 
                       {dock.status === "OCCUPIED" && (
@@ -621,7 +631,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
             <div>
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <Clock className="h-4 w-4 text-slate-500" />
-                Jadwal & Antrean Armada (Inbound Queue)
+                Jadwal & Antrean Armada Masuk
               </h3>
               <p className="text-xs text-slate-500">
                 Pencatatan kedatangan armada pemasok, alokasi pintu dermaga, dan progres bongkar koli.
@@ -633,7 +643,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Cari PO, Plat, Sopir, Vendor..."
+                  placeholder="Cari PO, plat, sopir, pemasok..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
@@ -662,7 +672,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Terjadwal (SCHEDULED)
+              Terjadwal
             </button>
             <button
               onClick={() => setAppointmentFilter("ARRIVED")}
@@ -672,7 +682,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Tiba (ARRIVED)
+              Sudah Tiba
             </button>
             <button
               onClick={() => setAppointmentFilter("UNLOADING")}
@@ -682,7 +692,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Bongkar (UNLOADING)
+              Proses Bongkar
             </button>
             <button
               onClick={() => setAppointmentFilter("COMPLETED")}
@@ -692,7 +702,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Selesai (COMPLETED)
+              Sudah Selesai
             </button>
           </div>
         </div>
@@ -719,7 +729,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                   <th className="px-4 py-3">Pemasok & Ref PO</th>
                   <th className="px-4 py-3">Armada & Sopir</th>
                   <th className="px-4 py-3">Estimasi Tiba (ETA)</th>
-                  <th className="px-4 py-3">Dermaga Bay</th>
+                  <th className="px-4 py-3">Dermaga</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Aksi</th>
                 </tr>
@@ -793,7 +803,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                                 onClick={() => handleOpenAssignModal(appt)}
                                 className="px-2.5 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold text-[11px] transition-colors"
                               >
-                                Alokasikan Dock
+                                Alokasikan Dermaga
                               </button>
                             </>
                           )}
@@ -816,7 +826,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                                   onClick={() => handleOpenAssignModal(appt)}
                                   className="px-2.5 py-1 rounded bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold text-[11px] transition-colors"
                                 >
-                                  Alokasikan Dock
+                                  Alokasikan Dermaga
                                 </button>
                               )}
                               {appt.dock_id && (
@@ -825,7 +835,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                                   className="px-2 py-1 rounded bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium text-[11px] transition-colors"
                                   title="Ganti Dermaga"
                                 >
-                                  Ganti Dock
+                                  Ganti Dermaga
                                 </button>
                               )}
                             </>
@@ -900,7 +910,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                 <input
                   type="text"
                   required
-                  placeholder="Mis: Dermaga Inbound Barat 1"
+                  placeholder="Mis: Dermaga Masuk Barat 1"
                   value={newDockName}
                   onChange={(e) => setNewDockName(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
@@ -915,9 +925,9 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                     onChange={(e) => setNewDockType(e.target.value as DockType)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   >
-                    <option value="INBOUND">INBOUND</option>
-                    <option value="OUTBOUND">OUTBOUND</option>
-                    <option value="CROSS_DOCK">CROSS_DOCK</option>
+                    <option value="INBOUND">Barang Masuk</option>
+                    <option value="OUTBOUND">Barang Keluar</option>
+                    <option value="CROSS_DOCK">Lintas Dermaga</option>
                   </select>
                 </div>
 
@@ -989,7 +999,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">
-                    Nama Pemasok / Vendor <span className="text-rose-500">*</span>
+                    Nama Pemasok <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -1081,7 +1091,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                   <option value="">-- Alokasikan Nanti saat Tiba --</option>
                   {docks.map((d) => (
                     <option key={d.id} value={d.id} disabled={d.status !== "AVAILABLE"}>
-                      {d.dock_name} ({d.dock_code}) - {d.status}
+                      {d.dock_name} ({d.dock_code}) - {dockStatusLabel(d.status)}
                     </option>
                   ))}
                 </select>
@@ -1163,7 +1173,7 @@ export function DockBoardSubView({ warehouseId }: DockBoardSubViewProps) {
                       value={d.id}
                       disabled={d.status !== "AVAILABLE" && d.id !== assigningAppointment.dock_id}
                     >
-                      {d.dock_name} ({d.dock_code}) - {d.status} (Max {d.max_tonnage} Ton)
+                      {d.dock_name} ({d.dock_code}) - {dockStatusLabel(d.status)} (Maks {d.max_tonnage} Ton)
                     </option>
                   ))}
                 </select>

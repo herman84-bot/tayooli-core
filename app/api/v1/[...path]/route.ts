@@ -119,6 +119,10 @@ async function proxy(req: NextRequest, path: string, init?: RequestInit) {
   // trusted-proxy rate limiter keys on the actual client instead of 127.0.0.1.
   const clientIp = extractClientIp(req.headers.get('x-real-ip'), req.headers.get('x-forwarded-for'));
   if (clientIp) headers.set('x-forwarded-for', clientIp);
+  const idempotencyKey = req.headers.get('idempotency-key');
+  if (idempotencyKey) headers.set('idempotency-key', idempotencyKey);
+  const reqId = req.headers.get('x-request-id');
+  if (reqId) headers.set('x-request-id', reqId);
 
   let res: Response;
   try {

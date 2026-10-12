@@ -57,7 +57,7 @@ export default function ChatWidget() {
             'transition-all duration-200',
             'hover:scale-105 active:scale-95'
           )}
-          aria-label="Open chat support"
+          aria-label="Buka bantuan chat"
           data-tutorial="chat-widget"
         >
           <MessageCircle className="h-5 w-5" />
@@ -86,14 +86,14 @@ export default function ChatWidget() {
               <div>
                 <h3 className="text-sm font-semibold text-foreground">Tayooli Support</h3>
                 <p className="text-[11px] text-muted-foreground">
-                  {isSending ? 'Mengetik...' : 'Online'}
+                  {isSending ? 'Mengetik...' : 'Daring'}
                 </p>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
               className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              aria-label="Close chat"
+              aria-label="Tutup chat"
             >
               <X className="h-4 w-4" />
             </button>
@@ -181,7 +181,7 @@ export default function ChatWidget() {
                     ? 'text-primary hover:bg-primary/10'
                     : 'text-muted-foreground/40'
                 )}
-                aria-label="Send message"
+                aria-label="Kirim pesan"
               >
                 <Send className="h-4 w-4" />
               </button>

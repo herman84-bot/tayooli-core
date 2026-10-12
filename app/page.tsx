@@ -87,13 +87,13 @@ function HeroMockup() {
               <span className="text-xs font-semibold text-foreground">Tayooli</span>
             </div>
             {[
-              { icon: LayoutDashboard, label: "Dashboard", active: true },
-              { icon: Package, label: "Products" },
-              { icon: Warehouse, label: "Warehouse & Stock" },
-              { icon: Truck, label: "Surat Jalan (DO)" },
+              { icon: LayoutDashboard, label: "Dasbor", active: true },
+              { icon: Package, label: "Produk" },
+              { icon: Warehouse, label: "Gudang & Stok" },
+              { icon: Truck, label: "Surat Jalan" },
               { icon: ShoppingBag, label: "Marketplace" },
-              { icon: Store, label: "Point of Sale" },
-              { icon: Settings, label: "Settings" },
+              { icon: Store, label: "Kasir (POS)" },
+              { icon: Settings, label: "Pengaturan" },
             ].map(({ icon: Icon, label, active }) => (
               <div
                 key={label}
@@ -113,7 +113,7 @@ function HeroMockup() {
           <div className="flex-1 space-y-4 bg-background p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-bold text-foreground">Dashboard Operasional</div>
+                <div className="text-sm font-bold text-foreground">Dasbor Operasional</div>
                 <div className="text-xs text-muted-foreground">
                   Kasir POS, pergudangan, dan mutasi barang hari ini
                 </div>
@@ -215,7 +215,7 @@ function HeroMockup() {
 
 function StatsBand() {
   const stats = [
-    { value: "Multi-Gudang", label: "pencatatan mutasi fisik antar gudang, rak, dan transit" },
+    { value: "Multi-Gudang", label: "pencatatan mutasi fisik antar gudang, rak, dan area transit" },
     { value: "Kasir POS", label: "cetak nota thermal 58mm/80mm, QRIS, dan hitung kembalian" },
     { value: "Marketplace", label: "pesanan marketplace langsung memotong stok gudang" },
     { value: "13 Modul", label: "alur barang masuk, stok, kasir, hingga kirim dalam satu alur" },
@@ -351,10 +351,10 @@ function FeaturesSection() {
         <div className="mt-14 space-y-16 sm:space-y-20">
           <FeatureRow
             eyebrowLabel="Kasir Cepat & Struk"
-            title="Kasir POS toko dengan barcode scanner"
-            desc="Layani transaksi pelanggan dengan cepat. Scan barcode kemasan, hitung kembalian otomatis, dan cetak struk thermal 58mm atau 80mm."
+            title="Kasir POS toko dengan pemindai barcode"
+            desc="Layani transaksi pelanggan dengan cepat. Pindai barcode kemasan, hitung kembalian otomatis, dan cetak struk thermal 58mm atau 80mm."
             bullets={[
-              "Mendukung scan barcode via kamera HP/laptop dan scanner USB/Bluetooth",
+              "Mendukung pemindaian barcode via kamera HP/laptop dan scanner USB/Bluetooth",
               "Pilihan pembayaran fleksibel: Tunai, QRIS, dan Kartu Debit",
               "Saldo stok gudang langsung terpotong saat transaksi selesai",
             ]}
@@ -364,7 +364,7 @@ function FeaturesSection() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600/10 text-emerald-600">
                     <Store className="h-4 w-4" />
                   </div>
-                  <span className="text-xs font-semibold text-foreground">Point of Sale (POS)</span>
+                  <span className="text-xs font-semibold text-foreground">Kasir (POS)</span>
                   <span className="ml-auto rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-[10px] font-medium">
                     Kasir Aktif
                   </span>
@@ -394,12 +394,12 @@ function FeaturesSection() {
 
           <FeatureRow
             eyebrowLabel="Logistik & Distribusi"
-            title="Kelola multi-gudang dan terbitkan Surat Jalan (DO)"
+            title="Kelola multi-gudang dan terbitkan Surat Jalan"
             desc="Kendalikan pergerakan barang antar gudang cabang. Terbitkan dokumen Surat Jalan resmi berstandar ekspedisi Indonesia dalam format cetak rapi."
             bullets={[
               "Monitoring stok unit fisik per rak dan lokasi gudang",
-              "Alur transfer stok cabang: Draft → Pending → In Transit → Received",
-              "Cetak Surat Jalan Delivery Order lengkap nomor polisi dan nama kurir",
+              "Alur transfer stok cabang: Draf → Menunggu Persetujuan → Dalam Pengiriman → Diterima",
+              "Cetak Surat Jalan lengkap nomor polisi dan nama kurir",
             ]}
             visual={
               <div className="rounded-xl border border-border bg-card p-5 shadow-card">
@@ -407,11 +407,11 @@ function FeaturesSection() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <Truck className="h-4 w-4" />
                   </div>
-                  <span className="text-xs font-semibold text-foreground">Surat Jalan (DO)</span>
+                  <span className="text-xs font-semibold text-foreground">Surat Jalan</span>
                 </div>
                 <div className="mt-4 space-y-2">
                   {[
-                    { label: "Nomor DO", val: "DO-2026-0018" },
+                    { label: "Nomor Surat Jalan", val: "DO-2026-0018" },
                     { label: "Tujuan Pengiriman", val: "Toko Sinar Jaya, Bekasi" },
                     { label: "Armada / Sopir", val: "B 9876 KDA (Sulaeman)" },
                     { label: "Total Muatan", val: "120 Karton" },
@@ -433,12 +433,12 @@ function FeaturesSection() {
 
           <FeatureRow
             eyebrowLabel="Akurasi Inventori"
-            title="Stock Opname berkala & pencatatan barang rusak"
-            desc="Audit stok fisik tanpa perlu menghentikan penjualan toko. Rekonsiliasi selisih hitung otomatis, pisahkan barang cacat atau kadaluwarsa ke gudang scrap."
+            title="Stok Opname berkala & pencatatan barang rusak"
+            desc="Audit stok fisik tanpa perlu menghentikan penjualan toko. Rekonsiliasi selisih hitung otomatis, pisahkan barang cacat atau kadaluwarsa ke gudang barang rusak."
             bullets={[
               "Pencatatan opname fisik cepat per kategori atau per lorong rak",
               "Penyesuaian selisih otomatis tercatat di buku besar mutasi",
-              "Pencatatan afkir/scrap agar stok yang rusak tidak ikut terjual",
+              "Pencatatan barang rusak agar stok yang rusak tidak ikut terjual",
             ]}
             visual={
               <div className="rounded-xl border border-border bg-card p-5 shadow-card">
@@ -446,7 +446,7 @@ function FeaturesSection() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <ClipboardCheck className="h-4 w-4" />
                   </div>
-                  <span className="text-xs font-semibold text-foreground">Audit Stock Opname</span>
+                  <span className="text-xs font-semibold text-foreground">Audit Stok Opname</span>
                 </div>
                 <div className="mt-4 space-y-2">
                   <div className="rounded-md bg-background px-3 py-2">
@@ -466,7 +466,7 @@ function FeaturesSection() {
                 </div>
                 <div className="mt-3 flex items-center gap-2 rounded-md bg-success/5 px-3 py-2">
                   <Check className="h-3.5 w-3.5 text-success" />
-                  <span className="text-[11px] text-muted-foreground">Selisih 2 botol dialihkan ke catatan scrap rusak</span>
+                  <span className="text-[11px] text-muted-foreground">Selisih 2 botol dialihkan ke catatan barang rusak</span>
                 </div>
               </div>
             }
@@ -474,7 +474,7 @@ function FeaturesSection() {
 
           <FeatureRow
             eyebrowLabel="Jualan di Marketplace"
-            title="Sinkronisasi stok dengan toko online"
+            title="Sinkronisasi stok dengan toko daring"
             desc="Cegah overselling saat produk laku bersamaan di toko fisik dan marketplace. Saldo stok selalu termutakhirkan secara konsisten."
             bullets={[
               "Mendukung alokasi stok untuk Tokopedia, Shopee, TikTok, dan Lazada",
@@ -521,7 +521,7 @@ function HowItWorks() {
     {
       n: "02",
       title: "Jalankan kasir POS & mutasi barang",
-      desc: "Mulai transaksi belanja di toko fisik dengan scanner barcode dan terbitkan Surat Jalan resmi saat mengirim barang.",
+      desc: "Mulai transaksi belanja di toko fisik dengan pemindai barcode dan terbitkan Surat Jalan resmi saat mengirim barang.",
     },
     {
       n: "03",
@@ -558,17 +558,17 @@ function OperationalScenarios() {
   const items = [
     {
       title: "Toko Ritel & Grosir Fisik",
-      desc: "Kasir melayani transaksi cepat dengan barcode scanner, menerima pembayaran tunai atau QRIS, mencetak nota belanja thermal, dan memotong stok toko secara langsung.",
+      desc: "Kasir melayani transaksi cepat dengan pemindai barcode, menerima pembayaran tunai atau QRIS, mencetak nota belanja thermal, dan memotong stok toko secara langsung.",
       role: "Fokus: Kecepatan kasir & akurasi kas",
     },
     {
       title: "Gudang & Distribusi Barang",
-      desc: "Menerima barang masuk dari pemasok, memisahkan barang rusak ke lokasi scrap, transfer antar cabang, dan menerbitkan Surat Jalan (DO) resmi pengiriman.",
+      desc: "Menerima barang masuk dari pemasok, memisahkan barang rusak ke lokasi barang rusak, transfer antar cabang, dan menerbitkan Surat Jalan resmi pengiriman.",
       role: "Fokus: Kontrol fisik & dokumen jalan",
     },
     {
       title: "Penjualan Toko & Marketplace",
-      desc: "Mengimpor pesanan penjualan multi-platform, memetakan SKU marketplace ke barang internal, dan audit fisik berkala lewat modul Stock Opname.",
+      desc: "Mengimpor pesanan penjualan multi-platform, memetakan SKU marketplace ke barang internal, dan audit fisik berkala lewat modul Stok Opname.",
       role: "Fokus: Pencegahan selisih rak & stok minus",
     },
   ]
@@ -600,20 +600,20 @@ function OperationalScenarios() {
 function Faq() {
   const items = [
     {
-      q: "Apakah kasir POS bisa digunakan dengan alat barcode scanner?",
-      a: "Bisa. Anda dapat menggunakan kamera bawaan perangkat atau alat barcode scanner laser eksternal (USB/Bluetooth) tipe plug-and-play tanpa driver tambahan.",
+      q: "Apakah kasir POS bisa digunakan dengan alat pemindai barcode?",
+      a: "Bisa. Anda dapat menggunakan kamera bawaan perangkat atau alat pemindai barcode laser eksternal (USB/Bluetooth) tipe plug-and-play tanpa driver tambahan.",
     },
     {
       q: "Format printer apa yang didukung untuk cetak struk kasir?",
       a: "Kasir POS mendukung pencetakan ke printer thermal ukuran standar 58mm dan 80mm secara langsung dari browser.",
     },
     {
-      q: "Apakah Surat Jalan (DO) bisa langsung dicetak?",
+      q: "Apakah Surat Jalan bisa langsung dicetak?",
       a: "Ya. Setiap Surat Jalan yang diterbitkan sudah memiliki layout cetak standar bisnis Indonesia lengkap dengan kolom nomor polisi kendaraan, nama sopir, dan tanda terima barang.",
     },
     {
       q: "Bagaimana cara kerja transfer stok antar gudang?",
-      a: "Transfer stok memiliki alur jelas: pengajuan (Draft), persetujuan staf, barang dalam perjalanan (In Transit), hingga diterima dan diverifikasi oleh gudang tujuan.",
+      a: "Transfer stok memiliki alur jelas: pengajuan (Draf), persetujuan staf, barang dalam perjalanan (Dalam Pengiriman), hingga diterima dan diverifikasi oleh gudang tujuan.",
     },
     {
       q: "Bisa dicoba tanpa kartu kredit?",
@@ -710,7 +710,7 @@ function Footer() {
       title: "Aplikasi",
       links: [
         { label: "Kasir POS", href: "/login" },
-        { label: "Gudang (WMS)", href: "/login" },
+        { label: "Gudang", href: "/login" },
         { label: "Surat Jalan", href: "/login" },
       ],
     },
@@ -725,7 +725,7 @@ function Footer() {
               <span className="text-lg font-semibold tracking-tight text-foreground">Tayooli</span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              Sistem manajemen operasional ritel, multi-gudang (WMS), dan kasir POS untuk bisnis Indonesia.
+              Sistem manajemen operasional ritel, multi-gudang, dan kasir POS untuk bisnis Indonesia.
             </p>
           </div>
           {cols.map((col) => (
@@ -790,14 +790,14 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-medium text-primary">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-              Sistem Operasional Toko Ritel &amp; Pergudangan WMS
+              Sistem Operasional Toko Ritel &amp; Pergudangan
             </span>
             <h1 className="mt-5 text-4xl font-bold leading-[1.1] tracking-tight text-foreground sm:text-5xl lg:text-5xl xl:text-[3.4rem]">
               Stok gudang rapi, kasir cepat, pengiriman terkontrol.
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Tayooli menyatukan transaksi kasir toko fisik (POS), manajemen stok multi-gudang,
-              surat jalan (DO), dan sinkronisasi marketplace dalam satu alur kerja yang mudah digunakan.
+              Tayooli menyatukan transaksi Kasir (POS) toko fisik, manajemen stok multi-gudang,
+              Surat Jalan, dan sinkronisasi marketplace dalam satu alur kerja yang mudah digunakan.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link href="/login" className={ctaPrimary}>

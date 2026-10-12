@@ -62,11 +62,12 @@ export function AutonomySettingsModal() {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-foreground">Pengaturan & Wewenang AI</h3>
-              <p className="text-[11px] text-muted-foreground">Governance izin & batas kendali otonom Copilot</p>
+              <p className="text-[11px] text-muted-foreground">Tata kelola izin & batas kendali otonom Copilot</p>
             </div>
           </div>
           <button
             onClick={closeSettings}
+            aria-label="Tutup"
             className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <X className="h-4 w-4" />
@@ -93,7 +94,7 @@ export function AutonomySettingsModal() {
                   <div className="flex items-start gap-2.5">
                     <ShieldAlert className={cn("h-4 w-4 mt-0.5", emergencyStop ? "text-rose-600" : "text-muted-foreground")} />
                     <div>
-                      <div className="font-semibold text-foreground">Emergency Kill-Switch</div>
+                      <div className="font-semibold text-foreground">Sakelar Pemutus Darurat</div>
                       <div className="text-[11px] text-muted-foreground">
                         Matikan seketika seluruh akses eksekusi AI di seluruh tenant
                       </div>
@@ -120,12 +121,12 @@ export function AutonomySettingsModal() {
                   {[
                     {
                       id: "advisory",
-                      title: "Level 1: Advisory (Read-Only)",
+                      title: "Level 1: Penasihat",
                       desc: "Hanya baca data, menjawab pertanyaan. Dilarang melakukan mutasi.",
                     },
                     {
                       id: "assisted",
-                      title: "Level 2: Assisted (Rekomendasi)",
+                      title: "Level 2: Terpandu",
                       desc: "AI menyusun saran tindakan, eksekusi tetap memerlukan konfirmasi Anda.",
                     },
                     {
@@ -165,7 +166,7 @@ export function AutonomySettingsModal() {
                 <label className="block font-semibold text-foreground mb-2">Cakupan Izin Operasional</label>
                 <div className="space-y-1.5">
                   {[
-                    { id: "workspace.read", label: "Membaca data dan ringkasan workspace" },
+                    { id: "workspace.read", label: "Membaca data dan ringkasan ruang kerja" },
                     { id: "workspace.profile_write", label: "Mengubah identitas & profil perusahaan" },
                     { id: "workspace.team_write", label: "Mengundang dan mengelola tim" },
                     { id: "workspace.master_write", label: "Menyimpan draf produk dan data operasional" },

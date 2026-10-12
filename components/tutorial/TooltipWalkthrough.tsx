@@ -12,18 +12,18 @@ interface TooltipStep {
 const STEPS: TooltipStep[] = [
   {
     target: '[data-tutorial="dashboard-header"]',
-    title: 'Dashboard Operasional',
+    title: 'Dasbor Operasional',
     description: 'Ringkasan performa omzet kasir POS harian dan saldo fisik stok gudang.',
   },
   {
     target: '[data-tutorial="pos-button"]',
     title: 'Kasir POS',
-    description: 'Buka mesin kasir untuk transaksi langsung, scan barcode, dan cetak struk belanja.',
+    description: 'Buka mesin kasir untuk transaksi langsung, pindai barcode, dan cetak struk belanja.',
   },
   {
     target: '[data-tutorial="sidebar"]',
     title: 'Menu Navigasi',
-    description: 'Kelola master produk, stok multi-gudang, surat jalan, transfer, hingga opname.',
+    description: 'Kelola master produk, stok multi-gudang, surat jalan, transfer stok, hingga stok opname.',
   },
   {
     target: '[data-tutorial="help-support"]',
@@ -109,7 +109,7 @@ export function TooltipWalkthrough() {
   return (
     <>
       {/* Overlay with spotlight cutout */}
-      <div className="fixed inset-0 z-50" aria-label="Tutorial overlay">
+      <div className="fixed inset-0 z-50" aria-label="Lapisan tutorial">
         {/* Dark background — use SVG for spotlight cutout */}
         <svg className="absolute inset-0 w-full h-full" aria-hidden="true">
           <defs>
@@ -148,13 +148,13 @@ export function TooltipWalkthrough() {
           transform: 'translate(-50%, -50%)',
         }}
         role="dialog"
-        aria-label={`Tutorial step ${currentStep + 1}`}
+        aria-label={`Langkah tutorial ${currentStep + 1}`}
       >
         {/* Close button */}
         <button
           onClick={handleSkip}
           className="absolute top-2 right-2 p-1 rounded-md hover:bg-background/20 transition-colors"
-          aria-label="Skip tutorial"
+          aria-label="Lewati tutorial"
         >
           <X className="h-4 w-4" />
         </button>
@@ -183,13 +183,13 @@ export function TooltipWalkthrough() {
               onClick={handleSkip}
               className="text-xs text-background/60 hover:text-background transition-colors"
             >
-              Skip
+              Lewati
             </button>
             <button
               onClick={handleNext}
               className="text-xs font-medium bg-primary text-primary-foreground px-3 py-1 rounded-md hover:bg-primary/90 transition-colors"
             >
-              {currentStep < STEPS.length - 1 ? 'Lanjut' : 'Selesai'}
+              {currentStep < STEPS.length - 1 ? 'Berikutnya' : 'Selesai'}
             </button>
           </div>
         </div>

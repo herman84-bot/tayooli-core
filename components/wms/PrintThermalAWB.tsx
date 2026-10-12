@@ -7,10 +7,20 @@ import React from "react"
 import { Printer, X, Truck, Package, QrCode } from "lucide-react"
 import { DeliveryOrder, DeliveryOrderItem } from "@/lib/api"
 
-interface PrintThermalAWBProps {
+export interface PrintThermalAWBProps {
   order: DeliveryOrder
   items: DeliveryOrderItem[]
   onClose: () => void
+}
+
+const THERMAL_ORDER_TYPE_LABELS: Record<string, string> = {
+  DIRECT_DO: "SURAT JALAN LANGSUNG",
+  REGULAR: "REGULER",
+  STANDARD: "STANDAR",
+  EXPRESS: "EKSPRES",
+  SAME_DAY: "HARI SAMA",
+  INSTANT: "INSTAN",
+  CARGO: "KARGO",
 }
 
 export function PrintThermalAWB({ order, items, onClose }: PrintThermalAWBProps) {
@@ -28,7 +38,7 @@ export function PrintThermalAWB({ order, items, onClose }: PrintThermalAWBProps)
         <div className="flex items-center justify-between border-b pb-4 mb-4 print:hidden">
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-indigo-600" />
-            <h2 className="text-base font-bold text-zinc-800">Label Thermal AWB (100x150 mm)</h2>
+            <h2 className="text-base font-bold text-zinc-800">Label Termal AWB (100x150 mm)</h2>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -36,7 +46,7 @@ export function PrintThermalAWB({ order, items, onClose }: PrintThermalAWBProps)
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium text-xs transition shadow-sm"
             >
               <Printer className="w-4 h-4" />
-              Cetak Thermal
+              Cetak Termal
             </button>
             <button
               onClick={onClose}
@@ -63,7 +73,7 @@ export function PrintThermalAWB({ order, items, onClose }: PrintThermalAWBProps)
               </div>
               <div className="text-right">
                 <span className="inline-block px-2 py-0.5 border-2 border-zinc-900 font-black text-xs uppercase">
-                  {order.order_type || "REGULER"}
+                  {order.order_type ? (THERMAL_ORDER_TYPE_LABELS[order.order_type] || order.order_type) : "REGULER"}
                 </span>
               </div>
             </div>
@@ -90,7 +100,7 @@ export function PrintThermalAWB({ order, items, onClose }: PrintThermalAWBProps)
               <p className="font-mono font-black text-sm tracking-widest text-zinc-900">
                 {order.tracking_number || order.do_number}
               </p>
-              <p className="font-mono text-[10px] text-zinc-600">No. DO: {order.do_number}</p>
+              <p className="font-mono text-[10px] text-zinc-600">No. Surat Jalan: {order.do_number}</p>
             </div>
 
             {/* Destination / Recipient (Big & Clear) */}

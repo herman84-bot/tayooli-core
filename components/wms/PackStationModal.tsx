@@ -191,7 +191,7 @@ export function PackStationModal({
             </div>
             <div>
               <h2 className="text-xl font-bold text-zinc-900 flex items-center gap-2">
-                Stasiun Meja Kemas (Pack Station)
+                Stasiun Meja Kemas
                 <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-mono">
                   {order.do_number}
                 </span>
@@ -267,7 +267,7 @@ export function PackStationModal({
                 type="text"
                 value={barcodeInput}
                 onChange={(e) => setBarcodeInput(e.target.value)}
-                placeholder="Arahkan scanner ke barcode atau ketik SKU/Batch..."
+                placeholder="Arahkan pemindai ke barcode atau ketik SKU/Batch..."
                 className="w-full pl-11 pr-4 py-3 rounded-xl border-2 border-indigo-300 focus:border-indigo-600 focus:outline-none font-mono text-sm bg-white"
                 autoFocus
               />
@@ -468,7 +468,7 @@ export function PackStationModal({
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  Selesaikan Pengemasan (PACKED)
+                  Selesaikan Pengemasan
                 </>
               )}
             </button>

@@ -76,7 +76,7 @@ describe("ApprovalsPage", () => {
     mockUseApprovals.mockReturnValue({ data: undefined, isLoading: true })
     render(<ApprovalsPage />)
 
-    expect(screen.getByText("Loading...")).toBeInTheDocument()
+    expect(screen.getByText("Memuat...")).toBeInTheDocument()
   })
 
   it("opens the drawer with details when a row is clicked", () => {

@@ -264,10 +264,10 @@ function ReceiptList({ onNew, onOpen }: { onNew: () => void; onOpen: (id: string
           { header: "Dari", value: (r) => r.supplier_name || r.from_warehouse_name || r.from_name || "", width: 24 },
           { header: "Gudang Tujuan", value: (r) => whName(r.warehouse_id), width: 22 },
           { header: "Jumlah Item", value: (r) => r.item_count, width: 12, align: "right" },
-          { header: "Qty Diterima", value: (r) => num(r.total_accepted_qty), width: 14, align: "right" },
-          { header: "Qty Ditolak", value: (r) => num(r.total_rejected_qty), width: 14, align: "right" },
+          { header: "Jml Diterima", value: (r) => num(r.total_accepted_qty), width: 14, align: "right" },
+          { header: "Jml Ditolak", value: (r) => num(r.total_rejected_qty), width: 14, align: "right" },
           { header: "Status", value: (r) => STATUS_LABEL[r.status]?.text ?? r.status, width: 18 },
-          { header: "Ref", value: (r) => r.supplier_ref || r.source_ref || "", width: 18 },
+          { header: "Referensi", value: (r) => r.supplier_ref || r.source_ref || "", width: 18 },
           { header: "Catatan", value: (r) => r.notes ?? "", width: 30 },
         ]}
         filters={[
@@ -728,7 +728,7 @@ function ReceiptForm({
               {internalLocations.map((l) => <option key={l.id} value={l.id}>{l.code} — {l.name}</option>)}
             </select>
             {form.warehouse_id && internalLocations.length === 0 && (
-              <p className="mt-1 text-xs text-amber-700">Gudang ini belum memiliki rak simpan internal. Buat di menu Warehouse &amp; Stock.</p>
+              <p className="mt-1 text-xs text-amber-700">Gudang ini belum memiliki rak simpan internal. Buat di menu Gudang &amp; Stok.</p>
             )}
           </div>
         </div>
@@ -739,17 +739,17 @@ function ReceiptForm({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold text-foreground">2. Barang yang Diterima</h2>
-            <p className="text-xs text-muted-foreground">Scan barcode fisik barang atau cari nama produk/SKU di bawah.</p>
+            <p className="text-xs text-muted-foreground">Pindai Barcode fisik barang atau cari nama produk/SKU di bawah.</p>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-foreground">
-            <ScanLine className="h-3.5 w-3.5 text-primary" /> Scanner Barcode Siap
+            <ScanLine className="h-3.5 w-3.5 text-primary" /> Pemindai Barcode Siap
           </span>
         </div>
 
         <div className="relative">
           <input
             className={inputClass}
-            placeholder="Ketik nama produk atau scan barcode SKU..."
+            placeholder="Ketik nama produk atau pindai Barcode SKU..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Cari produk"
@@ -775,7 +775,7 @@ function ReceiptForm({
 
         {form.lines.length === 0 ? (
           <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-            Belum ada barang dalam daftar penerimaan. Scan barcode atau cari produk di atas.
+            Belum ada barang dalam daftar penerimaan. Pindai Barcode atau cari produk di atas.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -848,7 +848,7 @@ function ReceiptForm({
         )}
         <div className="flex items-center gap-2 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
           <Layers className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span>Barang baik langsung masuk ke rak simpan. Barang rusak otomatis dipisahkan ke lokasi Scrap (@SCRAP) dan tidak dijual di kasir POS.</span>
+          <span>Barang baik langsung masuk ke rak simpan. Barang rusak otomatis dipisahkan ke lokasi Barang Rusak (@SCRAP) dan tidak dijual di kasir POS.</span>
         </div>
       </section>
 
@@ -1019,7 +1019,7 @@ function ReceiptDetail({
 
       {r.status === "DRAFT" && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
-          Status masih Draf. Stok belum masuk ke buku besar (ledger). Silakan periksa barang, lalu tekan <strong>Konfirmasi Masuk Stok</strong>.
+          Status masih Draf. Stok belum masuk ke buku besar. Silakan periksa barang, lalu tekan <strong>Konfirmasi Masuk Stok</strong>.
         </p>
       )}
       {r.status === "POSTED" && (
@@ -1081,7 +1081,7 @@ function ReceiptDetail({
         <Dialog title="Konfirmasi penerimaan?" onClose={() => setConfirming(false)}>
           <p className="text-sm text-muted-foreground">
             {fmtQty(r.total_accepted_qty)} barang baik akan ditambahkan ke stok {wh?.name ?? "gudang"}
-            {num(r.total_rejected_qty) > 0 ? `, dan ${fmtQty(r.total_rejected_qty)} barang rusak dicatat ke Scrap` : ""}.
+            {num(r.total_rejected_qty) > 0 ? `, dan ${fmtQty(r.total_rejected_qty)} barang rusak dicatat ke Barang Rusak` : ""}.
             Setelah dikonfirmasi, isi penerimaan tidak bisa diubah lagi.
           </p>
           <div className="mt-5 flex justify-end gap-2">
@@ -1102,7 +1102,7 @@ function ReceiptDetail({
         <Dialog title="Batalkan Penerimaan?" onClose={() => setCancelOpen(false)}>
           <p className="text-sm text-muted-foreground">
             {r.status === "POSTED"
-              ? "Stok yang telah masuk akan dibalikkan kembali (reverse movement). Pembatalan otomatis ditolak jika barang telah terjual di kasir POS atau dipindahkan ke tempat lain."
+              ? "Stok yang telah masuk akan dibalikkan kembali. Pembatalan otomatis ditolak jika barang telah terjual di kasir POS atau dipindahkan ke tempat lain."
               : "Draf penerimaan ini akan ditandai dibatalkan dan tidak dapat digunakan lagi."}
           </p>
           <label htmlFor="cancel-reason" className="mb-1 mt-4 block text-sm font-medium">Alasan Pembatalan</label>

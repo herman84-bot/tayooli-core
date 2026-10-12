@@ -131,20 +131,20 @@ describe('Task 7: Barcode Scanner Pallet LPN Putaway Mode', () => {
     jest.clearAllMocks()
   })
 
-  it('renders mode switch button for Palet (LPN Putaway)', () => {
+  it('renders mode switch button for Penataan Palet LPN', () => {
     render(<BarcodeScannerPage />)
 
-    const palletTabBtn = screen.getByRole('button', { name: /Palet \(LPN Putaway\)/i })
+    const palletTabBtn = screen.getByRole('button', { name: /Penataan Palet LPN/i })
     expect(palletTabBtn).toBeInTheDocument()
   })
 
   it('switches to PALLET_LPN mode and renders step indicators', () => {
     render(<BarcodeScannerPage />)
 
-    const palletTabBtn = screen.getByRole('button', { name: /Palet \(LPN Putaway\)/i })
+    const palletTabBtn = screen.getByRole('button', { name: /Penataan Palet LPN/i })
     fireEvent.click(palletTabBtn)
 
-    expect(screen.getByText(/Putaway Palet LPN:/i)).toBeInTheDocument()
+    expect(screen.getByText(/Penataan Palet LPN:/i)).toBeInTheDocument()
     expect(screen.getByText(/Langkah 1: Scan Barcode Palet LPN/i)).toBeInTheDocument()
     expect(screen.getByText(/Langkah 2: Scan Barcode Rak Lokasi Tujuan/i)).toBeInTheDocument()
     expect(screen.getByText('Belum Terpilih')).toBeInTheDocument()
@@ -153,7 +153,7 @@ describe('Task 7: Barcode Scanner Pallet LPN Putaway Mode', () => {
   it('Step 1: displays error if scanned code is not a valid LPN barcode', () => {
     render(<BarcodeScannerPage />)
 
-    const palletTabBtn = screen.getByRole('button', { name: /Palet \(LPN Putaway\)/i })
+    const palletTabBtn = screen.getByRole('button', { name: /Penataan Palet LPN/i })
     fireEvent.click(palletTabBtn)
 
     const input = screen.getByPlaceholderText(/Ketik barcode \/ SKU lalu Enter/i)
@@ -168,7 +168,7 @@ describe('Task 7: Barcode Scanner Pallet LPN Putaway Mode', () => {
   it('Step 1: scanning pallet LPN matches LPN, displays pallet badge and line items list', () => {
     render(<BarcodeScannerPage />)
 
-    const palletTabBtn = screen.getByRole('button', { name: /Palet \(LPN Putaway\)/i })
+    const palletTabBtn = screen.getByRole('button', { name: /Penataan Palet LPN/i })
     fireEvent.click(palletTabBtn)
 
     const input = screen.getByPlaceholderText(/Ketik barcode \/ SKU lalu Enter/i)
@@ -186,7 +186,7 @@ describe('Task 7: Barcode Scanner Pallet LPN Putaway Mode', () => {
 
     // Pallet Info Badge
     expect(screen.getByText('Informasi Palet Terpilih')).toBeInTheDocument()
-    expect(screen.getByText('WOODEN')).toBeInTheDocument()
+    expect(screen.getByText('Kayu')).toBeInTheDocument()
     expect(screen.getByText('STAGING-IN-01')).toBeInTheDocument()
     expect(screen.getByText('350 kg')).toBeInTheDocument()
 
@@ -205,7 +205,7 @@ describe('Task 7: Barcode Scanner Pallet LPN Putaway Mode', () => {
   it('allows operator to click "Ganti Palet" to reset selected pallet', () => {
     render(<BarcodeScannerPage />)
 
-    const palletTabBtn = screen.getByRole('button', { name: /Palet \(LPN Putaway\)/i })
+    const palletTabBtn = screen.getByRole('button', { name: /Penataan Palet LPN/i })
     fireEvent.click(palletTabBtn)
 
     // Step 1: Scan pallet
@@ -227,7 +227,7 @@ describe('Task 7: Barcode Scanner Pallet LPN Putaway Mode', () => {
   it('Step 2: scanning invalid rack location plays error tone and shows error message', () => {
     render(<BarcodeScannerPage />)
 
-    const palletTabBtn = screen.getByRole('button', { name: /Palet \(LPN Putaway\)/i })
+    const palletTabBtn = screen.getByRole('button', { name: /Penataan Palet LPN/i })
     fireEvent.click(palletTabBtn)
 
     // Step 1: Scan pallet
@@ -255,7 +255,7 @@ describe('Task 7: Barcode Scanner Pallet LPN Putaway Mode', () => {
 
     render(<BarcodeScannerPage />)
 
-    const palletTabBtn = screen.getByRole('button', { name: /Palet \(LPN Putaway\)/i })
+    const palletTabBtn = screen.getByRole('button', { name: /Penataan Palet LPN/i })
     fireEvent.click(palletTabBtn)
 
     // Step 1: Scan Pallet LPN
@@ -295,7 +295,7 @@ describe('Task 7: Barcode Scanner Pallet LPN Putaway Mode', () => {
 
     render(<BarcodeScannerPage />)
 
-    const palletTabBtn = screen.getByRole('button', { name: /Palet \(LPN Putaway\)/i })
+    const palletTabBtn = screen.getByRole('button', { name: /Penataan Palet LPN/i })
     fireEvent.click(palletTabBtn)
 
     // Step 1: Scan Pallet LPN

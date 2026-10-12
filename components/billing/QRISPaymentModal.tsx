@@ -56,7 +56,7 @@ export default function QRISPaymentModal({ plan, amount, onClose }: QRISPaymentM
           setQrImage(qrDataUrl)
         } catch { setPaymentURL(qrisString) }
       }
-    } catch { setError('Gagal generate QRIS.') }
+    } catch { setError('Gagal membuat kode QRIS.') }
     finally { setIsLoading(false) }
   }
 
@@ -81,7 +81,7 @@ export default function QRISPaymentModal({ plan, amount, onClose }: QRISPaymentM
       ctx.fillText(formatCurrency(totalPayment || amount), canvas.width / 2, qrSize + pad + 80)
       ctx.font = '16px sans-serif'
       ctx.fillStyle = '#666666'
-      ctx.fillText('Scan QR ini menggunakan Dana, GoPay, OVO, ShopeePay, atau LinkAja', canvas.width / 2, qrSize + pad + 110)
+      ctx.fillText('Pindai QR ini menggunakan Dana, GoPay, OVO, ShopeePay, atau LinkAja', canvas.width / 2, qrSize + pad + 110)
       const link = document.createElement('a')
       link.download = 'QRIS-' + (PLAN_LABELS[plan] || plan) + '-' + (orderCode || 'payment') + '.png'
       link.href = canvas.toDataURL('image/png')
@@ -97,7 +97,7 @@ export default function QRISPaymentModal({ plan, amount, onClose }: QRISPaymentM
       <div className='bg-card rounded-xl border border-border shadow-xl w-[400px] max-w-[90vw]'>
         <div className='flex items-center justify-between px-5 py-4 border-b border-border'>
           <h3 className='text-base font-semibold text-foreground'>Pembayaran {PLAN_LABELS[plan] || plan}</h3>
-          <button onClick={onClose} className='p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors' aria-label='Close'><X className='h-4 w-4' /></button>
+          <button onClick={onClose} className='p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors' aria-label='Tutup'><X className='h-4 w-4' /></button>
         </div>
         <div className='px-5 py-6'>
           {isLoading ? (
@@ -106,11 +106,11 @@ export default function QRISPaymentModal({ plan, amount, onClose }: QRISPaymentM
             <div className='flex flex-col items-center'>
               <div className='text-center mb-4'><p className='text-2xl font-bold text-foreground'>{formatCurrency(totalPayment || amount)}</p><p className='text-xs text-muted-foreground mt-1'>Paket {PLAN_LABELS[plan]} / bulan</p></div>
               <div className='bg-white p-4 rounded-lg border border-border mb-4 relative group'>
-                {qrImage ? (<><img src={qrImage} alt='QRIS Code' className='w-52 h-52' /><button onClick={downloadQR} className='absolute top-2 right-2 p-1.5 rounded-md bg-white/90 border border-border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-zinc-50' aria-label='Download QRIS' title='Download QRIS'><Download className='h-4 w-4 text-muted-foreground' /></button></>) : paymentURL ? (<a href={paymentURL} target='_blank' rel='noopener noreferrer' className='block text-center'><div className='w-52 h-52 bg-zinc-100 rounded-lg flex items-center justify-center'><span className='text-sm text-primary font-medium'>Buka halaman pembayaran</span></div></a>) : null}
+                {qrImage ? (<><img src={qrImage} alt='Kode QRIS' className='w-52 h-52' /><button onClick={downloadQR} className='absolute top-2 right-2 p-1.5 rounded-md bg-white/90 border border-border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-zinc-50' aria-label='Unduh QRIS' title='Unduh QRIS'><Download className='h-4 w-4 text-muted-foreground' /></button></>) : paymentURL ? (<a href={paymentURL} target='_blank' rel='noopener noreferrer' className='block text-center'><div className='w-52 h-52 bg-zinc-100 rounded-lg flex items-center justify-center'><span className='text-sm text-primary font-medium'>Buka halaman pembayaran</span></div></a>) : null}
               </div>
-              {qrImage && (<button onClick={downloadQR} className='mb-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/5 hover:bg-primary/10 rounded-md transition-colors'><Download className='h-3.5 w-3.5' /> Download QRIS</button>)}
+              {qrImage && (<button onClick={downloadQR} className='mb-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/5 hover:bg-primary/10 rounded-md transition-colors'><Download className='h-3.5 w-3.5' /> Unduh QRIS</button>)}
               <div className='text-center space-y-1.5'>
-                <p className='text-xs text-muted-foreground'>Buka aplikasi dompet digital, lalu scan QR di atas:</p>
+                <p className='text-xs text-muted-foreground'>Buka aplikasi dompet digital, lalu pindai QR di atas:</p>
                 <p className='text-xs font-medium text-foreground'>Dana - GoPay - OVO - ShopeePay - LinkAja</p>
                 <p className='text-[11px] text-muted-foreground'>Nominal {formatCurrency(totalPayment || amount)} sudah otomatis terisi</p>
               </div>
@@ -121,7 +121,7 @@ export default function QRISPaymentModal({ plan, amount, onClose }: QRISPaymentM
             <div className='text-center py-6'><p className='text-sm text-muted-foreground mb-4'>{error || 'Gagal memuat QRIS'}</p><button onClick={createPayment} className='px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors'>Coba Lagi</button></div>
           )}
         </div>
-        <div className='px-5 py-3 border-t border-border'><p className='text-[10px] text-muted-foreground text-center'>Pembayaran diproses oleh Pakasir. Setelah bayar, subscription akan aktif otomatis.</p></div>
+        <div className='px-5 py-3 border-t border-border'><p className='text-[10px] text-muted-foreground text-center'>Pembayaran diproses oleh Pakasir. Setelah bayar, langganan akan aktif otomatis.</p></div>
       </div>
     </div>
   )

@@ -67,6 +67,11 @@ const QC_BADGE: Record<QCBadgeStatus, { text: string; cls: string }> = {
   QC_REJECTED: { text: "Ditolak", cls: "bg-rose-50 text-rose-700 border-rose-200" },
 }
 
+const INSPECTION_MODE_LABELS: Record<string, string> = {
+  FULL: "Penuh (100%)",
+  SAMPLING: "Sampel",
+}
+
 function QCBadge({ status }: { status: QCBadgeStatus }) {
   const b = QC_BADGE[status] ?? QC_BADGE.PENDING_QC
   return <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${b.cls}`}>{b.text}</span>
@@ -186,7 +191,7 @@ function InspectionSection({ warehouseId }: { warehouseId: string }) {
                 <th className="px-4 py-3">No. Penerimaan</th>
                 <th className="px-4 py-3">Pemasok / Asal</th>
                 <th className="px-4 py-3">Tanggal</th>
-                <th className="px-4 py-3 text-right">Qty Diterima</th>
+                <th className="px-4 py-3 text-right">Jml Diterima</th>
                 <th className="px-4 py-3">Status QC</th>
                 <th className="px-4 py-3 text-center">Aksi</th>
               </tr>
@@ -200,7 +205,7 @@ function InspectionSection({ warehouseId }: { warehouseId: string }) {
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
                     <ClipboardCheck className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                    Belum ada penerimaan berstatus POSTED untuk diinspeksi.
+                    Belum ada penerimaan tercatat untuk diinspeksi.
                   </td>
                 </tr>
               ) : (
@@ -269,10 +274,10 @@ export function validateInspection(
 ): string | null {
   const gc = Number(grossCartons)
   if (grossCartons.trim() === "" || !Number.isFinite(gc) || gc < 0 || !Number.isInteger(gc))
-    return "Jumlah karton (Gross Count) wajib diisi dengan bilangan bulat ≥ 0"
+    return "Jumlah karton wajib diisi dengan bilangan bulat ≥ 0"
   if (mode === "SAMPLING") {
     const s = Number(sampleQty)
-    if (sampleQty.trim() === "" || !Number.isFinite(s) || s <= 0) return "Jumlah sampel wajib diisi (> 0) untuk mode SAMPLING"
+    if (sampleQty.trim() === "" || !Number.isFinite(s) || s <= 0) return "Jumlah sampel wajib diisi (> 0) untuk mode Sampel"
   }
   if (lines.length === 0) return "Penerimaan tidak memiliki baris dengan batch untuk diinspeksi"
   let anyDamaged = false
@@ -288,7 +293,7 @@ export function validateInspection(
       if (!st.reason.trim()) return `Alasan kerusakan untuk ${label} wajib diisi`
     }
   }
-  if (anyDamaged && mode === "SAMPLING") return "Sampel gagal: wajib ulangi dengan inspeksi FULL"
+  if (anyDamaged && mode === "SAMPLING") return "Sampel gagal: wajib ulangi dengan inspeksi penuh"
   if (anyDamaged) {
     if (!driverName.trim()) return "Nama sopir wajib diisi untuk BAK"
     if (!driverSigned) return "Sopir wajib menandatangani BAK"
@@ -342,7 +347,7 @@ function InspectionModal({
     },
     { expected: 0, checked: 0, damaged: 0, short: 0, over: 0 }
   )
-  const liveError = anyDamaged && mode === "SAMPLING" ? "Sampel gagal: wajib ulangi dengan inspeksi FULL" : null
+  const liveError = anyDamaged && mode === "SAMPLING" ? "Sampel gagal: wajib ulangi dengan inspeksi penuh" : null
 
   const handleSubmit = async () => {
     const v = validateInspection(mode, sampleQty, grossCartons, lines, driverName, driverSigned)
@@ -393,8 +398,8 @@ function InspectionModal({
             <div>
               <label htmlFor="qc-mode" className="mb-1 block text-xs font-medium text-slate-700">Mode Inspeksi</label>
               <select id="qc-mode" value={mode} onChange={(e) => setMode(e.target.value as QCInspectionMode)} className={INPUT_CLS}>
-                <option value="FULL">FULL (100%)</option>
-                <option value="SAMPLING">SAMPLING</option>
+                <option value="FULL">Penuh (100%)</option>
+                <option value="SAMPLING">Sampel</option>
               </select>
             </div>
             {mode === "SAMPLING" && (
@@ -407,7 +412,7 @@ function InspectionModal({
             )}
             <div>
               <label htmlFor="qc-gross" className="mb-1 block text-xs font-medium text-slate-700">
-                Jumlah Karton (Gross Count) <span className="text-rose-500">*</span>
+                Jumlah Karton <span className="text-rose-500">*</span>
               </label>
               <input id="qc-gross" type="number" min={0} step={1} value={grossCartons} onChange={(e) => setGrossCartons(e.target.value)} className={INPUT_CLS} />
             </div>
@@ -565,7 +570,7 @@ function ResultModal({ receiptId, onClose }: { receiptId: string; onClose: () =>
         <div className="space-y-4 text-sm">
           <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs sm:grid-cols-3">
             <div>Status: <QCBadge status={insp.status} /></div>
-            <div>Mode: <b>{insp.inspection_mode}</b>{insp.sample_qty ? ` (sampel ${fmtQty(insp.sample_qty)})` : ""}</div>
+            <div>Mode: <b>{INSPECTION_MODE_LABELS[insp.inspection_mode] ?? insp.inspection_mode}</b>{insp.sample_qty ? ` (sampel ${fmtQty(insp.sample_qty)})` : ""}</div>
             <div>Karton: <b>{insp.gross_cartons}</b></div>
             <div>Petugas: <b>{insp.inspector_name}</b></div>
             <div>Dihitung: <b>{fmtQty(insp.total_checked_qty)}</b> · Lolos: <b>{fmtQty(insp.total_passed_qty)}</b></div>
@@ -577,7 +582,7 @@ function ResultModal({ receiptId, onClose }: { receiptId: string; onClose: () =>
               <thead className="bg-slate-50 font-semibold uppercase text-slate-600">
                 <tr>
                   <th className="px-3 py-2">Produk / Batch</th>
-                  <th className="px-3 py-2 text-right">Staging</th>
+                  <th className="px-3 py-2 text-right">Area Transit</th>
                   <th className="px-3 py-2 text-right">Dihitung</th>
                   <th className="px-3 py-2 text-right">Lolos</th>
                   <th className="px-3 py-2 text-right">Rusak</th>
@@ -646,7 +651,7 @@ function QuarantineSection({ warehouseId }: { warehouseId: string }) {
                 <th className="px-4 py-3">Batch</th>
                 <th className="px-4 py-3">Kedaluwarsa</th>
                 <th className="px-4 py-3">Rak</th>
-                <th className="px-4 py-3 text-right">Qty</th>
+                <th className="px-4 py-3 text-right">Jml</th>
                 <th className="px-4 py-3 text-center">Aksi</th>
               </tr>
             </thead>
@@ -675,7 +680,7 @@ function QuarantineSection({ warehouseId }: { warehouseId: string }) {
                       <div className="flex flex-wrap justify-center gap-2">
                         <button type="button" onClick={() => setAction({ kind: "release", line: l })} className={BTN_SECONDARY}>
                           <Undo2 className="h-3.5 w-3.5" />
-                          Rilis ke Staging
+                          Rilis ke Area Transit
                         </button>
                         <button
                           type="button"
@@ -683,7 +688,7 @@ function QuarantineSection({ warehouseId }: { warehouseId: string }) {
                           className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-rose-600 px-4 text-xs font-medium text-white hover:bg-rose-500"
                         >
                           <PackageX className="h-3.5 w-3.5" />
-                          Musnahkan (Scrap)
+                          Musnahkan
                         </button>
                       </div>
                     </td>
@@ -735,7 +740,7 @@ function QuarantineActionModal({
     const q = Number(qty)
     if (qty.trim() === "" || !Number.isFinite(q) || q <= 0) return setErrorText("Jumlah harus lebih besar dari 0")
     if (q > max) return setErrorText(`Jumlah tidak boleh melebihi stok karantina (${fmtQty(max)})`)
-    if (isScrap && !notes.trim()) return setErrorText("Catatan wajib diisi untuk pemusnahan (scrap)")
+    if (isScrap && !notes.trim()) return setErrorText("Catatan wajib diisi untuk pemusnahan barang rusak")
     setErrorText(null)
     const input = {
       warehouse_id: warehouseId,
@@ -750,7 +755,7 @@ function QuarantineActionModal({
         onDone(`${fmtQty(q)} unit batch ${line.batch_number} dimusnahkan`)
       } else {
         await release.mutateAsync(input)
-        onDone(`${fmtQty(q)} unit batch ${line.batch_number} dirilis ke Staging (siap putaway)`)
+        onDone(`${fmtQty(q)} unit batch ${line.batch_number} dirilis ke Area Transit (siap penataan rak)`)
       }
     } catch (e) {
       setErrorText(errMsg(e))
@@ -758,7 +763,7 @@ function QuarantineActionModal({
   }
 
   return (
-    <Modal title={isScrap ? "Musnahkan Stok Karantina" : "Rilis Karantina ke Staging"} onClose={onClose}>
+    <Modal title={isScrap ? "Musnahkan Stok Karantina" : "Rilis Karantina ke Area Transit"} onClose={onClose}>
       {errorText && <ErrorBanner text={errorText} />}
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
         <div className="font-semibold text-slate-800">{line.product_name} ({line.product_sku})</div>
@@ -781,7 +786,7 @@ function QuarantineActionModal({
       <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
         <button type="button" onClick={onClose} className={BTN_SECONDARY}>Batal</button>
         <button type="button" onClick={handleSubmit} disabled={pending} className={BTN_PRIMARY}>
-          {pending ? "Memproses..." : isScrap ? "Konfirmasi Scrap" : "Konfirmasi Rilis"}
+          {pending ? "Memproses..." : isScrap ? "Konfirmasi Pemusnahan" : "Konfirmasi Rilis"}
         </button>
       </div>
     </Modal>

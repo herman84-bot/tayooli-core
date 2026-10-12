@@ -48,6 +48,19 @@ import type { ExportColumn } from "@/lib/export"
 // Sale Mode
 type SaleMode = "JUAL_PUTUS" | "KONSINYASI"
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = { CASH: "Tunai", QRIS: "QRIS" }
+const paymentMethodLabel = (m?: string | null) => (m ? PAYMENT_METHOD_LABELS[m.toUpperCase()] ?? m : "")
+const SALE_MODE_LABELS: Record<string, string> = { JUAL_PUTUS: "Jual Putus", KONSINYASI: "Konsinyasi" }
+const saleModeLabel = (m?: string | null) => (m ? SALE_MODE_LABELS[m] ?? m : "")
+const STATUS_LABELS: Record<string, string> = {
+  COMPLETED: "Selesai",
+  PAID: "Lunas",
+  CANCELLED: "Dibatalkan",
+  PENDING: "Menunggu",
+  OK: "Selesai",
+}
+const statusLabel = (s?: string | null) => (s ? STATUS_LABELS[s.toUpperCase()] ?? s : "")
+
 interface CartItem {
   id: string
   name: string
@@ -146,13 +159,13 @@ export default function POSPage() {
         new Date(o.created_at).toLocaleString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }),
       width: 20,
     },
-    { header: "Pelanggan", value: (o) => o.customer_name || "Walk-in", width: 22 },
-    { header: "Metode Bayar", value: (o) => o.payment_method, width: 18 },
+    { header: "Pelanggan", value: (o) => o.customer_name || "Pelanggan Umum", width: 22 },
+    { header: "Metode Bayar", value: (o) => paymentMethodLabel(o.payment_method), width: 18 },
     { header: "Subtotal (Rp)", value: (o) => Math.round(Number(o.subtotal) || 0), width: 16, align: "right" },
     { header: "Pajak (Rp)", value: (o) => Math.round(Number(o.tax_amount) || 0), width: 14, align: "right" },
     { header: "Diskon (Rp)", value: (o) => Math.round(Number(o.discount_amount) || 0), width: 14, align: "right" },
     { header: "Total (Rp)", value: (o) => Math.round(Number(o.total_amount) || 0), width: 16, align: "right" },
-    { header: "Status", value: (o) => o.status || "OK", width: 14 },
+    { header: "Status", value: (o) => statusLabel(o.status) || "Selesai", width: 14 },
   ]
   const [showReconciliationModal, setShowReconciliationModal] = useState(false)
   const [receiptWidth, setReceiptWidth] = useState<"58mm" | "80mm">("80mm")
@@ -268,7 +281,7 @@ export default function POSPage() {
       ...prev,
       {
         id,
-        name: `${customerName} (${cart.length} item)`,
+        name: `${customerName} (${cart.length} barang)`,
         time,
         items: [...cart],
       },
@@ -567,7 +580,7 @@ export default function POSPage() {
       `*STRUK PEMBAYARAN ${posStoreName.toUpperCase()}*\n` +
       `No. Transaksi: ${receiptData.orderNumber}\n` +
       `Waktu: ${receiptData.date}\n` +
-      `Metode: ${receiptData.method}\n` +
+      `Metode: ${paymentMethodLabel(receiptData.method)}\n` +
       `--------------------------------\n` +
       `${itemsList}\n` +
       `--------------------------------\n` +
@@ -600,15 +613,15 @@ export default function POSPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-extrabold tracking-tight text-slate-900">
-                  Point of Sale (POS Kasir)
+                  Kasir (POS)
                 </h1>
                 <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  ONLINE
+                  DARING
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                Mode Penjualan Kasir &amp; Integrasi Stok Real-Time
+                Mode Penjualan Kasir &amp; Integrasi Stok Waktu Nyata
               </p>
             </div>
           </div>
@@ -690,7 +703,7 @@ export default function POSPage() {
                     setScanBarInput(e.target.value)
                     setScanError(null)
                   }}
-                  placeholder="Scan barcode dengan USB Scanner Gun atau ketik SKU..."
+                  placeholder="Pindai barcode dengan pemindai USB atau ketik SKU..."
                   className="w-full pl-11 pr-4 min-h-[48px] text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-mono"
                 />
               </div>
@@ -855,7 +868,7 @@ export default function POSPage() {
                   type="text"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Nama Pelanggan / Walk-in..."
+                  placeholder="Nama Pelanggan..."
                   className="w-full pl-8 pr-2 py-1 text-xs bg-white border border-slate-200 rounded-md focus:ring-1 focus:ring-[#2563EB]"
                 />
               </div>
@@ -870,7 +883,7 @@ export default function POSPage() {
                     className="text-xs font-bold bg-amber-100 border border-amber-300 text-amber-900 rounded-md px-2 py-1 cursor-pointer"
                   >
                     <option value="" disabled>
-                      Resume ({heldCarts.length})
+                      Lanjutkan ({heldCarts.length})
                     </option>
                     {heldCarts.map((h) => (
                       <option key={h.id} value={h.id}>
@@ -890,7 +903,7 @@ export default function POSPage() {
                 <ShoppingCart className="w-12 h-12 stroke-[1.2]" />
                 <div className="text-sm font-semibold text-slate-700">Keranjang Masih Kosong</div>
                 <p className="text-xs max-w-xs">
-                  Scan barcode barang atau klik produk di katalog sebelah kiri untuk memulai transaksi kasir.
+                  Pindai barcode barang atau klik produk di katalog sebelah kiri untuk memulai transaksi kasir.
                 </p>
               </div>
             ) : (
@@ -953,7 +966,7 @@ export default function POSPage() {
                     {/* Per-item discount input */}
                     <div className="flex items-center justify-end gap-1.5 text-[11px] text-slate-500">
                       <Percent className="w-3 h-3 text-slate-400" />
-                      <span>Diskon item (Rp):</span>
+                      <span>Diskon barang (Rp):</span>
                       <input
                         type="number"
                         min="0"
@@ -1075,7 +1088,7 @@ export default function POSPage() {
                     }`}
                   >
                     <Banknote className="w-4 h-4" />
-                    <span>Uang Tunai (Cash)</span>
+                    <span>Uang Tunai</span>
                   </button>
 
                   <button
@@ -1136,7 +1149,7 @@ export default function POSPage() {
                       }`}
                     >
                       <span className="text-xs font-semibold">
-                        {cashTendered >= grandTotal ? "Kembalian (Change):" : "Uang Kurang:"}
+                        {cashTendered >= grandTotal ? "Kembalian:" : "Uang Kurang:"}
                       </span>
                       <span className="font-mono font-black text-lg">
                         Rp {Math.abs(cashTendered - grandTotal).toLocaleString("id-ID")}
@@ -1220,7 +1233,7 @@ export default function POSPage() {
                     </div>
 
                     <p className="text-xs text-slate-500">
-                      Scan dengan aplikasi BCA, Mandiri, GoPay, OVO, atau ShopeePay
+                      Pindai dengan aplikasi BCA, Mandiri, GoPay, OVO, atau ShopeePay
                     </p>
 
                     {qrisCharge && (
@@ -1237,7 +1250,7 @@ export default function POSPage() {
                       <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-left space-y-2">
                         <div className="text-[11px] font-bold text-amber-900 flex items-center gap-1.5">
                           <ShieldCheck className="w-4 h-4" />
-                          MODE DEMO — gateway pembayaran belum dikonfigurasi
+                          MODE DEMO — gerbang pembayaran belum dikonfigurasi
                         </div>
                         <p className="text-[11px] text-amber-800">
                           Hubungkan akun Midtrans milik Anda di Pengaturan → Pembayaran agar QRIS
@@ -1308,7 +1321,7 @@ export default function POSPage() {
 
                 {/* Format Selector: 58mm vs 80mm */}
                 <div className="flex items-center justify-between text-xs px-1">
-                  <span className="text-slate-500 font-medium">Format Kertas Thermal:</span>
+                  <span className="text-slate-500 font-medium">Format Kertas Termal:</span>
                   <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
                     <button
                       type="button"
@@ -1317,7 +1330,7 @@ export default function POSPage() {
                         receiptWidth === "58mm" ? "bg-white text-slate-900 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
                       }`}
                     >
-                      58mm (Mobile)
+                      58mm (Ponsel)
                     </button>
                     <button
                       type="button"
@@ -1326,7 +1339,7 @@ export default function POSPage() {
                         receiptWidth === "80mm" ? "bg-white text-slate-900 shadow-xs font-bold" : "text-slate-600 hover:text-slate-900"
                       }`}
                     >
-                      80mm (Desktop)
+                      80mm (Komputer)
                     </button>
                   </div>
                 </div>
@@ -1349,11 +1362,11 @@ export default function POSPage() {
                     <span>{receiptData?.date}</span>
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    Kasir: Budi | Mode: {receiptData?.saleMode}
+                    Kasir: Budi | Mode: {saleModeLabel(receiptData?.saleMode)}
                   </div>
                   {receiptData?.salesOrderId && (
                     <div className="text-[10px] text-slate-500 font-mono truncate">
-                      Ref SO: {receiptData.salesOrderId}
+                      Ref. Pesanan: {receiptData.salesOrderId}
                     </div>
                   )}
                   {receiptData?.salesInvoiceId && (
@@ -1393,7 +1406,7 @@ export default function POSPage() {
                       <span>Rp {receiptData?.total.toLocaleString("id-ID")}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Bayar ({receiptData?.method}):</span>
+                      <span>Bayar ({paymentMethodLabel(receiptData?.method)}):</span>
                       <span>Rp {receiptData?.paid.toLocaleString("id-ID")}</span>
                     </div>
                     <div className="flex justify-between font-bold">
@@ -1415,7 +1428,7 @@ export default function POSPage() {
                     type="button"
                     onClick={handlePrintReceipt}
                     className="flex-1 min-h-[44px] rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-900 text-white flex items-center justify-center gap-2 shadow-xs transition"
-                    title="Cetak struk ke printer thermal"
+                    title="Cetak struk ke printer termal"
                   >
                     <Printer className="w-4 h-4" />
                     <span>Cetak Struk ({receiptWidth})</span>
@@ -1459,12 +1472,12 @@ export default function POSPage() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">Kosongkan Keranjang</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Semua item belanja akan dihapus</p>
+                <p className="text-xs text-slate-500 mt-0.5">Semua barang belanjaan akan dihapus</p>
               </div>
             </div>
 
             <p className="text-sm text-slate-600 leading-relaxed">
-              Apakah Anda yakin ingin mengosongkan seluruh item di keranjang belanja kasir saat ini?
+              Apakah Anda yakin ingin mengosongkan seluruh barang di keranjang belanja kasir saat ini?
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -1522,7 +1535,7 @@ export default function POSPage() {
                           {order.order_number}
                         </span>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                          {order.payment_method}
+                          {paymentMethodLabel(order.payment_method)}
                         </span>
                       </div>
                       <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
@@ -1538,7 +1551,7 @@ export default function POSPage() {
                           Rp {Number(order.total_amount).toLocaleString("id-ID")}
                         </div>
                         <div className="text-[10px] text-slate-400">
-                          {order.items?.length ?? 0} item
+                          {order.items?.length ?? 0} barang
                         </div>
                       </div>
 
@@ -1579,9 +1592,9 @@ export default function POSPage() {
                   <Receipt className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">Rekonsiliasi Kasir (Z-Report)</h3>
+                  <h3 className="text-base font-bold text-slate-900">Rekonsiliasi Kasir</h3>
                   <p className="text-xs text-slate-500">
-                    Laporan ringkasan kas, penjualan, dan penutupan shift kasir
+                    Laporan ringkasan kas, penjualan, dan penutupan sif kasir
                   </p>
                 </div>
               </div>
@@ -1609,7 +1622,7 @@ export default function POSPage() {
                 </div>
 
                 <div className="p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/40">
-                  <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Kas Fisik (CASH)</span>
+                  <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Kas Fisik (Tunai)</span>
                   <div className="font-mono text-lg font-black text-slate-900 mt-1">
                     Rp {reconciliationData.cashTotal.toLocaleString("id-ID")}
                   </div>
@@ -1646,7 +1659,7 @@ export default function POSPage() {
                   <table className="w-full text-xs text-left">
                     <thead className="bg-slate-50 border-b border-slate-200 text-[10px] text-slate-500 uppercase font-semibold">
                       <tr>
-                        <th className="px-3 py-2">No. Order</th>
+                        <th className="px-3 py-2">No. Pesanan</th>
                         <th className="px-3 py-2">Metode</th>
                         <th className="px-3 py-2">Waktu</th>
                         <th className="px-3 py-2 text-right">Nominal</th>
@@ -1669,7 +1682,7 @@ export default function POSPage() {
                                   ? "bg-emerald-100 text-emerald-800"
                                   : "bg-indigo-100 text-indigo-800"
                               }`}>
-                                {o.payment_method}
+                                {paymentMethodLabel(o.payment_method)}
                               </span>
                             </td>
                             <td className="px-3 py-2 text-slate-500 font-sans text-[11px]">
@@ -1689,7 +1702,7 @@ export default function POSPage() {
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">
-                Laporan digenerate otomatis oleh Tayooli POS
+                Laporan dibuat otomatis oleh Tayooli POS
               </span>
               <div className="flex gap-2">
                 <button
@@ -1698,7 +1711,7 @@ export default function POSPage() {
                   className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Cetak Z-Report</span>
+                  <span>Cetak Rekonsiliasi Kas</span>
                 </button>
                 <button
                   type="button"

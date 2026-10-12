@@ -271,7 +271,7 @@ export default function StockOpnamePage() {
         setToast({
           type: "info",
           title: "Diajukan untuk Persetujuan",
-          message: "Sesi opname diajukan ke status PENDING_APPROVAL. Menunggu persetujuan Admin/Owner/Regional Manager sebelum mutasi stok diposting.",
+          message: "Sesi opname diajukan untuk persetujuan. Menunggu persetujuan Admin/Owner/Regional Manager sebelum mutasi stok diposting.",
         })
       } else {
         setToast({
@@ -297,7 +297,7 @@ export default function StockOpnamePage() {
     setCreateModalError(null)
 
     if (!newWarehouseId) {
-      setCreateModalError("Pilih gudang tempat dilakukannya stock opname.")
+      setCreateModalError("Pilih gudang tempat dilakukannya stok opname.")
       return
     }
 
@@ -321,7 +321,7 @@ export default function StockOpnamePage() {
       // Automatically open drawer for the newly created opname
       setActiveOpnameId(res.id)
     } catch (err: unknown) {
-      setCreateModalError(err instanceof Error ? err.message : "Gagal membuat sesi stock opname.")
+      setCreateModalError(err instanceof Error ? err.message : "Gagal membuat sesi stok opname.")
     }
   }
 
@@ -421,7 +421,7 @@ export default function StockOpnamePage() {
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300">
             <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-            Menunggu Approval
+            Menunggu Persetujuan
           </span>
         )
       case "COMPLETED":
@@ -507,7 +507,7 @@ export default function StockOpnamePage() {
             <Link
               href="/wms"
               className="p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 min-h-[48px] min-w-[48px] flex items-center justify-center transition-colors"
-              title="Kembali ke Dashboard WMS"
+              title="Kembali ke Dasbor WMS"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
@@ -515,7 +515,7 @@ export default function StockOpnamePage() {
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="w-6 h-6 text-[#2563EB]" />
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Stock Opname & Penyesuaian Fisik
+                  Stok Opname & Penyesuaian Fisik
                 </h1>
               </div>
               <p className="text-xs sm:text-sm text-slate-500">
@@ -542,7 +542,7 @@ export default function StockOpnamePage() {
               className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-all min-h-[48px]"
             >
               <Plus className="w-5 h-5" />
-              <span>Audit Baru (New Opname)</span>
+              <span>Audit Baru</span>
             </button>
           </div>
         </div>
@@ -562,7 +562,7 @@ export default function StockOpnamePage() {
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/20 shadow-xs">
-            <span className="text-xs font-medium text-amber-700">Sedang Dihitung (In Progress)</span>
+            <span className="text-xs font-medium text-amber-700">Sedang Dihitung</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-amber-700">
                 {opnames.filter((o) => o.status === "IN_PROGRESS").length}
@@ -580,13 +580,13 @@ export default function StockOpnamePage() {
                 {opnames.filter((o) => o.status === "COMPLETED").length}
               </span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                Kelar
+                Selesai
               </span>
             </div>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <span className="text-xs font-medium text-slate-500">Draft Menunggu Audit</span>
+            <span className="text-xs font-medium text-slate-500">Draf Menunggu Audit</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-slate-800">
                 {opnames.filter((o) => o.status === "DRAFT").length}
@@ -652,8 +652,8 @@ export default function StockOpnamePage() {
               >
                 {st === "ALL" && "Semua Status"}
                 {st === "IN_PROGRESS" && "Sedang Dihitung"}
-                {st === "PENDING_APPROVAL" && "Menunggu Approval"}
-                {st === "DRAFT" && "Draft"}
+                {st === "PENDING_APPROVAL" && "Menunggu Persetujuan"}
+                {st === "DRAFT" && "Draf"}
                 {st === "COMPLETED" && "Selesai"}
               </button>
             ))}
@@ -665,12 +665,12 @@ export default function StockOpnamePage() {
           {loadingOpnames ? (
             <div className="p-12 text-center">
               <RefreshCw className="w-8 h-8 text-[#2563EB] animate-spin mx-auto mb-3" />
-              <p className="text-sm font-medium text-slate-600">Memuat sesi stock opname...</p>
+              <p className="text-sm font-medium text-slate-600">Memuat sesi stok opname...</p>
             </div>
           ) : filteredOpnames.length === 0 ? (
             <div className="p-12 text-center">
               <ClipboardCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-base font-semibold text-slate-800">Tidak ada sesi stock opname ditemukan</h3>
+              <h3 className="text-base font-semibold text-slate-800">Tidak ada sesi stok opname ditemukan</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                 {searchQuery || statusFilter !== "ALL" || selectedWarehouseId !== "ALL"
                   ? "Coba ubah filter atau kata kunci pencarian Anda."
@@ -694,7 +694,7 @@ export default function StockOpnamePage() {
                       <th className="px-6 py-3.5">Nomor Audit</th>
                       <th className="px-6 py-3.5">Gudang</th>
                       <th className="px-6 py-3.5">Status</th>
-                      <th className="px-6 py-3.5">Petugas / Conductor</th>
+                      <th className="px-6 py-3.5">Petugas</th>
                       <th className="px-6 py-3.5">Tanggal Dibuat</th>
                       <th className="px-6 py-3.5 text-right">Aksi</th>
                     </tr>
@@ -875,11 +875,11 @@ export default function StockOpnamePage() {
                     <div className="flex items-center gap-2">
                       <Barcode className="w-5 h-5 text-[#2563EB]" />
                       <h3 className="text-sm font-bold text-slate-900">
-                        Scan Barcode Fisik (Continuous Scanner)
+                        Scan Barcode Fisik
                       </h3>
                     </div>
                     <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                      Scanner Aktif (&le;30ms)
+                      Pemindai Aktif (&le;30ms)
                     </span>
                   </div>
 
@@ -890,7 +890,7 @@ export default function StockOpnamePage() {
                       <input
                         ref={scanInputRef}
                         type="text"
-                        placeholder="Scan barcode SKU / nomor rak atau ketik..."
+                        placeholder="Pindai barcode SKU / nomor rak atau ketik..."
                         value={scanInput}
                         onChange={(e) => setScanInput(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-h-[48px]"
@@ -900,7 +900,7 @@ export default function StockOpnamePage() {
                       type="submit"
                       className="px-5 py-2.5 bg-[#EA580C] hover:bg-orange-700 text-white font-semibold text-sm rounded-lg shadow-xs transition-colors min-h-[48px] shrink-0"
                     >
-                      Scan / Cari
+                      Pindai / Cari
                     </button>
                   </form>
 
@@ -928,7 +928,7 @@ export default function StockOpnamePage() {
                           }}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-h-[48px]"
                         >
-                          <option value="">-- Pilih atau scan produk --</option>
+                          <option value="">-- Pilih atau pindai produk --</option>
                           {products.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name} [{p.sku}]
@@ -940,7 +940,7 @@ export default function StockOpnamePage() {
                       {/* Location Selector */}
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Lokasi Rak / Bin <span className="text-rose-500">*</span>
+                          Lokasi Rak <span className="text-rose-500">*</span>
                         </label>
                         <select
                           value={effectiveLocationId}
@@ -986,7 +986,7 @@ export default function StockOpnamePage() {
 
                     {/* Quick increment buttons */}
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                      <span className="text-[11px] text-slate-400 mr-1">Quick:</span>
+                      <span className="text-[11px] text-slate-400 mr-1">Cepat:</span>
                       {[1, 5, 10, 50].map((inc) => (
                         <button
                           key={inc}
@@ -1044,7 +1044,7 @@ export default function StockOpnamePage() {
                       ) : (
                         <>
                           <Plus className="w-5 h-5" />
-                          <span>Catat Hasil Hitung (Record Item)</span>
+                          <span>Catat Hasil Hitung</span>
                         </>
                       )}
                     </button>
@@ -1094,7 +1094,7 @@ export default function StockOpnamePage() {
                   <div className="p-8 text-center text-slate-500 text-xs">Memuat detail barang...</div>
                 ) : filteredCountedItems.length === 0 ? (
                   <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs">
-                    Belum ada barang yang dicatat pada sesi audit ini. Scan barcode atau pilih produk di atas.
+                    Belum ada barang yang dicatat pada sesi audit ini. Pindai barcode atau pilih produk di atas.
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -1202,7 +1202,7 @@ export default function StockOpnamePage() {
 
                   const buttonLabel = isApprover && !isConductor
                     ? (isPending ? "Setujui & Posting Penyesuaian (@LOSS)" : "Posting Penyesuaian (@LOSS)")
-                    : "Ajukan untuk Persetujuan (Pending Approval)"
+                    : "Ajukan untuk Persetujuan"
 
                   return (
                     <button
@@ -1250,7 +1250,7 @@ export default function StockOpnamePage() {
                   lokasi virtual <code>@LOSS</code>.
                 </li>
                 <li>
-                  Sesi ini akan disetujui & berstatus <code>COMPLETED</code>.
+                  Sesi ini akan disetujui & berstatus <code>Selesai</code>.
                 </li>
               </ul>
             </div>
@@ -1293,7 +1293,7 @@ export default function StockOpnamePage() {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <ClipboardCheck className="w-5 h-5 text-[#2563EB]" />
-                <h3 className="text-base font-bold text-slate-900">Audit Baru (New Opname)</h3>
+                <h3 className="text-base font-bold text-slate-900">Audit Baru</h3>
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}

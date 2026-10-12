@@ -221,7 +221,7 @@ function ExportDialog<T>({
                   onClick={resetFilters}
                   className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
                 >
-                  <RotateCcw className="w-3 h-3" aria-hidden="true" /> Reset
+                  <RotateCcw className="w-3 h-3" aria-hidden="true" /> Atur Ulang
                 </button>
               )}
             </div>

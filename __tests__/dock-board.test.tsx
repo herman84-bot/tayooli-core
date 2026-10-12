@@ -183,15 +183,15 @@ describe("DockBoardSubView Component", () => {
     // Dock bays
     expect(screen.getByText("Dermaga Inbound 1")).toBeInTheDocument()
     expect(screen.getByText("DCK-01")).toBeInTheDocument()
-    expect(screen.getByText("AVAILABLE")).toBeInTheDocument()
+    expect(screen.getByText("Tersedia")).toBeInTheDocument()
 
     expect(screen.getByText("Dermaga Inbound 2")).toBeInTheDocument()
     expect(screen.getByText("DCK-02")).toBeInTheDocument()
-    expect(screen.getByText("OCCUPIED")).toBeInTheDocument()
+    expect(screen.getByText("Terisi")).toBeInTheDocument()
 
     expect(screen.getByText("Dermaga Perbaikan 3")).toBeInTheDocument()
     expect(screen.getByText("DCK-03")).toBeInTheDocument()
-    expect(screen.getByText("MAINTENANCE")).toBeInTheDocument()
+    expect(screen.getAllByText("Perbaikan").length).toBeGreaterThanOrEqual(1)
 
     // Active appointment in occupied dock 2 (appears in dock card and table)
     expect(screen.getAllByText("B 9182 KDA").length).toBeGreaterThanOrEqual(1)
@@ -201,8 +201,8 @@ describe("DockBoardSubView Component", () => {
   it("supports toggle maintenance on dock card", async () => {
     render(<DockBoardSubView warehouseId={mockWarehouseId} />)
 
-    // dock-3 is in MAINTENANCE, button label is "Selesai Maint."
-    const finishMaintBtn = screen.getByText("Selesai Maint.")
+    // dock-3 is in MAINTENANCE, button label is "Selesai Perbaikan"
+    const finishMaintBtn = screen.getByText("Selesai Perbaikan")
     fireEvent.click(finishMaintBtn)
 
     await waitFor(() => {
@@ -235,10 +235,10 @@ describe("DockBoardSubView Component", () => {
     render(<DockBoardSubView warehouseId={mockWarehouseId} />)
 
     expect(screen.getByRole("button", { name: /^Semua$/i })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /Terjadwal \(SCHEDULED\)/i })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /Tiba \(ARRIVED\)/i })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /Bongkar \(UNLOADING\)/i })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /Selesai \(COMPLETED\)/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Terjadwal$/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Sudah Tiba$/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Proses Bongkar$/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Sudah Selesai$/i })).toBeInTheDocument()
 
     // Table rows
     expect(screen.getByText("APT-20261008-001")).toBeInTheDocument()
@@ -250,7 +250,7 @@ describe("DockBoardSubView Component", () => {
   it("filters appointments when clicking status tab", () => {
     render(<DockBoardSubView warehouseId={mockWarehouseId} />)
 
-    const scheduledTab = screen.getByRole("button", { name: /Terjadwal \(SCHEDULED\)/i })
+    const scheduledTab = screen.getByRole("button", { name: /^Terjadwal$/i })
     fireEvent.click(scheduledTab)
 
     expect(screen.getByText("APT-20261008-002")).toBeInTheDocument()
@@ -303,7 +303,7 @@ describe("DockBoardSubView Component", () => {
     fireEvent.change(screen.getByPlaceholderText(/Mis: DOCK-01/i), {
       target: { value: "DCK-04" },
     })
-    fireEvent.change(screen.getByPlaceholderText(/Mis: Dermaga Inbound Barat 1/i), {
+    fireEvent.change(screen.getByPlaceholderText(/Mis: Dermaga Masuk Barat 1/i), {
       target: { value: "Dermaga Inbound 4" },
     })
 
@@ -358,8 +358,8 @@ describe("DockBoardSubView Component", () => {
   it("assigns dock to appointment successfully", async () => {
     render(<DockBoardSubView warehouseId={mockWarehouseId} />)
 
-    // appt-2 is SCHEDULED without dock -> click "Alokasikan Dock"
-    const assignButtons = screen.getAllByRole("button", { name: /Alokasikan Dock/i })
+    // appt-2 is SCHEDULED without dock -> click "Alokasikan Dermaga"
+    const assignButtons = screen.getAllByRole("button", { name: /Alokasikan Dermaga/i })
     fireEvent.click(assignButtons[0])
 
     expect(screen.getByText("Alokasikan Dermaga Bongkar")).toBeInTheDocument()
@@ -386,7 +386,7 @@ describe("DockBoardSubView Component", () => {
 
     render(<DockBoardSubView warehouseId={mockWarehouseId} />)
 
-    const assignButtons = screen.getAllByRole("button", { name: /Alokasikan Dock/i })
+    const assignButtons = screen.getAllByRole("button", { name: /Alokasikan Dermaga/i })
     fireEvent.click(assignButtons[0])
 
     const select = screen.getByRole("combobox")

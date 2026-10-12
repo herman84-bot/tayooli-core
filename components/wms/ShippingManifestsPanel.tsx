@@ -209,7 +209,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
       return
     }
     if (selectedDoIds.length === 0) {
-      setCreateError("Pilih minimal 1 Surat Jalan untuk dimasukkan ke dalam manifest.")
+      setCreateError("Pilih minimal 1 Surat Jalan untuk dimasukkan ke dalam manifes.")
       return
     }
 
@@ -226,11 +226,11 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
       setShowCreateModal(false)
       setToast({
         type: "success",
-        message: `Manifest ${res.data.manifest_number} berhasil dibuat dengan ${selectedDoIds.length} Surat Jalan.`,
+        message: `Manifes ${res.data.manifest_number} berhasil dibuat dengan ${selectedDoIds.length} Surat Jalan.`,
       })
       refetch()
     } catch (err: unknown) {
-      setCreateError(err instanceof Error ? err.message : "Gagal membuat manifest pengiriman.")
+      setCreateError(err instanceof Error ? err.message : "Gagal membuat manifes pengiriman.")
     }
   }
 
@@ -292,11 +292,11 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
       }
       setToast({
         type: "success",
-        message: `Manifest ${targetNum} berhasil di-dispatch! Armada telah resmi diberangkatkan.`,
+        message: `Manifes ${targetNum} berhasil dikirim! Armada telah resmi diberangkatkan.`,
       })
       refetch()
     } catch (err: unknown) {
-      setDispatchError(err instanceof Error ? err.message : "Gagal melakukan dispatch manifest.")
+      setDispatchError(err instanceof Error ? err.message : "Gagal memproses pengiriman manifes.")
     }
   }
 
@@ -308,12 +308,12 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
       if (res.data) {
         setPrintDetail(res.data)
       } else {
-        setToast({ type: "error", message: "Gagal memuat data cetak manifest." })
+        setToast({ type: "error", message: "Gagal memuat data cetak manifes." })
       }
     } catch (err: unknown) {
       setToast({
         type: "error",
-        message: err instanceof Error ? err.message : "Gagal memuat detail cetak manifest.",
+        message: err instanceof Error ? err.message : "Gagal memuat detail cetak manifes.",
       })
     } finally {
       setLoadingPrintId(null)
@@ -327,28 +327,28 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
             <Clock className="w-3 h-3 text-amber-500" />
-            STAGED (Siap Muat)
+            Siap Muat
           </span>
         )
       case "LOADED":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
             <PackageCheck className="w-3 h-3 text-blue-500" />
-            LOADED (Terpindai)
+            Terpindai
           </span>
         )
       case "DISPATCHED":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-            DISPATCHED (Berangkat)
+            Dikirim
           </span>
         )
       case "CANCELLED":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
             <X className="w-3 h-3 text-rose-500" />
-            BATAL
+            Batal
           </span>
         )
       default:
@@ -390,16 +390,16 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-xs mb-1">
-            <span>Total Manifest</span>
+            <span>Total Manifes</span>
             <Truck className="h-4 w-4 text-slate-400" />
           </div>
           <div className="text-2xl font-bold text-slate-900">{metrics.total}</div>
-          <div className="text-[11px] text-slate-400 mt-1">Seluruh manifest pengiriman</div>
+          <div className="text-[11px] text-slate-400 mt-1">Seluruh manifes pengiriman</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between text-amber-600 text-xs mb-1">
-            <span>Staged (Siap Muat)</span>
+            <span>Area Transit (Siap Muat)</span>
             <Clock className="h-4 w-4 text-amber-500" />
           </div>
           <div className="text-2xl font-bold text-amber-600">{metrics.staged}</div>
@@ -408,7 +408,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between text-blue-600 text-xs mb-1">
-            <span>Loaded (Terpindai Penuh)</span>
+            <span>Terpindai Penuh</span>
             <PackageCheck className="h-4 w-4 text-blue-500" />
           </div>
           <div className="text-2xl font-bold text-blue-600">{metrics.loaded}</div>
@@ -417,7 +417,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between text-emerald-600 text-xs mb-1">
-            <span>Dispatched (Berangkat)</span>
+            <span>Dikirim (Berangkat)</span>
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-bold text-emerald-600">{metrics.dispatched}</div>
@@ -432,9 +432,9 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
           <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
             {[
               { label: "Semua", value: "ALL" },
-              { label: "Staged", value: "STAGED" },
-              { label: "Loaded", value: "LOADED" },
-              { label: "Dispatched", value: "DISPATCHED" },
+              { label: "Area Transit", value: "STAGED" },
+              { label: "Terpindai", value: "LOADED" },
+              { label: "Dikirim", value: "DISPATCHED" },
             ].map((tab) => (
               <button
                 key={tab.value}
@@ -455,7 +455,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Cari manifest, kurir, plat..."
+              placeholder="Cari manifes, kurir, plat..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -468,7 +468,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
             onClick={() => refetch()}
             disabled={isFetching}
             className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center justify-center transition disabled:opacity-50"
-            title="Segarkan data"
+            title="Muat Ulang"
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
           </button>
@@ -478,7 +478,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-xs bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition shadow-xs"
           >
             <Plus className="h-4 w-4" />
-            <span>Buat Manifest Baru</span>
+            <span>Buat Manifes Baru</span>
           </button>
         </div>
       </div>
@@ -489,7 +489,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
               <tr>
-                <th className="py-3 px-4">No. Manifest</th>
+                <th className="py-3 px-4">No. Manifes</th>
                 <th className="py-3 px-4">Ekspedisi</th>
                 <th className="py-3 px-4">Sopir / Plat</th>
                 <th className="py-3 px-4 text-center">Koli</th>
@@ -504,16 +504,16 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-slate-500">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-slate-400" />
-                    Memuat daftar manifest...
+                    Memuat daftar manifes...
                   </td>
                 </tr>
               ) : filteredManifests.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-500">
                     <Truck className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    <p className="font-medium text-slate-700">Belum ada manifest pengiriman</p>
+                    <p className="font-medium text-slate-700">Belum ada manifes pengiriman</p>
                     <p className="text-slate-400 text-[11px] mt-0.5">
-                      Kelompokkan Surat Jalan yang sudah dikemas menjadi manifest ekspedisi.
+                      Kelompokkan Surat Jalan yang sudah dikemas menjadi manifes ekspedisi.
                     </p>
                   </td>
                 </tr>
@@ -555,10 +555,10 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                           type="button"
                           onClick={() => setActiveDetailId(m.id)}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 transition text-[11px] font-medium"
-                          title="Periksa detail & scan koli"
+                          title="Periksa detail & pindai koli"
                         >
                           <Barcode className="w-3.5 h-3.5 text-blue-600" />
-                          <span>Scan / Detail</span>
+                          <span>Pindai / Detail</span>
                         </button>
 
                         {/* Dispatch Button if not dispatched */}
@@ -570,7 +570,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                             title="Tanda tangan & berangkatkan armada"
                           >
                             <Send className="w-3.5 h-3.5" />
-                            <span>Dispatch</span>
+                            <span>Kirim</span>
                           </button>
                         )}
 
@@ -580,7 +580,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                           onClick={() => handleOpenPrint(m.id)}
                           disabled={loadingPrintId === m.id}
                           className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
-                          title="Cetak Manifest A4"
+                          title="Cetak Manifes A4"
                         >
                           <Printer className={`w-3.5 h-3.5 ${loadingPrintId === m.id ? "animate-spin" : ""}`} />
                         </button>
@@ -606,7 +606,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                   <Truck className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 text-base">Buat Manifest Ekspedisi Baru</h3>
+                  <h3 className="font-bold text-slate-900 text-base">Buat Manifes Ekspedisi Baru</h3>
                   <p className="text-xs text-slate-500">
                     Kelompokkan beberapa Surat Jalan menjadi satu berkas serah terima pengiriman
                   </p>
@@ -870,7 +870,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                   ) : (
                     <Check className="w-3.5 h-3.5" />
                   )}
-                  <span>Buat Manifest</span>
+                  <span>Buat Manifes</span>
                 </button>
               </div>
             </form>
@@ -891,10 +891,10 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">
-                    Loading Scan &amp; Verifikasi Koli Truk
+                    Pindai Muat &amp; Verifikasi Koli Truk
                   </h3>
                   <p className="text-xs text-slate-500 font-mono">
-                    Manifest: {activeDetail?.manifest.manifest_number || "..."} &bull;{" "}
+                    Manifes: {activeDetail?.manifest.manifest_number || "..."} &bull;{" "}
                     {activeDetail?.manifest.expedition_name}
                   </p>
                 </div>
@@ -915,7 +915,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
               {isDetailLoading || !activeDetail ? (
                 <div className="py-12 text-center text-slate-400">
                   <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-slate-400" />
-                  Memuat detail manifest...
+                  Memuat detail manifes...
                 </div>
               ) : (
                 <>
@@ -939,7 +939,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                       </strong>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[11px]">Status Manifest</span>
+                      <span className="text-slate-400 block text-[11px]">Status Manifes</span>
                       <div className="mt-0.5">{renderStatusBadge(activeDetail.manifest.status)}</div>
                     </div>
                   </div>
@@ -956,7 +956,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-slate-800 flex items-center gap-1.5">
                             <PackageCheck className="w-4 h-4 text-blue-600" />
-                            Progress Pemuatan ke Truk:
+                            Progres Pemuatan ke Truk:
                           </span>
                           <span className="font-mono font-bold text-blue-700">
                             {scannedItems} / {totalItems} Koli ({pct}%)
@@ -973,7 +973,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                         {isAllLoaded && (
                           <div className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-1">
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            Seluruh koli telah terpindai lengkap dan siap di-dispatch!
+                            Seluruh koli telah terpindai lengkap dan siap dikirim!
                           </div>
                         )}
                       </div>
@@ -990,7 +990,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                         <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <input
                           type="text"
-                          placeholder="Scan barcode Surat Jalan (DO/xxx) atau ketik manual..."
+                          placeholder="Pindai barcode Surat Jalan (DO/xxx) atau ketik manual..."
                           value={scanBarcodeInput}
                           onChange={(e) => setScanBarcodeInput(e.target.value)}
                           className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1036,7 +1036,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                       <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
                         <tr>
                           <th className="py-2.5 px-3 w-10 text-center">No</th>
-                          <th className="py-2.5 px-3">No. DO</th>
+                          <th className="py-2.5 px-3">No. Surat Jalan</th>
                           <th className="py-2.5 px-3">Pelanggan</th>
                           <th className="py-2.5 px-3">Kota Tujuan</th>
                           <th className="py-2.5 px-3 text-right">Berat</th>
@@ -1105,7 +1105,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                       className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium border border-slate-200 text-slate-700 hover:bg-slate-100 transition"
                     >
                       <Printer className="w-4 h-4" />
-                      <span>Cetak Lembar Manifest</span>
+                      <span>Cetak Lembar Manifes</span>
                     </button>
 
                     {activeDetail.manifest.status !== "DISPATCHED" && (
@@ -1115,7 +1115,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                         className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition"
                       >
                         <Send className="w-4 h-4" />
-                        <span>Lanjut ke Dispatch &amp; TTD</span>
+                        <span>Lanjut ke Pengiriman &amp; TTD</span>
                       </button>
                     )}
                   </div>
@@ -1139,7 +1139,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">
-                    Dispatch &amp; Serah Terima Pengemudi
+                    Pengiriman &amp; Serah Terima Pengemudi
                   </h3>
                   <p className="text-xs text-slate-500 font-mono">
                     {dispatchManifestTarget.manifest_number} &bull; {dispatchManifestTarget.expedition_name}
@@ -1241,7 +1241,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                   ) : (
                     <Send className="w-3.5 h-3.5" />
                   )}
-                  <span>Konfirmasi &amp; Dispatch</span>
+                  <span>Konfirmasi &amp; Kirim</span>
                 </button>
               </div>
             </div>

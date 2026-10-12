@@ -91,7 +91,7 @@ export function ResetPasswordForm() {
         setDeadLink(
           typeof body?.error === 'string' && body.error
             ? body.error
-            : 'Tautan reset password tidak valid atau sudah kedaluwarsa. Minta tautan baru.',
+            : 'Tautan atur ulang kata sandi tidak valid atau sudah kedaluwarsa. Minta tautan baru.',
         )
       })
       .catch(() => {})
@@ -123,7 +123,7 @@ export function ResetPasswordForm() {
     setSuccess(null)
 
     if (!token) {
-      setError('Token reset password tidak valid')
+      setError('Token atur ulang kata sandi tidak valid')
       return
     }
 
@@ -135,7 +135,7 @@ export function ResetPasswordForm() {
         body: JSON.stringify({ token, password: data.password }),
       })
       if (!res.ok) {
-        const msg = await extractApiErrorMessage(res, 'Gagal reset password')
+        const msg = await extractApiErrorMessage(res, 'Gagal mengatur ulang kata sandi')
         throw new Error(msg)
       }
       setSuccess(
@@ -145,7 +145,7 @@ export function ResetPasswordForm() {
       )
       setDone(true)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Gagal reset password'
+      const msg = e instanceof Error ? e.message : 'Gagal mengatur ulang kata sandi'
       setError(msg)
     } finally {
       setIsLoading(false)
@@ -155,7 +155,7 @@ export function ResetPasswordForm() {
   if (!token) {
     return isInvite
       ? <DeadLink invite message={INVITE_DEAD.missing} />
-      : <DeadLink message="Tautan reset password tidak lengkap. Pastikan Anda membuka tautan lengkap dari email, atau minta tautan baru." />
+      : <DeadLink message="Tautan atur ulang kata sandi tidak lengkap. Pastikan Anda membuka tautan lengkap dari email, atau minta tautan baru." />
   }
 
   if (deadLink) {
@@ -249,7 +249,7 @@ export function ResetPasswordForm() {
         </Link>
       ) : (
         <Button type="submit" className="w-full font-semibold" disabled={isLoading}>
-          {isLoading ? 'Menyimpan...' : isInvite ? 'Aktifkan Akun' : 'Reset Password'}
+          {isLoading ? 'Menyimpan...' : isInvite ? 'Aktifkan Akun' : 'Atur Ulang Kata Sandi'}
         </Button>
       )}
     </form>

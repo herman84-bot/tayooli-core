@@ -17,6 +17,29 @@ import {
 import { useBatchTrace, useAuditTrail } from "@/hooks/useWMS"
 import type { BatchTrace } from "@/lib/api"
 
+const REFERENCE_TYPE_LABELS: Record<string, string> = {
+  RECEIPT: "Penerimaan Barang",
+  DELIVERY_ORDER: "Surat Jalan",
+  STOCK_TRANSFER: "Transfer Stok",
+  STOCK_OPNAME: "Stok Opname",
+  SCRAP: "Barang Rusak",
+  DIRECT_DO: "Surat Jalan Langsung",
+  PUTAWAY: "Penataan Rak",
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  CREATE: "Dibuat",
+  UPDATE: "Diperbarui",
+  CONFIRM: "Dikonfirmasi",
+  APPROVE: "Disetujui",
+  PUTAWAY: "Penataan Rak",
+  PACK: "Pengemasan",
+  DISPATCH: "Pengiriman",
+  CANCEL: "Dibatalkan",
+  SCRAP: "Pemusnahan",
+  RELEASE: "Rilis",
+}
+
 export function TraceBatchView() {
   const [batchIdInput, setBatchIdInput] = useState("")
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null)
@@ -101,7 +124,7 @@ export function TraceBatchView() {
             </div>
 
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-sm">
-              <span className="text-xs font-medium text-emerald-700 uppercase tracking-wider">Total Masuk (Inbound)</span>
+              <span className="text-xs font-medium text-emerald-700 uppercase tracking-wider">Total Barang Masuk</span>
               <div className="mt-1 font-mono text-xl font-bold text-emerald-800">
                 +{Number(trace.total_in).toLocaleString("id-ID")}
               </div>
@@ -109,11 +132,11 @@ export function TraceBatchView() {
             </div>
 
             <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 shadow-sm">
-              <span className="text-xs font-medium text-blue-700 uppercase tracking-wider">Total Keluar (Outbound)</span>
+              <span className="text-xs font-medium text-blue-700 uppercase tracking-wider">Total Barang Keluar</span>
               <div className="mt-1 font-mono text-xl font-bold text-blue-800">
                 -{Number(trace.total_out).toLocaleString("id-ID")}
               </div>
-              <div className="mt-1 text-[11px] text-blue-600">Surat Jalan, POS & Transfer</div>
+              <div className="mt-1 text-[11px] text-blue-600">Surat Jalan, Kasir (POS) & Transfer</div>
             </div>
 
             <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-4 shadow-sm">
@@ -167,7 +190,7 @@ export function TraceBatchView() {
                     <th className="px-4 py-2.5">Dari Rak</th>
                     <th className="px-4 py-2.5"></th>
                     <th className="px-4 py-2.5">Ke Rak</th>
-                    <th className="px-4 py-2.5 text-right">Kuantitas</th>
+                    <th className="px-4 py-2.5 text-right">Jml</th>
                     <th className="px-4 py-2.5">Operator</th>
                     <th className="px-4 py-2.5">Waktu</th>
                   </tr>
@@ -179,7 +202,7 @@ export function TraceBatchView() {
                       <td className="px-4 py-2.5">
                         <span className="inline-flex items-center gap-1 font-medium text-slate-700">
                           <FileText className="h-3 w-3 text-slate-400" />
-                          {m.reference_type}
+                          {REFERENCE_TYPE_LABELS[m.reference_type] ?? m.reference_type}
                         </span>
                         {m.counterparty && (
                           <span className="text-slate-400 text-[11px] block">{m.counterparty}</span>
@@ -228,7 +251,7 @@ export function TraceBatchView() {
                     <Hash className="h-3.5 w-3.5 text-slate-400 mt-0.5" />
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-800">{entry.action}</span>
+                        <span className="font-semibold text-slate-800">{ACTION_LABELS[entry.action] ?? entry.action}</span>
                         <span className="text-slate-400 text-[11px]">
                           {new Date(entry.created_at).toLocaleString("id-ID")}
                         </span>

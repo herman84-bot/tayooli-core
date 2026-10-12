@@ -111,7 +111,7 @@ describe('Scanner PUTAWAY mode uses real backend', () => {
     render(<BarcodeScannerPage />)
     scan('RAK-A-01')
     scan('GULA')
-    expect(await screen.findByText(/tidak memiliki stok di area staging/i)).toBeInTheDocument()
+    expect(await screen.findByText(/tidak memiliki stok di area transit masuk/i)).toBeInTheDocument()
     expect(mockConfirm).not.toHaveBeenCalled()
   })
 
@@ -129,7 +129,7 @@ describe('Scanner PUTAWAY mode uses real backend', () => {
 describe('Scanner OUTBOUND mode validates against Surat Jalan on server', () => {
   test('requires DO selection', () => {
     render(<BarcodeScannerPage />)
-    fireEvent.click(screen.getByText('Outbound Picking'))
+    fireEvent.click(screen.getByText('Pengambilan Barang Keluar'))
     scan('ANY')
     expect(screen.getByText(/Pilih Surat Jalan terlebih dahulu/)).toBeInTheDocument()
     expect(mockPackScan).not.toHaveBeenCalled()
@@ -137,7 +137,7 @@ describe('Scanner OUTBOUND mode validates against Surat Jalan on server', () => 
 
   test('match and mismatch come from pack/scan API', async () => {
     render(<BarcodeScannerPage />)
-    fireEvent.click(screen.getByText('Outbound Picking'))
+    fireEvent.click(screen.getByText('Pengambilan Barang Keluar'))
     fireEvent.change(screen.getByLabelText(/Pilih Surat Jalan/i), { target: { value: 'do-1' } })
 
     mockPackScan.mockResolvedValueOnce({
@@ -214,7 +214,7 @@ describe('useManualRefresh', () => {
     const btn = screen.getByRole('button')
     expect(btn).toBeDisabled()
     expect(btn.querySelector('svg')).toHaveClass('animate-spin')
-    expect(btn).toHaveTextContent('Menyegarkan...')
+    expect(btn).toHaveTextContent('Memuat ulang...')
     rerender(<RefreshButton status="done" onClick={() => {}} showLabel />)
     expect(screen.getByRole('button')).toHaveTextContent('Diperbarui')
     expect(screen.getByRole('button')).not.toBeDisabled()

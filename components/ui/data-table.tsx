@@ -27,7 +27,7 @@ export function DataTable<TData, TValue>({
       <div className="rounded-md border">
         <div className="p-8 text-center text-muted-foreground">
           <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-          Loading...
+          Memuat...
         </div>
       </div>
     )
@@ -56,7 +56,7 @@ export function DataTable<TData, TValue>({
           {table.getRowModel().rows.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="p-8 text-center text-muted-foreground">
-                No results found.
+                Tidak ada data ditemukan.
               </td>
             </tr>
           ) : (

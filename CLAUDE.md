@@ -23,26 +23,26 @@ You are the **CTO of Tayooli ERP Core**. When the user submits a development tas
 ## Core Modules Hierarchy (STRICT)
 > **Keputusan owner 2026-10-07 (KO-2):** Barang Masuk dan Surat Jalan digabung jadi satu modul "Barang Masuk & Keluar" dengan toggle MASUK | KELUAR. Target: **12 modul**. Sampai KO-2a selesai, kode masih memakai 2 menu lama (`/wms/inbound`, `/wms/delivery-orders`). Lihat `docs/specs/2026-10-07-enterprise-wms-inbound-outbound-master-prd-plan.md` §3.5.
 ```text
-OVERVIEW
- 1. Dashboard                 -> /dashboard
+RINGKASAN
+ 1. Dasbor                    -> /dashboard
 
-INVENTORY
- 2. Products                  -> /products
+INVENTARIS
+ 2. Produk                    -> /products
 
-WAREHOUSE & POS  (urutan mengikuti alur barang: masuk -> simpan -> keluar)
+GUDANG & KASIR  (urutan mengikuti alur barang: masuk -> simpan -> keluar)
  3. Barang Masuk & Keluar     -> /wms/arus-barang   (toggle MASUK | KELUAR;
                                  menggantikan /wms/inbound & /wms/delivery-orders)
- 4. Warehouse & Stock         -> /wms
- 5. Marketplace Omnichannel   -> /wms/marketplace
- 6. Stock Transfers           -> /wms/transfers
- 7. Stock Opname              -> /wms/opname
+ 4. Gudang & Stok             -> /wms
+ 5. Marketplace               -> /wms/marketplace
+ 6. Transfer Stok             -> /wms/transfers
+ 7. Stok Opname               -> /wms/opname
  8. Barang Rusak / Scrap      -> /wms/scrap
- 9. Barcode Scanner           -> /wms/scanner
- 10. Point of Sale            -> /pos
+ 9. Pemindai Barcode          -> /wms/scanner
+ 10. Kasir (POS)              -> /pos
 
-ACCOUNT
- 11. Settings                 -> /settings
- 12. Help & Support           -> /help
+AKUN
+ 11. Pengaturan               -> /settings
+ 12. Bantuan                  -> /help
 ```
 - **Data masuk dan keluar wajib terhubung per batch (KO-1):** setiap mutasi stok wajib membawa `batch_id`. Dilarang menulis jalur mutasi tanpa batch (ADR-014 Invariant 1/1b).
 

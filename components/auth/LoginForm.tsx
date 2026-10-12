@@ -122,7 +122,7 @@ export function LoginForm() {
           href="/forgot-password"
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          Lupa password?
+          Lupa kata sandi?
         </a>
       </div>
 

@@ -189,11 +189,11 @@ export default function ArusBarangPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            Arus Barang (Masuk & Keluar)
+            Barang Masuk & Keluar
           </h1>
           <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
-            Pusat operasional aliran fisik barang. Terima barang ke Staging Inbound, kelola QC, lakukan Putaway ke rak,
-            dan terbitkan Surat Jalan (DO). Barang yang paling dekat kedaluwarsa dikeluarkan lebih dulu.
+            Pusat operasional aliran fisik barang. Terima barang ke Area Transit Masuk, kelola QC, lakukan Penataan Rak,
+            dan terbitkan Surat Jalan. Barang yang paling dekat kedaluwarsa dikeluarkan lebih dulu.
           </p>
         </div>
 
@@ -227,7 +227,7 @@ export default function ArusBarangPage() {
           <button
             onClick={() => setShowSettingsModal(true)}
             className="p-2 text-slate-500 hover:text-slate-800 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
-            title="Pengaturan WMS & Kebijakan Rilis"
+            title="Pengaturan Gudang & Kebijakan Rilis"
           >
             <Settings className="h-4 w-4" />
           </button>
@@ -263,7 +263,7 @@ export default function ArusBarangPage() {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Penerimaan (GR)
+              Penerimaan Barang
             </button>
             <button
               onClick={() => setMasukTab("dock")}
@@ -273,7 +273,7 @@ export default function ArusBarangPage() {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Antrean Dermaga (Dock)
+              Antrean Dermaga
             </button>
             <button
               onClick={() => setMasukTab("putaway")}
@@ -283,7 +283,7 @@ export default function ArusBarangPage() {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Putaway ke Rak
+              Penataan Rak
             </button>
             <button
               onClick={() => setMasukTab("trace")}
@@ -316,7 +316,7 @@ export default function ArusBarangPage() {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Surat Jalan (DO)
+              Surat Jalan
             </button>
             <button
               onClick={() => setKeluarTab("picking")}
@@ -326,7 +326,7 @@ export default function ArusBarangPage() {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Picking Wave
+              Pengambilan Gelombang
             </button>
             <button
               onClick={() => setKeluarTab("packing")}
@@ -336,7 +336,7 @@ export default function ArusBarangPage() {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Packing Station
+              Stasiun Pengemasan
             </button>
             <button
               onClick={() => setKeluarTab("manifest")}
@@ -346,7 +346,7 @@ export default function ArusBarangPage() {
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              Manifest & Muat
+              Manifes & Muat
             </button>
           </div>
         )}
@@ -522,7 +522,7 @@ function InboundReceivingSubView({
                 title="Kelola wadah palet LPN di gudang"
               >
                 <Boxes className="h-4 w-4 text-emerald-600" />
-                Kelola Palet (LPN)
+                Kelola Palet LPN
               </button>
               <button
                 onClick={() => openNew("PRODUCTION")}
@@ -608,7 +608,7 @@ function InboundReceivingSubView({
                             </span>
                           ) : r.status === "POSTED" ? (
                             <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              RELEASED
+                              DIRILIS
                             </span>
                           ) : (
                             <span className="text-slate-400">-</span>
@@ -641,8 +641,8 @@ function InboundReceivingSubView({
               { header: "Dari", value: (r) => r.supplier_name || r.from_warehouse_name || r.from_name || "", width: 24 },
               { header: "Gudang Tujuan", value: (r) => whName(r.warehouse_id), width: 22 },
               { header: "Jumlah Item", value: (r) => r.item_count, width: 12, align: "right" },
-              { header: "Qty Diterima", value: (r) => num(r.total_accepted_qty), width: 14, align: "right" },
-              { header: "Qty Ditolak", value: (r) => num(r.total_rejected_qty), width: 14, align: "right" },
+              { header: "Jml Diterima", value: (r) => num(r.total_accepted_qty), width: 14, align: "right" },
+              { header: "Jml Ditolak", value: (r) => num(r.total_rejected_qty), width: 14, align: "right" },
               { header: "Status", value: (r) => STATUS_LABEL[r.status]?.text ?? r.status, width: 18 },
             ]}
             filters={[]}
@@ -658,7 +658,7 @@ function InboundReceivingSubView({
           onSaved={(id) => {
             setNotice({
               type: "success",
-              text: "Draf penerimaan tersimpan. Stok akan masuk ke Staging Inbound setelah Anda menekan tombol Konfirmasi.",
+              text: "Draf penerimaan tersimpan. Stok akan masuk ke Area Transit Masuk setelah Anda menekan tombol Konfirmasi.",
             })
             setView({ mode: "detail", id })
             refetch()
@@ -960,7 +960,7 @@ function InboundReceiptForm({
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Ketik nama produk atau scan barcode/SKU..."
+            placeholder="Ketik nama produk atau pindai Barcode/SKU..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-xs"
@@ -993,8 +993,8 @@ function InboundReceiptForm({
                 <th className="px-3 py-2.5">Produk</th>
                 <th className="px-3 py-2.5">Nomor Batch / Lot (Opsional)</th>
                 <th className="px-3 py-2.5">Tgl Kedaluwarsa</th>
-                <th className="px-3 py-2.5 text-right w-24">Qty Diterima</th>
-                <th className="px-3 py-2.5 text-right w-24">Qty Ditolak</th>
+                <th className="px-3 py-2.5 text-right w-24">Jml Diterima</th>
+                <th className="px-3 py-2.5 text-right w-24">Jml Ditolak</th>
                 <th className="px-3 py-2.5">Alasan Tolak</th>
                 <th className="px-3 py-2.5 text-center w-12">Aksi</th>
               </tr>
@@ -1042,7 +1042,7 @@ function InboundReceiptForm({
                         min="0"
                         step="1"
                         inputMode="numeric"
-                        aria-label={`Qty diterima ${line.product_name}`}
+                        aria-label={`Jumlah diterima ${line.product_name}`}
                         value={line.accepted}
                         onChange={(e) => updateLine(idx, { accepted: e.target.value })}
                         className="w-full px-2 py-1 border border-slate-300 rounded text-right font-semibold text-xs"
@@ -1054,7 +1054,7 @@ function InboundReceiptForm({
                         min="0"
                         step="1"
                         inputMode="numeric"
-                        aria-label={`Qty ditolak ${line.product_name}`}
+                        aria-label={`Jumlah ditolak ${line.product_name}`}
                         value={line.rejected}
                         onChange={(e) => updateLine(idx, { rejected: e.target.value })}
                         className="w-full px-2 py-1 border border-slate-300 rounded text-right text-xs"
@@ -1166,7 +1166,7 @@ function InboundReceiptDetail({
       await postMut.mutateAsync(r.id)
       onNotice({
         type: "success",
-        text: `Penerimaan ${r.receipt_number} berhasil dikonfirmasi ke Staging Inbound! Silakan lanjutkan proses Putaway ke rak.`,
+        text: `Penerimaan ${r.receipt_number} berhasil dikonfirmasi ke Area Transit Masuk! Silakan lanjutkan proses Penataan Rak.`,
       })
       refetch()
     } catch (e) {
@@ -1237,7 +1237,7 @@ function InboundReceiptDetail({
               disabled={isProcessing}
               className="px-4 py-2 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm"
             >
-              {isProcessing ? "Memproses..." : "Konfirmasi Masuk Staging"}
+              {isProcessing ? "Memproses..." : "Konfirmasi Masuk Area Transit"}
             </button>
           )}
 
@@ -1258,7 +1258,7 @@ function InboundReceiptDetail({
               title="Kelola wadah palet LPN di gudang"
             >
               <Boxes className="h-3.5 w-3.5 text-emerald-600" />
-              Kelola Palet (LPN)
+              Kelola Palet LPN
             </button>
           )}
 
@@ -1268,7 +1268,7 @@ function InboundReceiptDetail({
               className="px-3.5 py-2 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg shadow-sm inline-flex items-center gap-1"
             >
               <ArrowDownToLine className="h-3.5 w-3.5" />
-              Lanjut Putaway
+              Lanjut Penataan Rak
             </button>
           )}
 
@@ -1322,7 +1322,7 @@ function InboundReceiptDetail({
                   <div className="font-mono text-slate-400 text-[10px]">{it.product_sku}</div>
                 </td>
                 <td className="px-4 py-2.5 font-mono font-medium text-slate-800">
-                  {it.batch_number || "Otomatis di Ledger"}
+                  {it.batch_number || "Otomatis di Buku Besar"}
                 </td>
                 <td className="px-4 py-2.5 text-slate-600">{it.expiry_date ? fmtDate(it.expiry_date) : "-"}</td>
                 <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{fmtQty(it.accepted_qty)}</td>
@@ -1347,7 +1347,7 @@ function InboundReceiptDetail({
             <h3 className="text-base font-semibold text-slate-900">Konfirmasi Pembatalan Penerimaan</h3>
             <p className="text-xs text-slate-500">
               {r.status === "POSTED"
-                ? "Membatalkan penerimaan yang sudah diposting akan membalikkan mutasi buku besar jika stok belum terpakai."
+                ? "Membatalkan penerimaan yang sudah dikonfirmasi akan membalikkan mutasi buku besar jika stok belum terpakai."
                 : "Draf penerimaan akan dibatalkan."}
             </p>
             <div>

@@ -18,8 +18,8 @@ interface RefreshButtonProps {
 }
 
 const LABEL: Record<RefreshStatus, string> = {
-  idle: "Segarkan",
-  refreshing: "Menyegarkan...",
+  idle: "Muat Ulang",
+  refreshing: "Memuat ulang...",
   done: "Diperbarui",
   error: "Gagal",
 }
@@ -46,7 +46,7 @@ export function RefreshButton({
       : status === "error"
       ? "!border-rose-300 !bg-rose-50 !text-rose-700"
       : ""
-  const title = status === "error" && error ? `Gagal menyegarkan: ${error}` : LABEL[status]
+  const title = status === "error" && error ? `Gagal memuat ulang: ${error}` : LABEL[status]
 
   const timeLabel = updatedAt ? formatUpdatedAt(updatedAt) : null
 

@@ -44,35 +44,35 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    label: 'Overview',
+    label: 'Ringkasan',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+      { href: '/dashboard', label: 'Dasbor', icon: LayoutDashboard, exact: true },
     ],
   },
   {
-    label: 'Inventory',
+    label: 'Inventaris',
     items: [
-      { href: '/products', label: 'Products', icon: Box },
+      { href: '/products', label: 'Produk', icon: Box },
     ],
   },
   {
-    label: 'Warehouse & POS',
+    label: 'Gudang & Kasir',
     items: [
       { href: '/wms/arus-barang', label: 'Barang Masuk & Keluar', icon: ArrowLeftRight },
-      { href: '/wms', label: 'Warehouse & Stock', icon: Warehouse, exact: true },
+      { href: '/wms', label: 'Gudang & Stok', icon: Warehouse, exact: true },
       { href: '/wms/marketplace', label: 'Marketplace', icon: ShoppingBag },
-      { href: '/wms/transfers', label: 'Stock Transfers', icon: Truck },
-      { href: '/wms/opname', label: 'Stock Opname', icon: ClipboardCheck },
+      { href: '/wms/transfers', label: 'Transfer Stok', icon: Truck },
+      { href: '/wms/opname', label: 'Stok Opname', icon: ClipboardCheck },
       { href: '/wms/scrap', label: 'Barang Rusak / Scrap', icon: AlertTriangle },
-      { href: '/wms/scanner', label: 'Barcode Scanner', icon: ScanLine },
-      { href: '/pos', label: 'Point of Sale', icon: Store },
+      { href: '/wms/scanner', label: 'Pemindai Barcode', icon: ScanLine },
+      { href: '/pos', label: 'Kasir (POS)', icon: Store },
     ],
   },
   {
-    label: 'Account',
+    label: 'Akun',
     items: [
-      { href: '/settings', label: 'Settings', icon: Settings },
-      { href: '/help', label: 'Help & Support', icon: MessageCircle, tutorial: 'help-support' },
+      { href: '/settings', label: 'Pengaturan', icon: Settings },
+      { href: '/help', label: 'Bantuan', icon: MessageCircle, tutorial: 'help-support' },
     ],
   },
 ]
@@ -163,7 +163,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
             <button
               onClick={onMobileClose}
               className="shrink-0 p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              aria-label="Close menu"
+              aria-label="Tutup menu"
             >
               <X className="h-4 w-4" />
             </button>
@@ -219,7 +219,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                     })()
                   }}
                   className="ml-2 shrink-0 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  aria-label="Logout"
+                  aria-label="Keluar"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                 </button>
@@ -265,8 +265,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
             'shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors',
             collapsed ? 'p-1.5' : 'p-1',
           )}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Bentangkan sidebar' : 'Ciutkan sidebar'}
+          title={collapsed ? 'Bentangkan sidebar' : 'Ciutkan sidebar'}
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />
@@ -352,8 +352,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                   })()
                 }}
                 className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                aria-label="Logout"
-                title="Logout"
+                aria-label="Keluar"
+                title="Keluar"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -372,7 +372,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                   })()
                 }}
                 className="ml-2 shrink-0 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                aria-label="Logout"
+                aria-label="Keluar"
               >
                 <LogOut className="h-3.5 w-3.5" />
               </button>

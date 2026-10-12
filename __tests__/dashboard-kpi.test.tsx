@@ -84,7 +84,7 @@ describe('DashboardPage 8 Enterprise WMS SOP KPIs', () => {
   it('labels the two proxy metrics by what they actually measure', () => {
     mockKPIResult = { data: mockKPIs }
     render(<DashboardPage />)
-    expect(screen.getByText('Picking Tanpa Kerusakan')).toBeInTheDocument()
+    expect(screen.getByText('Pengambilan Tanpa Kerusakan')).toBeInTheDocument()
     expect(screen.getByText('Surat Jalan Terkirim')).toBeInTheDocument()
     expect(screen.queryByText('On-Time Shipment')).not.toBeInTheDocument()
     expect(screen.queryByText('Picking Accuracy')).not.toBeInTheDocument()

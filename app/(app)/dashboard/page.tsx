@@ -197,7 +197,7 @@ export default function DashboardPage() {
 
       <div className="flex items-start justify-between gap-3" data-tutorial="dashboard-header">
         <div>
-          <h1 className="text-lg font-bold tracking-tight text-foreground">Dashboard</h1>
+          <h1 className="text-lg font-bold tracking-tight text-foreground">Dasbor</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Ringkasan kasir POS, gudang dan stok, penjualan, serta aktivitas barang keluar.
           </p>
@@ -341,7 +341,7 @@ export default function DashboardPage() {
         </section>
 
         <section className="border border-border/60 rounded-lg bg-card">
-          <SectionHeader icon={Warehouse} title="Gudang & Monitoring Stok" href="/wms" linkLabel="Kelola Gudang" />
+          <SectionHeader icon={Warehouse} title="Gudang & Pemantauan Stok" href="/wms" linkLabel="Kelola Gudang" />
           <div className="p-5 space-y-4">
             <div className="grid grid-cols-3 gap-2.5">
               <MiniStat label="Gudang / Lokasi" value={`${s.wms.total_warehouses} / ${s.wms.total_locations}`} />
@@ -411,7 +411,7 @@ export default function DashboardPage() {
               href="/wms/arus-barang"
               className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
             >
-              Monitor Arus Barang <ExternalLink className="h-3 w-3" />
+              Pantau Arus Barang <ExternalLink className="h-3 w-3" />
             </Link>
           </div>
         </div>
@@ -498,7 +498,7 @@ export default function DashboardPage() {
                 samples={kpis?.order_to_dispatch_samples}
               />
               <SOPKPICard
-                label="Picking Tanpa Kerusakan"
+                label="Pengambilan Tanpa Kerusakan"
                 value={kpis?.picking_accuracy_pct}
                 unit="%"
                 target="Target: ≥ 99.8%"
@@ -585,7 +585,7 @@ export default function DashboardPage() {
             {/* Top 10 Produk Keluar */}
             <div className="space-y-1.5">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
-                <span>Top 10 Produk Keluar ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
+                <span>10 Produk Keluar Teratas ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
                 <span>Jumlah Fisik</span>
               </div>
               {s.outbound.top_products.length > 0 ? (
@@ -612,7 +612,7 @@ export default function DashboardPage() {
             {/* Top 10 Toko / Pelanggan Teraktif */}
             <div className="space-y-1.5">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
-                <span>Top 10 Toko / Pelanggan Teraktif ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
+                <span>10 Toko / Pelanggan Teraktif ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
                 <span>Nilai Transaksi</span>
               </div>
               {s.outbound.top_customers.length > 0 ? (

@@ -20,7 +20,7 @@ export function AnomalyBadge({ score, detected }: AnomalyBadgeProps) {
   return (
     <span className="flex items-center gap-1 text-red-600 text-sm">
       <Icon name="AlertTriangle" size="sm" />
-      Anomaly ({score.toFixed(1)}%)
+      Anomali ({score.toFixed(1)}%)
     </span>
   )
 }

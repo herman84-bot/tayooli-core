@@ -7,9 +7,25 @@ import React from "react"
 import { Printer, X, CheckSquare, Package, MapPin, Calendar, User, FileText } from "lucide-react"
 import { PickingTaskDetail } from "@/lib/api"
 
-interface PrintPickingListProps {
+export interface PrintPickingListProps {
   detail: PickingTaskDetail
   onClose: () => void
+}
+
+const ORDER_TYPE_LABELS: Record<string, string> = {
+  DIRECT_DO: "SURAT JALAN LANGSUNG",
+  SALES_ORDER: "PESANAN PENJUALAN",
+  TRANSFER: "TRANSFER STOK",
+  CONSIGNMENT: "KONSINYASI",
+}
+
+const PICKING_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Menunggu",
+  ASSIGNED: "Ditugaskan",
+  IN_PROGRESS: "Sedang Berjalan",
+  PICKED: "Diambil",
+  COMPLETED: "Selesai",
+  CANCELLED: "Dibatalkan",
 }
 
 export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
@@ -26,7 +42,7 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
         <div className="flex items-center justify-between border-b pb-4 mb-6 print:hidden">
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-indigo-600" />
-            <h2 className="text-lg font-bold text-zinc-800">Pratinjau Cetak Picking List</h2>
+            <h2 className="text-lg font-bold text-zinc-800">Pratinjau Cetak Daftar Pengambilan</h2>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -52,15 +68,15 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
           <div className="border-b-2 border-zinc-900 pb-4 flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-black tracking-tight text-zinc-900 uppercase">
-                DAFTAR AMBIL BARANG (PICKING LIST)
+                DAFTAR PENGAMBILAN BARANG
               </h1>
               <p className="text-xs text-zinc-500 font-mono mt-0.5">
-                No. Task: {task.task_number || `PICK-${order.do_number}`}
+                No. Tugas: {task.task_number || `PICK-${order.do_number}`}
               </p>
             </div>
             <div className="text-right">
               <span className="inline-block px-2.5 py-1 rounded bg-zinc-100 text-zinc-800 text-xs font-bold tracking-wider uppercase border border-zinc-300">
-                {order.order_type || "DIRECT_DO"}
+                {order.order_type ? (ORDER_TYPE_LABELS[order.order_type] || order.order_type) : "SURAT JALAN LANGSUNG"}
               </span>
               <p className="text-xs text-zinc-500 mt-1">
                 Dicetak: {new Date().toLocaleString("id-ID")}
@@ -71,7 +87,7 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
           {/* Metadata Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-50 p-4 rounded-lg border border-zinc-200 print:bg-transparent print:border-zinc-300">
             <div>
-              <span className="text-xs text-zinc-500 block">Surat Jalan (DO)</span>
+              <span className="text-xs text-zinc-500 block">Surat Jalan</span>
               <span className="font-bold font-mono text-zinc-800">{order.do_number}</span>
             </div>
             <div>
@@ -81,14 +97,14 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
               </span>
             </div>
             <div>
-              <span className="text-xs text-zinc-500 block">Petugas Picker</span>
+              <span className="text-xs text-zinc-500 block">Petugas Pengambil</span>
               <span className="font-semibold text-zinc-800">
                 {task.picker_name || "Belum Ditugaskan"}
               </span>
             </div>
             <div>
               <span className="text-xs text-zinc-500 block">Status Pengambilan</span>
-              <span className="font-bold text-indigo-700">{task.status}</span>
+              <span className="font-bold text-indigo-700">{PICKING_STATUS_LABELS[task.status] || task.status}</span>
             </div>
           </div>
 
@@ -102,8 +118,8 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
                   <th className="py-2.5 px-3">Lokasi Rak</th>
                   <th className="py-2.5 px-3">SKU & Nama Barang</th>
                   <th className="py-2.5 px-3">Batch / Kedaluwarsa</th>
-                  <th className="py-2.5 px-3 text-right">Qty Minta</th>
-                  <th className="py-2.5 px-3 text-right">Qty Ambil</th>
+                  <th className="py-2.5 px-3 text-right">Jml Diminta</th>
+                  <th className="py-2.5 px-3 text-right">Jml Diambil</th>
                   <th className="py-2.5 px-3 text-center">Catatan / Paraf</th>
                 </tr>
               </thead>
@@ -137,7 +153,7 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
                         <div className="font-mono text-zinc-800">{item.batch_number || "-"}</div>
                         {item.expiry_date && (
                           <div className="text-zinc-500 text-[11px]">
-                            Exp: {new Date(item.expiry_date).toLocaleDateString("id-ID")}
+                            Kedaluwarsa: {new Date(item.expiry_date).toLocaleDateString("id-ID")}
                           </div>
                         )}
                       </td>
@@ -159,7 +175,7 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
                 ) : (
                   <tr>
                     <td colSpan={8} className="py-6 text-center text-zinc-500">
-                      Tidak ada item dalam picking task ini.
+                      Tidak ada item dalam tugas pengambilan ini.
                     </td>
                   </tr>
                 )}
@@ -178,7 +194,7 @@ export function PrintPickingList({ detail, onClose }: PrintPickingListProps) {
 
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
-                <p className="text-xs text-zinc-500 mb-12">Petugas Picker,</p>
+                <p className="text-xs text-zinc-500 mb-12">Petugas Pengambil,</p>
                 <div className="border-b border-zinc-400 w-32 mx-auto"></div>
                 <p className="text-xs font-semibold mt-1">
                   ( {task.picker_name || "...................."} )

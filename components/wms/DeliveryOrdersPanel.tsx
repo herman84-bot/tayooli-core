@@ -156,6 +156,17 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
     return labels[status] || status
   }
 
+  const getOrderTypeLabel = (type?: string | null): string => {
+    if (!type) return "Surat Jalan Langsung"
+    const labels: Record<string, string> = {
+      DIRECT_DO: "Surat Jalan Langsung",
+      SALES_ORDER: "Pesanan Penjualan B2B",
+      MARKETPLACE: "Marketplace",
+      TRANSFER: "Transfer Stok",
+    }
+    return labels[type] || type
+  }
+
   const fmtDate = (iso?: string | null): string => {
     if (!iso) return ""
     const d = new Date(iso)
@@ -170,10 +181,10 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
     { header: "Gudang", value: (d) => getWarehouseName(d.warehouse_id), width: 22 },
     { header: "Status", value: (d) => getStatusLabel(d.status), width: 18 },
     { header: "Penerima", value: (d) => d.recipient_name || "", width: 22 },
-    { header: "Driver", value: (d) => d.driver_name || "", width: 22 },
+    { header: "Sopir", value: (d) => d.driver_name || "", width: 22 },
     { header: "Plat Kendaraan", value: (d) => d.vehicle_plate || "", width: 18 },
     { header: "Ekspedisi", value: (d) => d.expedition_name || "", width: 22 },
-    { header: "No. Tracking", value: (d) => d.tracking_number || "", width: 22 },
+    { header: "No. Resi", value: (d) => d.tracking_number || "", width: 22 },
     { header: "Tgl Diterima", value: (d) => fmtDate(d.received_date), width: 20 },
   ]
   const doExportFilters: ExportFilter<DeliveryOrder>[] = [
@@ -283,7 +294,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
     } catch (err: any) {
       setToast({
         type: "error",
-        message: err.message || "Gagal memuat Picking Task",
+        message: err.message || "Gagal memuat tugas pengambilan",
       })
     } finally {
       setLoadingPicking(false)
@@ -300,7 +311,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
     } catch (err: any) {
       setToast({
         type: "error",
-        message: err.message || "Gagal memuat item stasiun kemas",
+        message: err.message || "Gagal memuat barang meja kemas",
       })
     } finally {
       setLoadingPackStation(false)
@@ -316,7 +327,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
     } catch (err: any) {
       setToast({
         type: "error",
-        message: err.message || "Gagal memuat data label thermal",
+        message: err.message || "Gagal memuat data label resi thermal",
       })
     } finally {
       setLoadingThermal(false)
@@ -370,7 +381,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
     } catch (err: unknown) {
       setToast({
         type: "error",
-        message: err instanceof Error ? err.message : "Gagal melakukan dispatch Surat Jalan.",
+        message: err instanceof Error ? err.message : "Gagal mengirim Surat Jalan.",
       })
     }
   }
@@ -434,7 +445,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
     }
     const soRef = salesOrderId.trim()
     if (soRef && !UUID_RE.test(soRef)) {
-      setModalError("Ref. Sales Order harus berupa ID Sales Order yang valid, atau kosongkan untuk Surat Jalan langsung.")
+      setModalError("Ref. Pesanan Penjualan harus berupa ID yang valid, atau kosongkan untuk Surat Jalan langsung.")
       return
     }
 
@@ -548,7 +559,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
               <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100">
                 <FileCheck className="h-6 w-6" />
               </div>
-              Surat Jalan & Delivery Orders
+              Surat Jalan
             </h1>
             <p className="text-xs sm:text-sm text-slate-500">
               Penerbitan dokumen legal serah terima pengiriman, pelacakan armada ekspedisi, dan pemotongan stok otomatis.
@@ -562,7 +573,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                   onClick={() => refetch()}
                   disabled={isFetching}
                   className="p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors disabled:opacity-50"
-                  title="Segarkan data"
+                  title="Muat ulang data"
                 >
                   <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
                 </button>
@@ -571,10 +582,10 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                 <button
                   onClick={() => setIsWaveModalOpen(true)}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-lg font-semibold text-xs border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95 transition-all shadow-xs"
-                  title="Gabungkan beberapa Surat Jalan menjadi satu daftar picking"
+                  title="Gabungkan beberapa Surat Jalan menjadi satu daftar pengambilan"
                 >
                   <Layers className="h-4 w-4 text-indigo-600" />
-                  <span>Gabung Picking</span>
+                  <span>Gabung Pengambilan</span>
                 </button>
 
                 <button
@@ -603,7 +614,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
             }`}
           >
             <FileCheck className="w-4 h-4" />
-            <span>Surat Jalan (DO)</span>
+            <span>Surat Jalan</span>
           </button>
           <button
             type="button"
@@ -615,7 +626,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
             }`}
           >
             <Truck className="w-4 h-4" />
-            <span>Manifest Ekspedisi</span>
+            <span>Manifes Ekspedisi</span>
           </button>
         </div>
 
@@ -638,11 +649,11 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
 
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-xs">
             <div className="flex items-center justify-between text-amber-600 text-xs mb-1">
-              <span>Siap Dikirim (Draft)</span>
+              <span>Siap Dikirim</span>
               <Clock className="h-4 w-4 text-amber-500" />
             </div>
             <div className="text-2xl font-bold text-amber-600">{metrics.draft}</div>
-            <div className="text-[11px] text-slate-400 mt-1">Menunggu armada & dispatch</div>
+            <div className="text-[11px] text-slate-400 mt-1">Menunggu armada & pengiriman</div>
           </div>
 
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-xs">
@@ -688,9 +699,9 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
               {[
                 { label: "Semua", value: "ALL" },
-                { label: "Draft", value: "DRAFT" },
-                { label: "Shipped", value: "SHIPPED" },
-                { label: "Delivered", value: "DELIVERED" },
+                { label: "Draf", value: "DRAFT" },
+                { label: "Dikirim", value: "SHIPPED" },
+                { label: "Diterima", value: "DELIVERED" },
               ].map((tab) => (
                 <button
                   key={tab.value}
@@ -712,7 +723,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Cari No. DO, penerima, supir..."
+              placeholder="Cari No. Surat Jalan, penerima, sopir..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white transition"
@@ -732,7 +743,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
               <Truck className="h-10 w-10 mx-auto text-slate-300 stroke-[1.5]" />
               <p className="text-sm font-medium text-slate-800">Tidak ada Surat Jalan yang ditemukan</p>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Silakan ubah filter atau terbitkan Surat Jalan pengiriman baru untuk memulai proses dispatch.
+                Silakan ubah filter atau terbitkan Surat Jalan pengiriman baru untuk memulai proses pengiriman.
               </p>
             </div>
           ) : (
@@ -744,10 +755,10 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                     <th className="py-3.5 px-4">Gudang Asal</th>
                     <th className="py-3.5 px-4">Pelanggan / Penerima</th>
                     <th className="py-3.5 px-4">Tipe & Ref</th>
-                    <th className="py-3.5 px-4">Ekspedisi & Driver</th>
+                    <th className="py-3.5 px-4">Ekspedisi & Sopir</th>
                     <th className="py-3.5 px-4">Pelaku (Dibuat / Disetujui / Dikemas / Dikirim)</th>
                     <th className="py-3.5 px-4">Status</th>
-                    <th className="py-3.5 px-4 text-right">Aksi Outbound</th>
+                    <th className="py-3.5 px-4 text-right">Aksi Barang Keluar</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -773,14 +784,14 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                           {getWarehouseName(order.warehouse_id)}
                         </td>
                         <td className="py-3.5 px-4">
-                          <div className="font-bold text-slate-900">{order.customer_name || order.recipient_name || "Pelanggan Retail"}</div>
+                          <div className="font-bold text-slate-900">{order.customer_name || order.recipient_name || "Pelanggan Umum"}</div>
                           {order.customer_name && order.recipient_name && (
                             <div className="text-[10px] text-slate-500">U.P: {order.recipient_name}</div>
                           )}
                         </td>
                         <td className="py-3.5 px-4">
                           <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[10px] font-bold">
-                            {order.order_type || "DIRECT_DO"}
+                            {getOrderTypeLabel(order.order_type)}
                           </span>
                           {order.sales_order_id && (
                             <div className="text-[10px] font-mono text-slate-400 mt-0.5">SO: {order.sales_order_id.slice(0, 8)}</div>
@@ -788,7 +799,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="text-slate-800 font-medium">{order.expedition_name || "Internal"}</div>
-                          <div className="text-[10px] text-slate-500">{order.driver_name ? `Supir: ${order.driver_name}` : (order.vehicle_plate || "—")}</div>
+                          <div className="text-[10px] text-slate-500">{order.driver_name ? `Sopir: ${order.driver_name}` : (order.vehicle_plate || "—")}</div>
                         </td>
                         <td className="py-3.5 px-4 text-[11px] text-slate-600">
                           <div>Buat: <span className="font-medium text-slate-800">{order.created_by_name || "Admin"}</span></div>
@@ -808,7 +819,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                               order.status
                             )}`}
                           >
-                            {order.status}
+                            {getStatusLabel(order.status)}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-right">
@@ -831,16 +842,16 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                             </button>
                             <button
                               onClick={() => handleOpenPicking(order)}
-                              title="Cetak Picking List (Terurut Rak)"
+                              title="Cetak Daftar Pengambilan (Terurut Rak)"
                               className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-indigo-200 bg-indigo-50/50 text-indigo-700 hover:bg-indigo-100 text-[11px] font-medium shadow-2xs"
                             >
                               <ClipboardList className="h-3 w-3 text-indigo-600" />
-                              Picking
+                              Pengambilan
                             </button>
                             {(order.status === "DRAFT" || order.status === "CONFIRMED" || order.status === "PICKED" || order.status === "PACKED") && (
                               <button
                                 onClick={() => handleOpenPackStation(order)}
-                                title="Buka Meja Kemas Barcode Scanner"
+                                title="Buka Meja Kemas Pemindai Barcode"
                                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 text-[11px] font-semibold shadow-2xs"
                               >
                                 <Barcode className="h-3 w-3 text-amber-700" />
@@ -888,7 +899,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
           isOpen={!!selectedDoForAudit}
           onClose={() => setSelectedDoForAudit(null)}
           title={selectedDoForAudit.do_number}
-          subtitle={`Surat Jalan Keluar (${selectedDoForAudit.order_type || "DIRECT_DO"})`}
+          subtitle={`Surat Jalan Keluar (${getOrderTypeLabel(selectedDoForAudit.order_type)})`}
           entityType="delivery_order"
           entityId={selectedDoForAudit.id}
           actors={{
@@ -927,13 +938,13 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
             </div>
 
             <p className="text-sm text-slate-600 leading-relaxed">
-              Konfirmasi pengiriman Surat Jalan ini? Status akan diperbarui menjadi <strong>SHIPPED</strong> dan stok gudang otomatis dipotong untuk pelanggan tujuan.
+              Konfirmasi pengiriman Surat Jalan ini? Status akan diperbarui menjadi <strong>DIKIRIM</strong> dan stok gudang otomatis dipotong untuk pelanggan tujuan.
             </p>
             {(!orderToDispatch.driver_name?.trim() ||
               !orderToDispatch.vehicle_plate?.trim() ||
               !orderToDispatch.expedition_name?.trim()) && (
               <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-800">
-                Peringatan: Data armada pengiriman (Nama Sopir, Plat Nomor, Ekspedisi) belum lengkap pada Surat Jalan ini. Backend mewajibkan data tersebut sebelum dispatch.
+                Peringatan: Data armada pengiriman (Nama Sopir, Plat Nomor, Ekspedisi) belum lengkap pada Surat Jalan ini. Sistem mewajibkan data tersebut sebelum pengiriman.
               </p>
             )}
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
@@ -998,20 +1009,20 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-slate-700 font-semibold">Nomor Surat Jalan (DO) *</label>
+                  <label className="text-slate-700 font-semibold">Nomor Surat Jalan *</label>
                   <input
                     type="text"
                     required
                     value={doNumber}
                     onChange={(e) => setDoNumber(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                    placeholder="e.g. DO/2026/09/0001"
+                    placeholder="Contoh: DO/2026/09/0001"
                   />
                 </div>
 
                 <div className="space-y-1">
                   <label htmlFor="do-sales-order-ref" className="text-slate-700 font-semibold">
-                    Ref. Sales Order <span className="font-normal text-slate-400">(opsional)</span>
+                    Ref. Pesanan Penjualan <span className="font-normal text-slate-400">(opsional)</span>
                   </label>
                   <input
                     id="do-sales-order-ref"
@@ -1042,7 +1053,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-slate-700 font-semibold">Pilih Pelanggan (Customer)</label>
+                    <label className="text-slate-700 font-semibold">Pilih Pelanggan</label>
                     <button
                       type="button"
                       onClick={() => setShowQuickCustomerModal(true)}
@@ -1060,7 +1071,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                     }}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   >
-                    <option value="">Pilih dari database pelanggan...</option>
+                    <option value="">Pilih dari daftar pelanggan...</option>
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name} {c.phone ? `(${c.phone})` : ""}
@@ -1078,10 +1089,10 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                     onChange={(e) => setOrderType(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-medium"
                   >
-                    <option value="DIRECT_DO">Surat Jalan Langsung (DIRECT_DO)</option>
-                    <option value="SALES_ORDER">Pesanan Penjualan B2B (SALES_ORDER)</option>
+                    <option value="DIRECT_DO">Surat Jalan Langsung</option>
+                    <option value="SALES_ORDER">Pesanan Penjualan B2B</option>
                     <option value="MARKETPLACE">Pesanan Marketplace</option>
-                    <option value="TRANSFER">Transfer Antar Gudang / Cabang (TRANSFER)</option>
+                    <option value="TRANSFER">Transfer Antar Gudang / Cabang</option>
                   </select>
                 </div>
 
@@ -1093,7 +1104,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                    placeholder="e.g. Toko Berkah Mandiri / Bpk. Hendra"
+                    placeholder="Contoh: Toko Berkah Mandiri / Bpk. Hendra"
                   />
                 </div>
               </div>
@@ -1106,18 +1117,18 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                     value={expeditionName}
                     onChange={(e) => setExpeditionName(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                    placeholder="e.g. JNE Trucking"
+                    placeholder="Contoh: JNE Trucking"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-slate-700 font-semibold">Nama Sopir / Driver</label>
+                  <label className="text-slate-700 font-semibold">Nama Sopir</label>
                   <input
                     type="text"
                     value={driverName}
                     onChange={(e) => setDriverName(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                    placeholder="e.g. Bambang Sudarsono"
+                    placeholder="Contoh: Bambang Sudarsono"
                   />
                 </div>
 
@@ -1128,7 +1139,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                     value={vehiclePlate}
                     onChange={(e) => setVehiclePlate(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-                    placeholder="e.g. B 9482 TKL"
+                    placeholder="Contoh: B 9482 TKL"
                   />
                 </div>
               </div>
@@ -1176,7 +1187,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                           >
                             {products.map((p) => (
                               <option key={p.id} value={p.id}>
-                                {p.name} ({p.sku || "NO-SKU"})
+                                {p.name} ({p.sku || "Tanpa SKU"})
                               </option>
                             ))}
                           </select>
@@ -1211,7 +1222,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                             min="1"
                             step="1"
                             inputMode="numeric"
-                            aria-label={`Qty baris ${idx + 1}`}
+                            aria-label={`Jumlah baris ${idx + 1}`}
                             aria-invalid={!!lineChecks[idx]?.error}
                             value={Number.isFinite(item.quantity) ? item.quantity : ""}
                             onChange={(e) => {
@@ -1232,7 +1243,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                             <span role="alert" className="text-rose-600 font-semibold">{lineChecks[idx].error}</span>
                           ) : lineChecks[idx]?.remaining !== undefined ? (
                             <span className="text-slate-500">
-                              Sisa available {item.locationId ? "di rak ini" : "(semua rak)"}: {lineChecks[idx].remaining}
+                              Sisa tersedia {item.locationId ? "di rak ini" : "(semua rak)"}: {lineChecks[idx].remaining}
                             </span>
                           ) : modalStockLoading ? (
                             <span className="text-slate-400">Memeriksa stok gudang...</span>
@@ -1337,7 +1348,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
             setSelectedDoForPackStation(null)
             setToast({
               type: "success",
-              message: `Surat Jalan ${updatedOrder.do_number} telah selesai dikemas 100% (PACKED).`,
+              message: `Surat Jalan ${updatedOrder.do_number} telah selesai dikemas 100%.`,
             })
             refetch()
           }}
@@ -1388,7 +1399,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                   required
                   value={newCustName}
                   onChange={(e) => setNewCustName(e.target.value)}
-                  placeholder="e.g. Toko Berkah Abadi"
+                  placeholder="Contoh: Toko Berkah Abadi"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                   autoFocus
                 />
@@ -1400,7 +1411,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                   type="text"
                   value={newCustPhone}
                   onChange={(e) => setNewCustPhone(e.target.value)}
-                  placeholder="e.g. 081234567890"
+                  placeholder="Contoh: 081234567890"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                 />
               </div>
@@ -1411,7 +1422,7 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                   rows={2}
                   value={newCustAddress}
                   onChange={(e) => setNewCustAddress(e.target.value)}
-                  placeholder="e.g. Jl. Raya Industri No. 45, Cikarang"
+                  placeholder="Contoh: Jl. Raya Industri No. 45, Cikarang"
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
                 />
               </div>

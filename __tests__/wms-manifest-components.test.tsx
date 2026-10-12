@@ -466,7 +466,7 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
         />
       )
 
-      expect(screen.getAllByText(/MANIFEST SERAH TERIMA PENGIRIMAN/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/MANIFES SERAH TERIMA PENGIRIMAN/i).length).toBeGreaterThan(0)
       expect(screen.getByText('MAN-20261008-001')).toBeInTheDocument()
       expect(screen.getByText(/: JNE Trucking \(JTR\)/i)).toBeInTheDocument()
       expect(screen.getByText(/: Budi Santoso/i)).toBeInTheDocument()
@@ -480,7 +480,7 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
       expect(screen.getByText('Semarang')).toBeInTheDocument()
 
       // Summary
-      expect(screen.getByText(/TOTAL SUMMARY:/i)).toBeInTheDocument()
+      expect(screen.getByText(/TOTAL KESELURUHAN:/i)).toBeInTheDocument()
       expect(screen.getByText(/25.50 kg/i)).toBeInTheDocument()
       expect(screen.getAllByText('2').length).toBeGreaterThan(0) // 2 koli
 
@@ -498,7 +498,7 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
         />
       )
 
-      const printBtn = screen.getByRole('button', { name: /Cetak \/ Cetak PDF/i })
+      const printBtn = screen.getByRole('button', { name: /Cetak PDF/i })
       fireEvent.click(printBtn)
       expect(window.print).toHaveBeenCalledTimes(1)
 
@@ -513,28 +513,28 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
       render(<ShippingManifestsPanel warehouseId="wh-1" />)
 
       // Metrics
-      expect(screen.getByText('Total Manifest')).toBeInTheDocument()
-      expect(screen.getByText('Staged (Siap Muat)')).toBeInTheDocument()
-      expect(screen.getByText('Loaded (Terpindai Penuh)')).toBeInTheDocument()
-      expect(screen.getByText('Dispatched (Berangkat)')).toBeInTheDocument()
+      expect(screen.getByText('Total Manifes')).toBeInTheDocument()
+      expect(screen.getByText('Area Transit (Siap Muat)')).toBeInTheDocument()
+      expect(screen.getByText('Terpindai Penuh')).toBeInTheDocument()
+      expect(screen.getByText('Dikirim (Berangkat)')).toBeInTheDocument()
 
       // Table rows
       expect(screen.getByText('MAN-20261008-001')).toBeInTheDocument()
       expect(screen.getByText('MAN-20261008-002')).toBeInTheDocument()
       expect(screen.getByText('MAN-20261008-003')).toBeInTheDocument()
-      expect(screen.getAllByText(/STAGED \(Siap Muat\)/i).length).toBeGreaterThan(0)
-      expect(screen.getByText(/LOADED \(Terpindai\)/i)).toBeInTheDocument()
-      expect(screen.getAllByText(/DISPATCHED \(Berangkat\)/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Siap Muat/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Terpindai/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Dikirim/i).length).toBeGreaterThan(0)
     })
 
     it('opens Create Manifest modal, calculates selected DOs weight, and submits', async () => {
       render(<ShippingManifestsPanel warehouseId="wh-1" />)
 
-      // Click "Buat Manifest Baru"
-      const createBtn = screen.getByRole('button', { name: /Buat Manifest Baru/i })
+      // Click "Buat Manifes Baru"
+      const createBtn = screen.getByRole('button', { name: /Buat Manifes Baru/i })
       fireEvent.click(createBtn)
 
-      expect(screen.getByText(/Buat Manifest Ekspedisi Baru/i)).toBeInTheDocument()
+      expect(screen.getByText(/Buat Manifes Ekspedisi Baru/i)).toBeInTheDocument()
       expect(screen.getByText(/Pilih Surat Jalan Siap Muat/i)).toBeInTheDocument()
 
       // Fill driver & vehicle plate
@@ -552,7 +552,7 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
       expect(screen.getByText(/Terpilih:/i)).toHaveTextContent(/1 Surat Jalan/i)
 
       // Submit form
-      const submitBtn = screen.getByRole('button', { name: /^Buat Manifest$/i })
+      const submitBtn = screen.getByRole('button', { name: /^Buat Manifes$/i })
       fireEvent.click(submitBtn)
 
       await waitFor(() => {
@@ -570,12 +570,12 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
     it('opens Loading Scan drawer and submits scanned barcode', async () => {
       render(<ShippingManifestsPanel warehouseId="wh-1" />)
 
-      // Click first "Scan / Detail" button
-      const scanBtns = screen.getAllByRole('button', { name: /Scan \/ Detail/i })
+      // Click first "Pindai / Detail" button
+      const scanBtns = screen.getAllByRole('button', { name: /Pindai \/ Detail/i })
       fireEvent.click(scanBtns[0])
 
-      expect(screen.getByText(/Loading Scan & Verifikasi Koli Truk/i)).toBeInTheDocument()
-      expect(screen.getByText(/Progress Pemuatan ke Truk:/i)).toBeInTheDocument()
+      expect(screen.getByText(/Pindai Muat & Verifikasi Koli Truk/i)).toBeInTheDocument()
+      expect(screen.getByText(/Progres Pemuatan ke Truk:/i)).toBeInTheDocument()
 
       // Verify item rows
       expect(screen.getByText('DO/20261008/1001')).toBeInTheDocument()
@@ -583,7 +583,7 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
       expect(screen.getByText('DO/20261008/1002')).toBeInTheDocument()
 
       // Scan barcode input
-      const scanInput = screen.getByPlaceholderText(/Scan barcode Surat Jalan/i)
+      const scanInput = screen.getByPlaceholderText(/Pindai barcode Surat Jalan/i)
       fireEvent.change(scanInput, { target: { value: 'DO/20261008/1002' } })
 
       const verifyBtn = screen.getByRole('button', { name: /Verifikasi Muat/i })
@@ -602,10 +602,10 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
       render(<ShippingManifestsPanel warehouseId="wh-1" />)
 
       // Click Dispatch on first manifest
-      const dispatchBtns = screen.getAllByRole('button', { name: /^Dispatch$/i })
+      const dispatchBtns = screen.getAllByRole('button', { name: /^Kirim$/i })
       fireEvent.click(dispatchBtns[0])
 
-      expect(screen.getByText(/Dispatch & Serah Terima Pengemudi/i)).toBeInTheDocument()
+      expect(screen.getByText(/Pengiriman & Serah Terima Pengemudi/i)).toBeInTheDocument()
       expect(screen.getByText(/Tanda Tangan Digital Pengemudi \/ Kurir/i)).toBeInTheDocument()
 
       // Draw signature on canvas
@@ -620,8 +620,8 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
 
       expect(screen.getByText(/Tanda tangan tersimpan dan siap diverifikasi/i)).toBeInTheDocument()
 
-      // Click "Konfirmasi & Dispatch"
-      const confirmDispatchBtn = screen.getByRole('button', { name: /Konfirmasi & Dispatch/i })
+      // Click "Konfirmasi & Kirim"
+      const confirmDispatchBtn = screen.getByRole('button', { name: /Konfirmasi & Kirim/i })
       fireEvent.click(confirmDispatchBtn)
 
       await waitFor(() => {
@@ -637,24 +637,24 @@ describe('Task 5: WMS Shipping Manifests & Digital Signature Components', () => 
   })
 
   describe('4. DeliveryOrdersPanel Tab Toggle Integration', () => {
-    it('toggles between Surat Jalan (DO) and Manifest Ekspedisi submodules', async () => {
+    it('toggles between Surat Jalan and Manifes Ekspedisi submodules', async () => {
       render(<DeliveryOrdersPanel />)
 
-      // Initially shows Surat Jalan (DO) tab active
-      expect(screen.getByRole('button', { name: /Surat Jalan \(DO\)/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Manifest Ekspedisi/i })).toBeInTheDocument()
+      // Initially shows Surat Jalan tab active
+      expect(screen.getByRole('button', { name: /^Surat Jalan$/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Manifes Ekspedisi/i })).toBeInTheDocument()
       expect(screen.getByText('Total Surat Jalan')).toBeInTheDocument()
 
-      // Switch to Manifest Ekspedisi tab
-      const manifestTabBtn = screen.getByRole('button', { name: /Manifest Ekspedisi/i })
+      // Switch to Manifes Ekspedisi tab
+      const manifestTabBtn = screen.getByRole('button', { name: /Manifes Ekspedisi/i })
       fireEvent.click(manifestTabBtn)
 
       // ShippingManifestsPanel should now be rendered
-      expect(screen.getByText(/Total Manifest/i)).toBeInTheDocument()
+      expect(screen.getByText(/Total Manifes/i)).toBeInTheDocument()
       expect(screen.getByText('MAN-20261008-001')).toBeInTheDocument()
 
       // Switch back to DO tab
-      const doTabBtn = screen.getByRole('button', { name: /Surat Jalan \(DO\)/i })
+      const doTabBtn = screen.getByRole('button', { name: /^Surat Jalan$/i })
       fireEvent.click(doTabBtn)
 
       expect(screen.getByText(/Total Surat Jalan/i)).toBeInTheDocument()

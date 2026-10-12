@@ -162,15 +162,15 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
 
   it('renders page header and MASUK / KELUAR toggle buttons', () => {
     render(<ArusBarangPage />)
-    expect(screen.getByText(/Arus Barang \(Masuk & Keluar\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Barang Masuk & Keluar/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /BARANG MASUK/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /BARANG KELUAR/i })).toBeInTheDocument()
   })
 
   it('renders MASUK sub-tabs: Penerimaan, Putaway, Lacak Batch, QC', () => {
     render(<ArusBarangPage />)
-    expect(screen.getByRole('button', { name: /Penerimaan \(GR\)/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Putaway ke Rak/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Penerimaan Barang/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Penataan Rak/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Lacak Batch/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /QC & Karantina/i })).toBeInTheDocument()
   })
@@ -182,10 +182,10 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
 
     expect(mockRouterReplace).toHaveBeenCalledWith('/wms/arus-barang?mode=keluar')
     rerender(<ArusBarangPage />) // router.replace updates the search params
-    expect(screen.getAllByRole('button', { name: /Surat Jalan \(DO\)/i })[0]).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Picking Wave/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Packing Station/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Manifest & Muat/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Surat Jalan$/i })[0]).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Pengambilan Gelombang/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Stasiun Pengemasan/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Manifes & Muat/i })).toBeInTheDocument()
   })
 
   // Regression (prod bug): ?mode=keluar must win over a stale localStorage "masuk".
@@ -193,8 +193,8 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
     localStorage.setItem('wms_arus_barang_mode', 'masuk')
     currentMode = 'keluar'
     render(<ArusBarangPage />)
-    expect(screen.getAllByRole('button', { name: /Surat Jalan \(DO\)/i })[0]).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Penerimaan \(GR\)/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Surat Jalan$/i })[0]).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Penerimaan Barang/i })).not.toBeInTheDocument()
     expect(mockRouterReplace).not.toHaveBeenCalled()
     expect(localStorage.getItem('wms_arus_barang_mode')).toBe('keluar')
   })
@@ -216,7 +216,7 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
 
   it('switches to Putaway tab and displays pending lines in staging', () => {
     render(<ArusBarangPage />)
-    const putawayTab = screen.getByRole('button', { name: /Putaway ke Rak/i })
+    const putawayTab = screen.getByRole('button', { name: /Penataan Rak/i })
     fireEvent.click(putawayTab)
 
     expect(screen.getByText('Kopi Robusta 500g')).toBeInTheDocument()

@@ -154,7 +154,7 @@ describe("WMS Frontend Fraud Controls", () => {
     render(<DeliveryOrdersPanel />)
 
     // Row DO-DRAFT-01 and DO-CONF-01 should not have Kirim button
-    const kirimButtons = screen.queryAllByRole("button", { name: /Kirim/i })
+    const kirimButtons = screen.queryAllByRole("button", { name: /^Kirim$/i })
     expect(kirimButtons.length).toBe(1)
     expect(screen.getByText("DO-PACKED-01")).toBeInTheDocument()
   })
@@ -180,7 +180,7 @@ describe("WMS Frontend Fraud Controls", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Karantina & Catat Scrap/i }))
 
-    expect(await screen.findByText(/Alasan pemusnahan\/scrap barang harus minimal 10 karakter/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Alasan pemusnahan barang harus minimal 10 karakter/i)).toBeInTheDocument()
 
     // Now try quantity > 10 for warehouse role
     fireEvent.change(screen.getByDisplayValue("5"), { target: { value: "15" } })
@@ -238,7 +238,7 @@ describe("WMS Frontend Fraud Controls", () => {
     // Open active opname drawer
     fireEvent.click(screen.getByRole("button", { name: /Buka Penghitungan/i }))
 
-    // The submit button for warehouse role should say "Ajukan untuk Persetujuan (Pending Approval)"
-    expect(screen.getByRole("button", { name: /Ajukan untuk Persetujuan \(Pending Approval\)/i })).toBeInTheDocument()
+    // The submit button for warehouse role should say "Ajukan untuk Persetujuan"
+    expect(screen.getByRole("button", { name: /^Ajukan untuk Persetujuan$/i })).toBeInTheDocument()
   })
 })

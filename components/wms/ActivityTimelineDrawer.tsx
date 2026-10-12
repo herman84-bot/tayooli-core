@@ -18,6 +18,39 @@ import {
 import { useAuditTrail } from "@/hooks/useWMS"
 import { AuditTrailEntry } from "@/lib/api"
 
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draf",
+  PENDING: "Menunggu",
+  PENDING_APPROVAL: "Menunggu Persetujuan",
+  APPROVED: "Disetujui",
+  REJECTED: "Ditolak",
+  CONFIRMED: "Dikonfirmasi",
+  IN_PROGRESS: "Sedang Berjalan",
+  PICKING: "Pengambilan",
+  PACKING: "Pengemasan",
+  PACKED: "Dikemas",
+  IN_TRANSIT: "Dalam Pengiriman",
+  SHIPPED: "Dikirim",
+  DELIVERED: "Terkirim",
+  RECEIVED: "Diterima",
+  DONE: "Selesai",
+  COMPLETED: "Selesai",
+  CANCELLED: "Dibatalkan",
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  CREATE: "Dibuat",
+  UPDATE: "Diperbarui",
+  CONFIRM: "Dikonfirmasi",
+  APPROVE: "Disetujui",
+  PUTAWAY: "Penataan Rak",
+  PACK: "Pengemasan",
+  DISPATCH: "Pengiriman",
+  CANCEL: "Dibatalkan",
+  SCRAP: "Pemusnahan",
+  RELEASE: "Rilis",
+}
+
 export interface ActivityTimelineDrawerProps {
   isOpen: boolean
   onClose: () => void
@@ -83,7 +116,7 @@ export function ActivityTimelineDrawer({
   if (actors?.created_at || actors?.created_by_name) {
     synthesizedEvents.push({
       id: "ev-created",
-      title: "Dokumen Dibuat (Draft / Created)",
+      title: "Dokumen Dibuat (Draf)",
       actor: actors.created_by_name || "Admin Gudang",
       timestamp: actors.created_at || new Date().toISOString(),
       icon: FileText,
@@ -95,7 +128,7 @@ export function ActivityTimelineDrawer({
   if (actors?.confirmed_at || actors?.confirmed_by_name) {
     synthesizedEvents.push({
       id: "ev-confirmed",
-      title: "Dikonfirmasi / Disetujui (Confirmed / Approved)",
+      title: "Dikonfirmasi / Disetujui",
       actor: actors.confirmed_by_name || actors.approved_by_name || "Supervisor WMS",
       timestamp: actors.confirmed_at || actors.approved_at || actors.created_at || new Date().toISOString(),
       icon: ShieldCheck,
@@ -105,7 +138,7 @@ export function ActivityTimelineDrawer({
   } else if (actors?.approved_at || actors?.approved_by_name) {
     synthesizedEvents.push({
       id: "ev-approved",
-      title: "Disetujui (Approved)",
+      title: "Disetujui",
       actor: actors.approved_by_name || "Supervisor WMS",
       timestamp: actors.approved_at || actors.created_at || new Date().toISOString(),
       icon: ShieldCheck,
@@ -117,20 +150,20 @@ export function ActivityTimelineDrawer({
   if (actors?.packed_at || actors?.packed_by_name) {
     synthesizedEvents.push({
       id: "ev-packed",
-      title: "Pemeriksaan Meja Kemas (Packed 100%)",
+      title: "Pemeriksaan Meja Kemas (Dikemas 100%)",
       actor: actors.packed_by_name || "Petugas Meja Kemas",
       timestamp: actors.packed_at || new Date().toISOString(),
       icon: Package,
       color: "bg-emerald-100 text-emerald-700 border-emerald-300",
-      desc: "Verifikasi 100% scan barcode SKU dan segel kemasan fisik",
+      desc: "Verifikasi 100% pemindaian barcode SKU dan segel kemasan fisik",
     })
   }
 
   if (actors?.dispatched_at || actors?.dispatched_by_name) {
     synthesizedEvents.push({
       id: "ev-dispatched",
-      title: "Pengiriman / Dispatch Selesai",
-      actor: actors.dispatched_by_name || "Petugas Dispatch / Kurir",
+      title: "Pengiriman Selesai",
+      actor: actors.dispatched_by_name || "Petugas Pengiriman / Kurir",
       timestamp: actors.dispatched_at || new Date().toISOString(),
       icon: Truck,
       color: "bg-purple-100 text-purple-700 border-purple-300",
@@ -141,7 +174,7 @@ export function ActivityTimelineDrawer({
   if (actors?.executed_at || actors?.executed_by_name) {
     synthesizedEvents.push({
       id: "ev-executed",
-      title: "Mutasi Fisik Dieksekusi (Executed)",
+      title: "Mutasi Fisik Dieksekusi",
       actor: actors.executed_by_name || "Operator Gudang",
       timestamp: actors.executed_at || actors.created_at || new Date().toISOString(),
       icon: CheckCircle2,
@@ -185,7 +218,7 @@ export function ActivityTimelineDrawer({
               <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Status Dokumen</span>
                 <span className="font-bold px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-800 uppercase text-[10px]">
-                  {metadata.status || "DONE"}
+                  {metadata.status ? STATUS_LABELS[metadata.status] ?? metadata.status : "SELESAI"}
                 </span>
               </div>
 
@@ -200,7 +233,7 @@ export function ActivityTimelineDrawer({
 
               {metadata.quantity !== undefined && (
                 <div className="flex justify-between items-center text-slate-700">
-                  <span className="text-slate-500">Kuantitas</span>
+                  <span className="text-slate-500">Jumlah</span>
                   <span className="font-mono font-bold text-slate-900">{metadata.quantity} unit</span>
                 </div>
               )}
@@ -231,7 +264,7 @@ export function ActivityTimelineDrawer({
           <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 shadow-2xs">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
               <UserCheck className="h-4 w-4 text-emerald-600" />
-              <span>Daftar Pelaku (Actor Audit)</span>
+              <span>Daftar Pelaku Audit</span>
             </h3>
 
             <div className="grid grid-cols-1 gap-2.5 text-xs divide-y divide-slate-100">
@@ -275,7 +308,7 @@ export function ActivityTimelineDrawer({
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
               <Clock className="h-4 w-4 text-slate-500" />
-              <span>Kronologi Aktivitas (Timeline)</span>
+              <span>Kronologi Aktivitas</span>
             </h3>
 
             {isLoading ? (
@@ -289,7 +322,7 @@ export function ActivityTimelineDrawer({
                     </span>
                     <div className="space-y-0.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-slate-900">{log.action}</span>
+                        <span className="font-bold text-slate-900">{ACTION_LABELS[log.action] ?? log.action}</span>
                         <time className="text-[10px] text-slate-400">
                           {new Date(log.created_at).toLocaleString("id-ID", {
                             day: "numeric",

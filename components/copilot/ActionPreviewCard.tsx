@@ -93,6 +93,24 @@ export function ActionPreviewCard({ action }: ActionPreviewCardProps) {
   const riskBadge = riskLevels[levelKey]
   const RiskIcon = riskBadge.icon
 
+  const fieldLabels: Record<string, string> = {
+    modul: "Modul",
+    rute: "Rute",
+    company_name: "Nama Perusahaan",
+    email: "Email",
+    role: "Peran",
+    provider: "Penyedia",
+    is_active: "Status Aktif",
+    name: "Nama",
+    phone: "Telepon",
+    price: "Harga",
+    code: "Kode",
+    sku: "SKU",
+    qty: "Jumlah",
+    quantity: "Jumlah",
+    status: "Status",
+  }
+
   return (
     <div className="my-3 rounded-xl border border-border bg-card text-card-foreground shadow-xs overflow-hidden">
       {/* Card Header */}
@@ -118,7 +136,7 @@ export function ActionPreviewCard({ action }: ActionPreviewCardProps) {
             <table className="w-full text-left text-xs">
               <thead className="bg-muted/50 text-[11px] text-muted-foreground border-b border-border font-medium">
                 <tr>
-                  <th className="py-1.5 px-2.5">Field</th>
+                  <th className="py-1.5 px-2.5">Kolom</th>
                   <th className="py-1.5 px-2.5">Sebelumnya</th>
                   <th className="py-1.5 px-2.5">Perubahan</th>
                 </tr>
@@ -126,7 +144,7 @@ export function ActionPreviewCard({ action }: ActionPreviewCardProps) {
               <tbody className="divide-y divide-border">
                 {action.diff.map((d, idx) => (
                   <tr key={idx} className="hover:bg-muted/20">
-                    <td className="py-1.5 px-2.5 font-medium text-foreground">{d.field}</td>
+                    <td className="py-1.5 px-2.5 font-medium text-foreground">{fieldLabels[d.field] || d.field}</td>
                     <td className="py-1.5 px-2.5 text-muted-foreground line-through font-mono text-[11px]">
                       {String(d.oldValue || "-")}
                     </td>
@@ -171,7 +189,7 @@ export function ActionPreviewCard({ action }: ActionPreviewCardProps) {
         <div className="px-3.5 py-2 border-t border-border bg-amber-50/70 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs">
           <div className="font-semibold flex items-center gap-1.5 mb-1 text-amber-900 dark:text-amber-200">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-            <span>Field Tidak Didukung (Akan Dibuang):</span>
+            <span>Kolom Tidak Didukung (Akan Dibuang):</span>
           </div>
           <ul className="list-disc pl-5 space-y-0.5 text-[11px]">
             {action.unsupportedFields.map((f, idx) => (
@@ -187,7 +205,7 @@ export function ActionPreviewCard({ action }: ActionPreviewCardProps) {
               onChange={(e) => setUnsupportedAck(e.target.checked)}
               className="rounded border-amber-400"
             />
-            <span>Saya mengerti field di atas tidak didukung dan akan dibuang</span>
+            <span>Saya mengerti kolom di atas tidak didukung dan akan dibuang</span>
           </label>
         </div>
       )}
@@ -216,7 +234,7 @@ export function ActionPreviewCard({ action }: ActionPreviewCardProps) {
               onClick={handleCancel}
               className="px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground hover:bg-muted font-medium transition-colors"
             >
-              Batalkan
+              Batal
             </button>
             <button
               onClick={handleExecute}
@@ -266,7 +284,7 @@ export function ActionPreviewCard({ action }: ActionPreviewCardProps) {
                 onClick={handleCancel}
                 className="px-3 py-1.5 text-xs rounded-md border border-border bg-background text-foreground hover:bg-muted font-medium transition-colors"
               >
-                Batalkan
+                Batal
               </button>
               <button
                 onClick={handleRetry}

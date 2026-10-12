@@ -52,12 +52,12 @@ export function ForgotPasswordForm() {
         body: JSON.stringify({ email: data.email }),
       })
       if (!res.ok) {
-        const msg = await extractApiErrorMessage(res, 'Gagal mengirim email reset password')
+        const msg = await extractApiErrorMessage(res, 'Gagal mengirim email atur ulang kata sandi')
         throw new Error(msg)
       }
-      setSuccess('Link reset password telah dikirim. Cek Inbox atau folder Spam/Junk email Anda.')
+      setSuccess('Tautan atur ulang kata sandi telah dikirim. Periksa kotak masuk atau folder spam email Anda.')
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Gagal mengirim email reset password'
+      const msg = e instanceof Error ? e.message : 'Gagal mengirim email atur ulang kata sandi'
       setError(msg)
     } finally {
       setIsLoading(false)
@@ -105,13 +105,13 @@ export function ForgotPasswordForm() {
         </div>
 
         <Button type="submit" className="w-full font-semibold" disabled={isLoading}>
-          {isLoading ? 'Mengirim...' : 'Kirim Link Reset'}
+          {isLoading ? 'Mengirim...' : 'Kirim Tautan Atur Ulang'}
         </Button>
       </form>
 
       <p className="mt-4 text-center text-sm text-muted-foreground">
         <a href="/login" className="font-medium text-primary hover:text-primary/80 transition-colors">
-          ← Kembali ke login
+          ← Kembali ke Masuk
         </a>
       </p>
     </>

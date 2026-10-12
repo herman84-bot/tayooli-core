@@ -104,9 +104,9 @@ export default function StockScrapPage() {
   // Preset reason options
   const PRESET_REASONS = [
     "Kemasan Bocor / Rusak",
-    "Kadaluwarsa / Expired",
-    "Jatuh saat Forklift / Handling",
-    "Cacat Pabrik / Defective",
+    "Kedaluwarsa",
+    "Jatuh saat Forklift / Penanganan",
+    "Cacat Pabrik",
     "Kotor / Terkontaminasi",
     "Segel Terbuka / Rusak",
   ]
@@ -180,7 +180,7 @@ export default function StockScrapPage() {
       return
     }
     if (!selectedProduct) {
-      setModalError("Pilih atau scan barcode produk yang rusak.")
+      setModalError("Pilih atau pindai barcode produk yang rusak.")
       return
     }
     if (!sourceLocationId) {
@@ -200,7 +200,7 @@ export default function StockScrapPage() {
       return
     }
     if (fullReason.length < 10) {
-      setModalError("Alasan pemusnahan/scrap barang harus minimal 10 karakter.")
+      setModalError("Alasan pemusnahan barang harus minimal 10 karakter.")
       return
     }
     if (qty > 10 && currentRole !== "admin" && currentRole !== "owner") {
@@ -233,7 +233,7 @@ export default function StockScrapPage() {
         type: "success",
         title: "Karantina Barang Berhasil Dibukukan",
         message: `Stok telah dipotong dari rak asal ke ${
-          scrapDestinationType === "VIRTUAL" ? "ledger virtual @SCRAP" : "rak karantina fisik"
+          scrapDestinationType === "VIRTUAL" ? "buku besar virtual @SCRAP" : "rak karantina fisik"
         } (No: ${res.scrap_number || "SCRAP"}).`,
       })
 
@@ -347,7 +347,7 @@ export default function StockScrapPage() {
             <Link
               href="/wms"
               className="p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 min-h-[48px] min-w-[48px] flex items-center justify-center transition-colors"
-              title="Kembali ke Dashboard WMS"
+              title="Kembali ke Dasbor Gudang"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
@@ -355,11 +355,11 @@ export default function StockScrapPage() {
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-6 h-6 text-[#EA580C]" />
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Barang Rusak & Karantina (Scrap)
+                  Barang Rusak & Karantina
                 </h1>
               </div>
               <p className="text-xs sm:text-sm text-slate-500">
-                Pencatatan barang cacat, pemindahan ke rak karantina, atau pemusnahan ke ledger @SCRAP
+                Pencatatan barang cacat, pemindahan ke rak karantina, atau pemusnahan ke buku besar @SCRAP
               </p>
             </div>
           </div>
@@ -391,7 +391,7 @@ export default function StockScrapPage() {
         {/* ── Summary Stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <span className="text-xs font-medium text-slate-500">Total Insiden Scrap</span>
+            <span className="text-xs font-medium text-slate-500">Total Insiden Barang Rusak</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-slate-900">{metrics.totalRecords}</span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
@@ -405,7 +405,7 @@ export default function StockScrapPage() {
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-rose-700">{metrics.totalQty}</span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800">
-                Pcs / Unit
+                Unit
               </span>
             </div>
           </div>
@@ -415,13 +415,13 @@ export default function StockScrapPage() {
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-orange-700">{metrics.virtualCount}</span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
-                Write-off
+                Penghapusan
               </span>
             </div>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-blue-200 bg-blue-50/20 shadow-xs">
-            <span className="text-xs font-medium text-[#2563EB]">Karantina Fisik (Bay)</span>
+            <span className="text-xs font-medium text-[#2563EB]">Karantina Fisik</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-[#2563EB]">{metrics.physicalCount}</span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
@@ -439,7 +439,7 @@ export default function StockScrapPage() {
               <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Cari nomor scrap, produk, SKU, alasan, atau pelapor..."
+                placeholder="Cari nomor barang rusak, produk, SKU, alasan, atau pelapor..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent min-h-[48px]"
@@ -525,12 +525,12 @@ export default function StockScrapPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-600 tracking-wider">
                     <tr>
-                      <th className="px-6 py-3.5">Nomor Scrap</th>
+                      <th className="px-6 py-3.5">Nomor Barang Rusak</th>
                       <th className="px-6 py-3.5">Tanggal</th>
                       <th className="px-6 py-3.5">Produk & SKU</th>
                       <th className="px-6 py-3.5">Lokasi Asal</th>
                       <th className="px-6 py-3.5">Tujuan</th>
-                      <th className="px-6 py-3.5">Jumlah</th>
+                      <th className="px-6 py-3.5">Jml</th>
                       <th className="px-6 py-3.5">Alasan Kerusakan</th>
                       <th className="px-6 py-3.5">Pelapor</th>
                     </tr>
@@ -582,7 +582,7 @@ export default function StockScrapPage() {
                           </td>
                           <td className="px-6 py-4">
                             <span className="inline-flex items-center px-2 py-0.5 rounded font-bold text-xs bg-rose-100 text-rose-800">
-                              {s.quantity} pcs
+                              {s.quantity} unit
                             </span>
                           </td>
                           <td className="px-6 py-4 text-xs text-slate-700 max-w-xs truncate" title={s.reason}>
@@ -673,7 +673,7 @@ export default function StockScrapPage() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    Karantina Barang Rusak (Quarantine Damaged Goods)
+                    Karantina Barang Rusak
                   </h3>
                   <p className="text-xs text-slate-500">
                     Diverifikasi secara atomik dengan advisory lock untuk mencegah stok negatif
@@ -701,15 +701,15 @@ export default function StockScrapPage() {
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-700 flex items-center gap-1.5">
                   <ScanLine className="w-4 h-4 text-[#EA580C]" />
-                  Scan Barcode Produk / Rak Asal
+                  Pindai Barcode Produk / Rak Asal
                 </span>
-                <span className="text-[10px] text-emerald-600 font-medium">Scanner Hardware Aktif</span>
+                <span className="text-[10px] text-emerald-600 font-medium">Pemindai Perangkat Aktif</span>
               </div>
               <div className="flex gap-2">
                 <input
                   ref={barcodeInputRef}
                   type="text"
-                  placeholder="Scan SKU barcode atau kode rak..."
+                  placeholder="Pindai barcode SKU atau kode rak..."
                   value={barcodeSearchInput}
                   onChange={(e) => setBarcodeSearchInput(e.target.value)}
                   className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#EA580C] min-h-[44px]"
@@ -718,7 +718,7 @@ export default function StockScrapPage() {
                   type="submit"
                   className="px-4 py-2 bg-[#EA580C] hover:bg-orange-700 text-white font-semibold text-xs rounded-lg min-h-[44px]"
                 >
-                  Scan
+                  Pindai
                 </button>
               </div>
             </form>
@@ -773,7 +773,7 @@ export default function StockScrapPage() {
               {/* Source Rack Location */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Lokasi Rak Asal (Source Rack) <span className="text-rose-500">*</span>
+                  Lokasi Rak Asal <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={sourceLocationId}
@@ -830,7 +830,7 @@ export default function StockScrapPage() {
                       <span>Rak Karantina Fisik</span>
                     </div>
                     <p className="text-[11px] text-slate-500 mt-1">
-                      Isolasi fisik untuk inspeksi / retur supplier
+                      Isolasi fisik untuk inspeksi / retur pemasok
                     </p>
                   </button>
                 </div>
@@ -861,7 +861,7 @@ export default function StockScrapPage() {
               {/* Quantity */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Jumlah Rusak (Quantity) <span className="text-rose-500">*</span>
+                  Jumlah Rusak <span className="text-rose-500">*</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -911,7 +911,7 @@ export default function StockScrapPage() {
                 </div>
                 <textarea
                   rows={2}
-                  placeholder="Detail kronologi kerusakan (misal: pallet miring saat loading truk)..."
+                  placeholder="Detail kronologi kerusakan (misal: palet miring saat pemuatan truk)..."
                   value={reasonDetail}
                   onChange={(e) => setReasonDetail(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#EA580C]"
@@ -921,7 +921,7 @@ export default function StockScrapPage() {
               {/* Custom Scrap Number (Optional) */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nomor Referensi Scrap (Opsional)
+                  Nomor Referensi Barang Rusak (Opsional)
                 </label>
                 <input
                   type="text"

@@ -292,7 +292,7 @@ export default function ProductsPage() {
               onClick={() => refetch()}
               disabled={isFetching}
               className="p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors disabled:opacity-50"
-              title="Segarkan data"
+              title="Muat Ulang"
             >
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </button>
@@ -363,7 +363,7 @@ export default function ProductsPage() {
               onClick={() => setSearchQuery("")}
               className="text-xs text-slate-500 hover:text-slate-800 px-3 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 transition"
             >
-              Reset filter
+              Atur Ulang Filter
             </button>
           )}
         </div>
@@ -482,7 +482,7 @@ export default function ProductsPage() {
                             type="button"
                             onClick={(e) => handleOpenEdit(p, e)}
                             className="p-1.5 rounded-lg border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors shadow-2xs"
-                            title="Edit Produk"
+                            title="Ubah Produk"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
@@ -623,7 +623,7 @@ export default function ProductsPage() {
         }}
       >
         <Drawer>
-          <DrawerHeader title="Edit Master Produk" icon={<Pencil className="w-5 h-5 text-amber-600" />} />
+          <DrawerHeader title="Ubah Master Produk" icon={<Pencil className="w-5 h-5 text-amber-600" />} />
           <DrawerContent>
             <form onSubmit={handleEditSubmit} className="space-y-4" noValidate>
               {editFormError && (

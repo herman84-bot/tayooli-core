@@ -352,7 +352,7 @@ export function CopilotDrawer() {
     "Ubah nama perusahaan",
     "Cek stok produk",
     "Buka kasir POS",
-    "Buka Stock Opname",
+    "Buka Stok Opname",
   ]
 
   if (!isOpen) return null
@@ -382,7 +382,7 @@ export function CopilotDrawer() {
                 <h3 className="text-xs font-semibold text-foreground tracking-tight">Tayooli Copilot</h3>
                 <ProviderStatusBadge provider={activeProvider} cooldownSeconds={cooldownSeconds} />
               </div>
-              <p className="text-[10px] text-muted-foreground">Autonomous Workspace Assistant</p>
+              <p className="text-[10px] text-muted-foreground">Asisten Ruang Kerja Otonom</p>
             </div>
           </div>
 
@@ -390,6 +390,7 @@ export function CopilotDrawer() {
             <button
               onClick={openSettings}
               title="Pengaturan Wewenang AI"
+              aria-label="Pengaturan Wewenang AI"
               className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <Settings2 className="h-4 w-4" />
@@ -397,6 +398,7 @@ export function CopilotDrawer() {
             <button
               onClick={clearMessages}
               title="Reset Percakapan"
+              aria-label="Reset Percakapan"
               className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <Trash2 className="h-4 w-4" />
@@ -404,6 +406,7 @@ export function CopilotDrawer() {
             <button
               onClick={close}
               title="Tutup Panel"
+              aria-label="Tutup Panel"
               className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <X className="h-4 w-4" />
@@ -415,7 +418,7 @@ export function CopilotDrawer() {
         {permissions?.emergency_stop && (
           <div className="px-4 py-2 bg-rose-50 dark:bg-rose-950/40 border-b border-rose-200 dark:border-rose-900 flex items-center gap-2 text-rose-800 dark:text-rose-200 text-xs">
             <ShieldAlert className="h-4 w-4 shrink-0 text-rose-600" />
-            <span>Emergency Kill-Switch aktif: Eksekusi otomatis dinonaktifkan.</span>
+            <span>Sakelar Pemutus Darurat aktif: Eksekusi otomatis dinonaktifkan.</span>
           </div>
         )}
 
@@ -468,7 +471,7 @@ export function CopilotDrawer() {
           {isStreaming && (
             <div className="flex items-center gap-2 text-muted-foreground text-xs p-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-              <span>Memproses instruksi workspace...</span>
+              <span>Memproses instruksi ruang kerja...</span>
             </div>
           )}
 
@@ -504,6 +507,7 @@ export function CopilotDrawer() {
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isStreaming}
+              aria-label="Kirim perintah"
               className={cn(
                 "absolute right-1.5 p-1.5 rounded-md text-primary-foreground transition-colors cursor-pointer",
                 input.trim() && !isStreaming

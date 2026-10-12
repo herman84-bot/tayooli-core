@@ -29,6 +29,15 @@ export interface PrintSalesInvoiceProps {
   onClose: () => void
 }
 
+const SALES_INVOICE_STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'DRAF',
+  PENDING: 'MENUNGGU PEMBAYARAN',
+  PAID: 'LUNAS',
+  UNPAID: 'BELUM LUNAS',
+  OVERDUE: 'JATUH TEMPO',
+  CANCELLED: 'DIBATALKAN',
+}
+
 function getCompanyInitial(name: string): string {
   const clean = name.trim().replace(/^(PT|PT\.|CV|CV\.|UD|UD\.)\s+/i, '')
   return clean.charAt(0).toUpperCase() || name.charAt(0).toUpperCase() || 'T'
@@ -72,7 +81,7 @@ export function PrintSalesInvoice({
       ? items
       : [
           {
-            description: `Pasokan Produk & Pemenuhan Pesanan Sales Order (${invoice.orderId ? invoice.orderId.slice(0, 8).toUpperCase() : 'SO-RETAIL-01'})`,
+            description: `Pasokan Produk & Pemenuhan Pesanan Penjualan (${invoice.orderId ? invoice.orderId.slice(0, 8).toUpperCase() : 'SO-RETAIL-01'})`,
             quantity: 1,
             unitPrice: dppAmount,
             discount: 0,
@@ -181,7 +190,7 @@ export function PrintSalesInvoice({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white shadow hover:bg-blue-500 active:scale-95 transition-all"
               >
                 <Printer className="h-4 w-4" />
-                Cetak / Print PDF
+                Cetak PDF
               </button>
               <button
                 type="button"
@@ -211,7 +220,7 @@ export function PrintSalesInvoice({
                     : 'border-red-600 text-red-600'
                 }`}
               >
-                {isPaid ? 'LUNAS / PAID' : isCancelled ? 'BATAL' : 'BELUM LUNAS'}
+                {isPaid ? 'LUNAS' : isCancelled ? 'DIBATALKAN' : 'BELUM LUNAS'}
               </div>
             </div>
 
@@ -254,7 +263,7 @@ export function PrintSalesInvoice({
               {/* Kolom Kiri: Ditujukan Kepada (Customer) */}
               <div className="rounded border border-zinc-300 p-3 bg-zinc-50/40 space-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
-                  <Building2 className="h-3 w-3 text-zinc-700" /> Ditujukan Kepada (Customer):
+                  <Building2 className="h-3 w-3 text-zinc-700" /> Ditujukan Kepada:
                 </span>
                 <p className="text-[12px] font-bold text-zinc-950">{customerName}</p>
                 <p className="text-[10px] text-zinc-600">{customerAddress}</p>
@@ -272,7 +281,7 @@ export function PrintSalesInvoice({
                   <Receipt className="h-3 w-3 text-zinc-700" /> Informasi Dokumen Penagihan:
                 </span>
                 <div className="grid grid-cols-3 gap-1 text-[11px] pt-0.5">
-                  <span className="text-zinc-500">Nomor Invoice</span>
+                  <span className="text-zinc-500">Nomor Faktur</span>
                   <span className="col-span-2 font-mono font-bold text-zinc-950">
                     : {invoice.invoiceNumber}
                   </span>
@@ -287,7 +296,7 @@ export function PrintSalesInvoice({
                     : {formatDate(invoice.dueDate)}
                   </span>
 
-                  <span className="text-zinc-500">Ref. Sales Order</span>
+                  <span className="text-zinc-500">Ref. Pesanan Penjualan</span>
                   <span className="col-span-2 font-mono text-zinc-900">
                     : {invoice.orderId ? invoice.orderId.slice(0, 13) : '—'}
                   </span>
@@ -307,7 +316,7 @@ export function PrintSalesInvoice({
                   <tr className="bg-zinc-100 text-zinc-900 font-bold border-b border-zinc-900">
                     <th className="border-r border-zinc-900 py-1.5 px-2 text-center w-8">No</th>
                     <th className="border-r border-zinc-900 py-1.5 px-2 text-left">Deskripsi Barang / Jasa</th>
-                    <th className="border-r border-zinc-900 py-1.5 px-2 text-right w-14">Qty</th>
+                    <th className="border-r border-zinc-900 py-1.5 px-2 text-right w-14">Jml</th>
                     <th className="border-r border-zinc-900 py-1.5 px-2 text-right w-28">Harga Satuan</th>
                     <th className="border-r border-zinc-900 py-1.5 px-2 text-right w-20">Diskon</th>
                     <th className="py-1.5 px-2 text-right w-32">Subtotal (Rp)</th>
@@ -372,7 +381,7 @@ export function PrintSalesInvoice({
                     </div>
                   </div>
                   <p className="text-[9px] text-zinc-500 mt-1.5 italic">
-                    * Harap sertakan nomor invoice pada berita transfer dan kirimkan bukti bayar ke billing@tayooli.co.id.
+                    * Harap sertakan nomor faktur pada berita transfer dan kirimkan bukti bayar ke billing@tayooli.co.id.
                   </p>
                 </div>
               </div>
@@ -414,7 +423,7 @@ export function PrintSalesInvoice({
                         : 'bg-amber-100 text-amber-900 border border-amber-300'
                     }`}
                   >
-                    STATUS: {invoice.status}
+                    STATUS: {SALES_INVOICE_STATUS_LABELS[invoice.status] || invoice.status}
                   </span>
                 </div>
               </div>
@@ -437,11 +446,11 @@ export function PrintSalesInvoice({
                 </p>
                 <div className="h-20 flex items-center justify-center">
                   <div className="rounded border border-dashed border-zinc-300 px-4 py-2 text-[9px] text-zinc-400 font-mono">
-                    [Tanda Tangan Digital & Stempel Finance]
+                    [Tanda Tangan Digital & Stempel Keuangan]
                   </div>
                 </div>
                 <p className="text-[11px] font-bold text-zinc-950 underline underline-offset-4">
-                  Finance & Accounting Manager
+                  Manajer Keuangan & Akuntansi
                 </p>
                 <p className="text-[9px] text-zinc-500">Divisi Keuangan & Pajak</p>
               </div>
@@ -477,8 +486,8 @@ export function PrintSalesInvoice({
               </div>
 
               <div className="text-right space-y-0.5 font-mono text-[9px]">
-                <p>Dokumen ID: {invoice.id}</p>
-                <p>Invoice No: {invoice.invoiceNumber}</p>
+                <p>ID Dokumen: {invoice.id}</p>
+                <p>No. Faktur: {invoice.invoiceNumber}</p>
                 <p>Dicetak: {new Date().toLocaleString('id-ID')}</p>
               </div>
             </div>

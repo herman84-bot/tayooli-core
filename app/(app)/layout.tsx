@@ -43,7 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => setMobileOpen(true)}
               className="p-1.5 -ml-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              aria-label="Open menu"
+              aria-label="Buka menu"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -57,7 +57,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         ) : !isAuthenticated ? null : !allowed ? (
           <div role="alert" className="flex items-center justify-center min-h-96 p-6 text-sm text-muted-foreground">
-            Akses terbatas untuk role Anda. Mengalihkan...
+            Akses terbatas untuk peran Anda. Mengalihkan...
           </div>
         ) : (
           children

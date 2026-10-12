@@ -126,7 +126,7 @@ describe('Barang Masuk page', () => {
     render(<InboundPage />)
     fireEvent.click(screen.getByText('GR-20261005-ABCDEF12'))
     fireEvent.click(screen.getByRole('button', { name: /^Konfirmasi$/ }))
-    expect(screen.getByRole('dialog', { name: /Konfirmasi penerimaan/i })).toHaveTextContent('dicatat ke Scrap')
+    expect(screen.getByRole('dialog', { name: /Konfirmasi penerimaan/i })).toHaveTextContent('dicatat ke Barang Rusak')
     expect(postMutateAsync).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: /Ya, konfirmasi/i }))
     await waitFor(() => expect(postMutateAsync).toHaveBeenCalledWith('r-1'))

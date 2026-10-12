@@ -24,10 +24,10 @@ const TIERS: Tier[] = [
     cta: { label: "Mulai Gratis", href: "/login" },
     features: [
       "Aplikasi kasir POS & cetak struk",
-      "Master produk & barcode scanner",
+      "Master produk & pemindai barcode",
       "1 gudang fisik & pemantauan stok",
       "Pencatatan surat jalan dasar",
-      "Dashboard ringkasan omzet & stok",
+      "Dasbor ringkasan omzet & stok",
     ],
   },
   {
@@ -39,9 +39,9 @@ const TIERS: Tier[] = [
     features: [
       "Semua fitur Starter",
       "Manajemen multi-gudang & transfer stok",
-      "Surat Jalan (DO) & Stock Opname berkala",
+      "Surat Jalan & Stok Opname berkala",
       "Sinkron stok dengan pesanan marketplace",
-      "Pencatatan barang rusak / scrap",
+      "Pencatatan barang rusak",
       "Multi-kasir & hak akses tim",
     ],
   },
@@ -49,7 +49,7 @@ const TIERS: Tier[] = [
     name: "Enterprise",
     tagline: "Untuk jaringan toko & pergudangan skala besar.",
     monthly: null,
-    cta: { label: "Hubungi Sales", href: "/login" },
+    cta: { label: "Hubungi Kami", href: "/login" },
     features: [
       "Pengguna & gudang tak terbatas",
       "Kustomisasi format surat jalan & nota",
@@ -146,7 +146,7 @@ export function PricingSection() {
 
                 <div className="mt-6 flex items-baseline gap-1">
                   {price === null ? (
-                    <span className="text-3xl font-bold tracking-tight text-foreground">Custom</span>
+                    <span className="text-3xl font-bold tracking-tight text-foreground">Kustom</span>
                   ) : (
                     <>
                       <span className="text-3xl font-bold tracking-tight text-foreground">

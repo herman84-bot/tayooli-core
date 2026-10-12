@@ -15,6 +15,59 @@ const defaultColorMap: Record<string, string> = {
   ai_failed: 'bg-red-50 text-red-700 border-red-200',
 }
 
+const defaultLabelMap: Record<string, string> = {
+  draft: 'Draf',
+  DRAFT: 'Draf',
+  pending: 'Menunggu Persetujuan',
+  PENDING: 'Menunggu Persetujuan',
+  pending_approval: 'Menunggu Persetujuan',
+  PENDING_APPROVAL: 'Menunggu Persetujuan',
+  approved: 'Disetujui',
+  APPROVED: 'Disetujui',
+  accepted: 'Diterima',
+  ACCEPTED: 'Diterima',
+  matched: 'Sesuai',
+  MATCHED: 'Sesuai',
+  received: 'Diterima',
+  RECEIVED: 'Diterima',
+  rejected: 'Ditolak',
+  REJECTED: 'Ditolak',
+  cancelled: 'Dibatalkan',
+  CANCELLED: 'Dibatalkan',
+  canceled: 'Dibatalkan',
+  CANCELED: 'Dibatalkan',
+  pending_review: 'Menunggu Peninjauan',
+  PENDING_REVIEW: 'Menunggu Peninjauan',
+  partially_received: 'Diterima Sebagian',
+  PARTIALLY_RECEIVED: 'Diterima Sebagian',
+  open: 'Terbuka',
+  OPEN: 'Terbuka',
+  completed: 'Selesai',
+  COMPLETED: 'Selesai',
+  done: 'Selesai',
+  DONE: 'Selesai',
+  in_progress: 'Sedang Berjalan',
+  IN_PROGRESS: 'Sedang Berjalan',
+  in_transit: 'Dalam Pengiriman',
+  IN_TRANSIT: 'Dalam Pengiriman',
+  transit: 'Dalam Pengiriman',
+  TRANSIT: 'Dalam Pengiriman',
+  picking: 'Pengambilan',
+  PICKING: 'Pengambilan',
+  packing: 'Pengemasan',
+  PACKING: 'Pengemasan',
+  shipping: 'Pengiriman',
+  SHIPPING: 'Pengiriman',
+  shipped: 'Dikirim',
+  SHIPPED: 'Dikirim',
+  putaway: 'Penataan Rak',
+  PUTAWAY: 'Penataan Rak',
+  ai_processed: 'Diproses AI',
+  AI_PROCESSED: 'Diproses AI',
+  ai_failed: 'Gagal AI',
+  AI_FAILED: 'Gagal AI',
+}
+
 export interface StatusBadgeProps {
   status: string
   colorMap?: Record<string, string>
@@ -24,6 +77,7 @@ export interface StatusBadgeProps {
 export function StatusBadge({ status, colorMap, label }: StatusBadgeProps) {
   const map = colorMap ?? defaultColorMap
   const classes = map[status] ?? 'bg-zinc-50 text-zinc-600 border-zinc-200'
+  const displayLabel = label ?? defaultLabelMap[status] ?? status
   return (
     <span
       className={cn(
@@ -31,7 +85,7 @@ export function StatusBadge({ status, colorMap, label }: StatusBadgeProps) {
         classes,
       )}
     >
-      {label ?? status}
+      {displayLabel}
     </span>
   )
 }

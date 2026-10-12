@@ -117,22 +117,22 @@ describe('Task 6: Barcode Scanner Truck Loading Mode', () => {
     jest.clearAllMocks()
   })
 
-  it('renders mode switch button for Truck (Loading Truk)', () => {
+  it('renders mode switch button for Loading Truk', () => {
     render(<BarcodeScannerPage />)
 
-    const truckTabBtn = screen.getByRole('button', { name: /Truck \(Loading Truk\)/i })
+    const truckTabBtn = screen.getByRole('button', { name: /Loading Truk/i })
     expect(truckTabBtn).toBeInTheDocument()
   })
 
   it('switches to LOADING_TRUCK mode and renders manifest dropdown', () => {
     render(<BarcodeScannerPage />)
 
-    const truckTabBtn = screen.getByRole('button', { name: /Truck \(Loading Truk\)/i })
+    const truckTabBtn = screen.getByRole('button', { name: /Loading Truk/i })
     fireEvent.click(truckTabBtn)
 
     expect(screen.getByText(/Pemuatan Armada:/i)).toBeInTheDocument()
     expect(
-      screen.getByLabelText(/Pilih Manifest Pengiriman \(Armada \/ Truk\)/i)
+      screen.getByLabelText(/Pilih Manifes Pengiriman \(Armada \/ Truk\)/i)
     ).toBeInTheDocument()
 
     // Options exist in select
@@ -143,7 +143,7 @@ describe('Task 6: Barcode Scanner Truck Loading Mode', () => {
   it('displays warning if barcode scanned without selecting manifest', () => {
     render(<BarcodeScannerPage />)
 
-    const truckTabBtn = screen.getByRole('button', { name: /Truck \(Loading Truk\)/i })
+    const truckTabBtn = screen.getByRole('button', { name: /Loading Truk/i })
     fireEvent.click(truckTabBtn)
 
     // Manual input without selecting manifest
@@ -153,17 +153,17 @@ describe('Task 6: Barcode Scanner Truck Loading Mode', () => {
     fireEvent.click(scanBtn)
 
     expect(mockPlayTone).toHaveBeenCalledWith('error')
-    expect(screen.getByText('Pilih manifest tujuan terlebih dahulu')).toBeInTheDocument()
+    expect(screen.getByText('Pilih manifes tujuan terlebih dahulu')).toBeInTheDocument()
     expect(mockScanLoadingMutate).not.toHaveBeenCalled()
   })
 
   it('displays manifest metadata, progress bar, and DO checklist when manifest selected', () => {
     render(<BarcodeScannerPage />)
 
-    const truckTabBtn = screen.getByRole('button', { name: /Truck \(Loading Truk\)/i })
+    const truckTabBtn = screen.getByRole('button', { name: /Loading Truk/i })
     fireEvent.click(truckTabBtn)
 
-    const select = screen.getByLabelText(/Pilih Manifest Pengiriman \(Armada \/ Truk\)/i)
+    const select = screen.getByLabelText(/Pilih Manifes Pengiriman \(Armada \/ Truk\)/i)
     fireEvent.change(select, { target: { value: 'm-1' } })
 
     // Manifest metadata
@@ -187,10 +187,10 @@ describe('Task 6: Barcode Scanner Truck Loading Mode', () => {
 
     render(<BarcodeScannerPage />)
 
-    const truckTabBtn = screen.getByRole('button', { name: /Truck \(Loading Truk\)/i })
+    const truckTabBtn = screen.getByRole('button', { name: /Loading Truk/i })
     fireEvent.click(truckTabBtn)
 
-    const select = screen.getByLabelText(/Pilih Manifest Pengiriman \(Armada \/ Truk\)/i)
+    const select = screen.getByLabelText(/Pilih Manifes Pengiriman \(Armada \/ Truk\)/i)
     fireEvent.change(select, { target: { value: 'm-1' } })
 
     const input = screen.getByPlaceholderText(/Ketik barcode \/ SKU lalu Enter/i)
@@ -216,10 +216,10 @@ describe('Task 6: Barcode Scanner Truck Loading Mode', () => {
 
     render(<BarcodeScannerPage />)
 
-    const truckTabBtn = screen.getByRole('button', { name: /Truck \(Loading Truk\)/i })
+    const truckTabBtn = screen.getByRole('button', { name: /Loading Truk/i })
     fireEvent.click(truckTabBtn)
 
-    const select = screen.getByLabelText(/Pilih Manifest Pengiriman \(Armada \/ Truk\)/i)
+    const select = screen.getByLabelText(/Pilih Manifes Pengiriman \(Armada \/ Truk\)/i)
     fireEvent.change(select, { target: { value: 'm-1' } })
 
     const input = screen.getByPlaceholderText(/Ketik barcode \/ SKU lalu Enter/i)
@@ -233,7 +233,7 @@ describe('Task 6: Barcode Scanner Truck Loading Mode', () => {
     )
 
     expect(mockPlayTone).toHaveBeenCalledWith('error')
-    expect(screen.getByText('PERINGATAN MISLOAD')).toBeInTheDocument()
+    expect(screen.getByText('PERINGATAN SALAH MUAT')).toBeInTheDocument()
     expect(
       screen.getByText(/MISLOAD: Barcode tidak terdaftar dalam manifest ini!/i)
     ).toBeInTheDocument()

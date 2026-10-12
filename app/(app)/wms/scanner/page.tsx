@@ -51,6 +51,18 @@ import { api, ResolvedProduct } from "@/lib/api"
 
 type ScannerMode = "PUTAWAY" | "OUTBOUND" | "PRICE_CHECK" | "LOADING_TRUCK" | "PALLET_LPN"
 
+// Display-only labels for raw backend status enums (values themselves are unchanged).
+const STATUS_LABELS: Record<string, string> = {
+  CONFIRMED: "Dikonfirmasi",
+  PICKED: "Sudah Diambil",
+  STAGED: "Di Area Transit",
+  LOADED: "Dimuat",
+  STANDARD: "Standar",
+  WOODEN: "Kayu",
+  PLASTIC: "Plastik",
+}
+const statusLabel = (s: string) => STATUS_LABELS[s] ?? s
+
 export default function BarcodeScannerPage() {
   const [mode, setMode] = useState<ScannerMode>("PUTAWAY")
 
@@ -146,14 +158,14 @@ export default function BarcodeScannerPage() {
         const line = putawayPending.find((p) => p.product_id === product.product_id)
         if (!line) {
           throw new Error(
-            `${product.name} tidak memiliki stok di area staging inbound gudang ini (tidak ada yang perlu di-putaway).`
+            `${product.name} tidak memiliki stok di area transit masuk gudang ini (tidak ada yang perlu ditata ke rak).`
           )
         }
         if (line.suggested_location_id && line.suggested_location_id !== putawayRackId) {
           throw new Error(
             `Rak ${putawayRack} bukan rak tujuan untuk ${product.name}. Rak yang disarankan: ${
               line.suggested_location_code ?? line.suggested_location_id
-            }. Gunakan menu Putaway untuk override dengan alasan.`
+            }. Gunakan menu Penataan Rak untuk ubah dengan alasan.`
           )
         }
         await confirmPutaway.mutateAsync({
@@ -170,7 +182,7 @@ export default function BarcodeScannerPage() {
       } catch (err) {
         playScannerTone("error")
         setPutawaySuccessMessage(null)
-        setPutawayError(err instanceof Error ? err.message : "Putaway gagal diproses server.")
+        setPutawayError(err instanceof Error ? err.message : "Penataan rak gagal diproses server.")
       } finally {
         setPutawaySubmitting(false)
       }
@@ -296,7 +308,7 @@ export default function BarcodeScannerPage() {
           playTone("error")
           setLoadingScanResult({
             success: false,
-            message: "Pilih manifest tujuan terlebih dahulu",
+            message: "Pilih manifes tujuan terlebih dahulu",
           })
           return
         }
@@ -317,7 +329,7 @@ export default function BarcodeScannerPage() {
               const errMsg =
                 err instanceof Error && err.message
                   ? err.message
-                  : `MISLOAD: Barcode tidak terdaftar dalam manifest ini!`
+                  : `SALAH MUAT: Barcode tidak terdaftar dalam manifes ini!`
               setLoadingScanResult({
                 success: false,
                 message: errMsg,
@@ -502,11 +514,11 @@ export default function BarcodeScannerPage() {
               <div className="flex items-center gap-2">
                 <ScanLine className="w-5 h-5 text-[#2563EB]" />
                 <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
-                  Barcode Scanner Mobile
+                  Pemindai Barcode Mobile
                 </h1>
               </div>
               <p className="text-xs text-slate-500">
-                WebRTC Camera & USB Gun Auto-Detection (&le;30ms)
+                Deteksi Otomatis Kamera WebRTC & USB Gun (&le;30ms)
               </p>
             </div>
           </div>
@@ -520,8 +532,8 @@ export default function BarcodeScannerPage() {
                   ? "border-blue-200 bg-blue-50 text-[#2563EB]"
                   : "border-slate-200 bg-slate-50 text-slate-400"
               }`}
-              title={soundEnabled ? "Audio beep aktif" : "Audio mute"}
-              aria-label="Toggle Sound"
+              title={soundEnabled ? "Audio beep aktif" : "Audio bisu"}
+              aria-label="Alihkan Suara"
             >
               {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
             </button>
@@ -548,7 +560,7 @@ export default function BarcodeScannerPage() {
             }`}
           >
             <Layers className="w-4 h-4 shrink-0" />
-            <span className="truncate">Inbound Putaway</span>
+            <span className="truncate">Penataan Rak Masuk</span>
           </button>
 
           <button
@@ -564,7 +576,7 @@ export default function BarcodeScannerPage() {
             }`}
           >
             <Package className="w-4 h-4 shrink-0" />
-            <span className="truncate">Outbound Picking</span>
+            <span className="truncate">Pengambilan Barang Keluar</span>
           </button>
 
           <button
@@ -580,7 +592,7 @@ export default function BarcodeScannerPage() {
             }`}
           >
             <Truck className="w-4 h-4 shrink-0" />
-            <span className="truncate">Truck (Loading Truk)</span>
+            <span className="truncate">Loading Truk</span>
           </button>
 
           <button
@@ -597,7 +609,7 @@ export default function BarcodeScannerPage() {
             }`}
           >
             <Box className="w-4 h-4 shrink-0" />
-            <span className="truncate">Palet (LPN Putaway)</span>
+            <span className="truncate">Penataan Palet LPN</span>
           </button>
 
           <button
@@ -621,32 +633,32 @@ export default function BarcodeScannerPage() {
             <div>
               {mode === "PUTAWAY" && (
                 <span>
-                  <strong>Alur Putaway:</strong> Langkah 1 Scan Barcode Rak Lokasi &rarr; Langkah 2 Scan
+                  <strong>Alur Penataan Rak:</strong> Langkah 1 Scan Barcode Rak Lokasi &rarr; Langkah 2 Scan
                   Barcode Produk.
                 </span>
               )}
               {mode === "OUTBOUND" && (
                 <span>
-                  <strong>Verifikasi Keluar:</strong> Scan item untuk mencocokkan dengan Surat Jalan / Picking
-                  Order.
+                  <strong>Verifikasi Barang Keluar:</strong> Scan item untuk mencocokkan dengan Surat Jalan / Pengambilan
+                  Barang.
                 </span>
               )}
               {mode === "LOADING_TRUCK" && (
                 <span>
-                  <strong>Pemuatan Armada:</strong> Pilih nomor manifest pengiriman, kemudian scan barcode
+                  <strong>Pemuatan Armada:</strong> Pilih nomor manifes pengiriman, kemudian scan barcode
                   Surat Jalan (DO) saat dimuat ke truk.
                 </span>
               )}
               {mode === "PALLET_LPN" && (
                 <span>
-                  <strong>Putaway Palet LPN:</strong> Langkah 1 Scan Barcode Palet LPN &rarr; Langkah 2 Scan
+                  <strong>Penataan Palet LPN:</strong> Langkah 1 Scan Barcode Palet LPN &rarr; Langkah 2 Scan
                   Barcode Rak Lokasi Tujuan.
                 </span>
               )}
               {mode === "PRICE_CHECK" && (
                 <span>
                   <strong>Pemeriksaan Cepat:</strong> Scan barcode fisik atau ketik kode untuk melihat master
-                  SKU dan packaging.
+                  SKU dan kemasan.
                 </span>
               )}
             </div>
@@ -729,7 +741,7 @@ export default function BarcodeScannerPage() {
                 htmlFor="outbound-do-select"
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
               >
-                Pilih Surat Jalan (CONFIRMED / PICKED)
+                Pilih Surat Jalan (Dikonfirmasi / Sudah Diambil)
               </label>
               <select
                 id="outbound-do-select"
@@ -744,7 +756,7 @@ export default function BarcodeScannerPage() {
                 {outboundOrders.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.do_number}
-                    {o.customer_name ? ` — ${o.customer_name}` : ""} [{o.status}]
+                    {o.customer_name ? ` — ${o.customer_name}` : ""} [{statusLabel(o.status)}]
                   </option>
                 ))}
               </select>
@@ -785,7 +797,7 @@ export default function BarcodeScannerPage() {
                 htmlFor="manifest-select"
                 className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
               >
-                Pilih Manifest Pengiriman (Armada / Truk)
+                Pilih Manifes Pengiriman (Armada / Truk)
               </label>
               <select
                 id="manifest-select"
@@ -796,10 +808,10 @@ export default function BarcodeScannerPage() {
                 }}
                 className="w-full min-h-[48px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-medium"
               >
-                <option value="">-- Pilih Manifest Aktif (STAGED / LOADED) --</option>
+                <option value="">-- Pilih Manifes Aktif (Di Area Transit / Dimuat) --</option>
                 {activeManifests.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.manifest_number} — {m.expedition_name} ({m.vehicle_plate}) — [{m.status}]
+                    {m.manifest_number} — {m.expedition_name} ({m.vehicle_plate}) — [{statusLabel(m.status)}]
                   </option>
                 ))}
               </select>
@@ -829,7 +841,7 @@ export default function BarcodeScannerPage() {
                 </div>
                 <div>
                   <div className="text-sm font-bold">
-                    {loadingScanResult.success ? "BERHASIL DIMUAT" : "PERINGATAN MISLOAD"}
+                    {loadingScanResult.success ? "BERHASIL DIMUAT" : "PERINGATAN SALAH MUAT"}
                   </div>
                   <div className="text-xs mt-0.5">{loadingScanResult.message}</div>
                 </div>
@@ -842,7 +854,7 @@ export default function BarcodeScannerPage() {
                 {/* Manifest Metadata */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs">
                   <div>
-                    <div className="text-slate-500">No. Manifest:</div>
+                    <div className="text-slate-500">No. Manifes:</div>
                     <div className="font-mono font-bold text-slate-900 mt-0.5">
                       {manifestDetail.manifest.manifest_number}
                     </div>
@@ -877,7 +889,7 @@ export default function BarcodeScannerPage() {
                   return (
                     <div className="space-y-1.5 bg-blue-50/50 p-3.5 rounded-lg border border-blue-100">
                       <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                        <span>Progress Pemuatan:</span>
+                        <span>Kemajuan Pemuatan:</span>
                         <span className="font-mono text-sm font-bold text-blue-700">
                           {scannedCount} dari {total} Koli Termuat ({pct}%)
                         </span>
@@ -895,7 +907,7 @@ export default function BarcodeScannerPage() {
                 {/* List of DOs in manifest with badges */}
                 <div className="space-y-2">
                   <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Daftar Surat Jalan (DO) Dalam Manifest:
+                    Daftar Surat Jalan (DO) Dalam Manifes:
                   </div>
                   <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
                     {(manifestDetail.items || []).map((item) => (
@@ -1062,7 +1074,7 @@ export default function BarcodeScannerPage() {
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold">PUTAWAY PALET BERHASIL</div>
+                  <div className="text-sm font-bold">PENATAAN PALET BERHASIL</div>
                   <div className="text-xs mt-0.5">{lpnPutawaySuccessMessage}</div>
                 </div>
               </div>
@@ -1074,7 +1086,7 @@ export default function BarcodeScannerPage() {
                   <AlertCircle className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold">PERINGATAN SCAN PALET</div>
+                  <div className="text-sm font-bold">PERINGATAN PINDAI PALET</div>
                   <div className="text-xs mt-0.5">{lpnPutawayErrorMessage}</div>
                 </div>
               </div>
@@ -1117,7 +1129,7 @@ export default function BarcodeScannerPage() {
                   <div>
                     <div className="text-slate-500">Tipe Palet:</div>
                     <div className="font-semibold text-slate-900 mt-0.5">
-                      {lpnDetail?.lpn?.pallet_type || "STANDARD"}
+                      {statusLabel(lpnDetail?.lpn?.pallet_type || "STANDARD")}
                     </div>
                   </div>
                   <div>
@@ -1156,7 +1168,7 @@ export default function BarcodeScannerPage() {
                             <th className="py-2.5 px-3">SKU</th>
                             <th className="py-2.5 px-3">Nama Barang</th>
                             <th className="py-2.5 px-3">Batch</th>
-                            <th className="py-2.5 px-3 text-right">Jumlah</th>
+                            <th className="py-2.5 px-3 text-right">Jml</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1256,7 +1268,7 @@ export default function BarcodeScannerPage() {
                     className={`p-3 rounded-full min-h-[48px] min-w-[48px] flex items-center justify-center text-white backdrop-blur-md transition-all ${
                       torchOn ? "bg-amber-500 shadow-lg" : "bg-black/40 hover:bg-black/60"
                     }`}
-                    aria-label="Flashlight"
+                    aria-label="Senter"
                   >
                     {torchOn ? <Zap className="w-5 h-5" /> : <ZapOff className="w-5 h-5" />}
                   </button>
@@ -1313,7 +1325,7 @@ export default function BarcodeScannerPage() {
               <div>
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-blue-100 text-[#2563EB]">
                   <BarcodeIcon className="w-3.5 h-3.5" />
-                  Resolved Master SKU
+                  Master SKU Ditemukan
                 </span>
                 <h3 className="text-lg font-extrabold text-slate-900 mt-1">
                   {displayProduct.name}
@@ -1332,7 +1344,7 @@ export default function BarcodeScannerPage() {
                 </div>
               </div>
               <div>
-                <div className="text-slate-500">Packaging Multiplier:</div>
+                <div className="text-slate-500">Pengali Kemasan:</div>
                 <div className="font-bold text-slate-900 mt-0.5">
                   1 Box = {displayProduct.multiplier} Pcs
                 </div>
@@ -1346,7 +1358,7 @@ export default function BarcodeScannerPage() {
               <div>
                 <div className="text-slate-500">SKU Marketplace:</div>
                 <div className="font-semibold text-slate-800 mt-0.5">
-                  {displayProduct.external_sku || "Tokopedia / Shopee Ready"}
+                  {displayProduct.external_sku || "Siap Tokopedia / Shopee"}
                 </div>
               </div>
             </div>

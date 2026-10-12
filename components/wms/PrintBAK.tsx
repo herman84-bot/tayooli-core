@@ -90,7 +90,7 @@ export function PrintBAK({ inspection, items, warehouseName, companyProfile, onC
                 className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-xs font-medium text-white hover:bg-emerald-500"
               >
                 <Printer className="h-4 w-4" />
-                Cetak / Print PDF
+                Cetak PDF
               </button>
               <button
                 type="button"
@@ -123,7 +123,7 @@ export function PrintBAK({ inspection, items, warehouseName, companyProfile, onC
             <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-1 rounded border border-zinc-300 p-3 text-[11px]">
               <span className="text-zinc-500">Tanggal</span>
               <span className="font-medium">: {fmtDate(inspection.created_at)}</span>
-              <span className="text-zinc-500">No. Penerimaan (GR)</span>
+              <span className="text-zinc-500">No. Penerimaan Barang</span>
               <span className="font-mono font-bold">: {inspection.receipt_number}</span>
               <span className="text-zinc-500">Pemasok</span>
               <span className="font-medium">: {inspection.supplier_name || "—"}</span>
@@ -135,7 +135,7 @@ export function PrintBAK({ inspection, items, warehouseName, companyProfile, onC
               <span className="font-medium">
                 : {inspection.driver_name || "—"} {inspection.driver_signed ? "(telah menandatangani)" : ""}
               </span>
-              <span className="text-zinc-500">Jumlah Karton (Gross)</span>
+              <span className="text-zinc-500">Jumlah Karton Bruto</span>
               <span className="font-medium">: {inspection.gross_cartons}</span>
             </div>
 
@@ -146,8 +146,8 @@ export function PrintBAK({ inspection, items, warehouseName, companyProfile, onC
                   <th className="border-r border-zinc-900 px-2 py-1.5 text-left">SKU</th>
                   <th className="border-r border-zinc-900 px-2 py-1.5 text-left">Produk</th>
                   <th className="border-r border-zinc-900 px-2 py-1.5 text-left">Batch</th>
-                  <th className="border-r border-zinc-900 px-2 py-1.5 text-left">Exp</th>
-                  <th className="border-r border-zinc-900 px-2 py-1.5 text-right">Qty Rusak</th>
+                  <th className="border-r border-zinc-900 px-2 py-1.5 text-left">Kedaluwarsa</th>
+                  <th className="border-r border-zinc-900 px-2 py-1.5 text-right">Jml Rusak</th>
                   <th className="px-2 py-1.5 text-left">Alasan</th>
                 </tr>
               </thead>

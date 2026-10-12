@@ -1,6 +1,6 @@
 "use client"
 
-// FE-10: Modal for managing Pallet LPN (License Plate Number) containers.
+// FE-10: Modal for managing Pallet LPN (Nomor Identitas Palet) containers.
 // Enables containerizing received batch items, inspecting pallet contents,
 // and printing ISO-28219 thermal barcode stickers.
 
@@ -42,10 +42,10 @@ const STATUS_CONFIG: Record<
   LPNStatus,
   { label: string; cls: string }
 > = {
-  STAGED: { label: "Staging (STAGED)", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  STORED: { label: "Tersimpan (STORED)", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  PICKED: { label: "Diambil (PICKED)", cls: "bg-blue-50 text-blue-700 border-blue-200" },
-  SHIPPED: { label: "Terkirim (SHIPPED)", cls: "bg-purple-50 text-purple-700 border-purple-200" },
+  STAGED: { label: "Area Transit", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  STORED: { label: "Tersimpan", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  PICKED: { label: "Diambil", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+  SHIPPED: { label: "Dikirim", cls: "bg-purple-50 text-purple-700 border-purple-200" },
   DECOMMISSIONED: { label: "Nonaktif", cls: "bg-slate-100 text-slate-600 border-slate-200" },
 }
 
@@ -53,10 +53,10 @@ const PALLET_TYPE_CONFIG: Record<
   PalletType,
   { label: string; desc: string }
 > = {
-  WOODEN: { label: "Kayu (WOODEN)", desc: "Standar ISPM-15" },
-  PLASTIC: { label: "Plastik (PLASTIC)", desc: "HDPE Food Grade" },
-  METAL: { label: "Logam (METAL)", desc: "Baja Heavy Duty" },
-  CAGE: { label: "Keranjang (CAGE)", desc: "Stillage Jaring" },
+  WOODEN: { label: "Kayu", desc: "Standar ISPM-15" },
+  PLASTIC: { label: "Plastik", desc: "HDPE Food Grade" },
+  METAL: { label: "Logam", desc: "Baja Tugas Berat" },
+  CAGE: { label: "Keranjang", desc: "Rangka Jaring" },
 }
 
 function parseNum(val: unknown): number {
@@ -140,7 +140,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
       return
     }
     if (!newLocationId) {
-      setNotice({ type: "error", text: "Pilih lokasi rak / staging awal untuk palet." })
+      setNotice({ type: "error", text: "Pilih lokasi rak / area transit awal untuk palet." })
       return
     }
 
@@ -199,7 +199,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
       return
     }
     if (qty <= 0) {
-      setNotice({ type: "error", text: "Kuantitas barang harus lebih dari 0." })
+      setNotice({ type: "error", text: "Jumlah barang harus lebih dari 0." })
       return
     }
 
@@ -257,11 +257,11 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 Manajemen Palet & Kontainer LPN
                 <span className="text-[11px] font-mono px-2 py-0.5 bg-slate-200 text-slate-700 rounded-md font-normal">
-                  License Plate Number
+                  Nomor Identitas Palet
                 </span>
               </h2>
               <p className="text-xs text-slate-500">
-                Wadah palet penampung lot barang di staging & rak gudang
+                Wadah palet penampung lot barang di area transit & rak gudang
               </p>
             </div>
           </div>
@@ -328,7 +328,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                             : "text-slate-500 hover:text-slate-800"
                         }`}
                       >
-                        {st === "ALL" ? "Semua" : st}
+                        {st === "ALL" ? "Semua" : STATUS_CONFIG[st]?.label ?? st}
                       </button>
                     ))}
                   </div>
@@ -501,10 +501,10 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                     <div>
                       <span className="text-slate-400 block text-[10px] uppercase font-bold">Tipe & Status</span>
                       <span className="font-semibold text-slate-800 block">
-                        {selectedLpnDetail.lpn.pallet_type}
+                        {PALLET_TYPE_CONFIG[selectedLpnDetail.lpn.pallet_type]?.label ?? selectedLpnDetail.lpn.pallet_type}
                       </span>
                       <span className="text-[10px] font-bold text-emerald-700">
-                        {selectedLpnDetail.lpn.status}
+                        {STATUS_CONFIG[selectedLpnDetail.lpn.status]?.label ?? selectedLpnDetail.lpn.status}
                       </span>
                     </div>
                     <div>
@@ -537,7 +537,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                           <th className="px-4 py-2.5">Produk</th>
                           <th className="px-4 py-2.5">Batch / Lot</th>
                           <th className="px-4 py-2.5">Tgl Kedaluwarsa</th>
-                          <th className="px-4 py-2.5 text-right">Kuantitas</th>
+                          <th className="px-4 py-2.5 text-right">Jml</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -594,17 +594,17 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
 
               <div>
                 <label htmlFor="newLocationSelect" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Lokasi Staging / Rak Awal <span className="text-rose-500">*</span>
+                  Lokasi Area Transit / Rak Awal <span className="text-rose-500">*</span>
                 </label>
                 <select
                   id="newLocationSelect"
-                  aria-label="Lokasi Staging / Rak Awal"
+                  aria-label="Lokasi Area Transit / Rak Awal"
                   value={newLocationId}
                   onChange={(e) => setNewLocationId(e.target.value)}
                   className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:bg-white"
                   required
                 >
-                  <option value="">-- Pilih Lokasi Staging atau Rak --</option>
+                  <option value="">-- Pilih Lokasi Area Transit atau Rak --</option>
                   {locations.map((loc) => (
                     <option key={loc.id} value={loc.id}>
                       {loc.code} - {loc.name} ({loc.type})
@@ -612,7 +612,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                   ))}
                 </select>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  Biasanya ditempatkan di Staging Inbound sebelum proses putaway ke rak.
+                  Biasanya ditempatkan di Area Transit Masuk sebelum proses penataan rak.
                 </p>
               </div>
 
@@ -626,10 +626,10 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                     onChange={(e) => setNewPalletType(e.target.value as PalletType)}
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:bg-white"
                   >
-                    <option value="WOODEN">Kayu (WOODEN)</option>
-                    <option value="PLASTIC">Plastik (PLASTIC)</option>
-                    <option value="METAL">Logam / Besi (METAL)</option>
-                    <option value="CAGE">Keranjang (CAGE)</option>
+                    <option value="WOODEN">Kayu</option>
+                    <option value="PLASTIC">Plastik</option>
+                    <option value="METAL">Logam / Besi</option>
+                    <option value="CAGE">Keranjang</option>
                   </select>
                 </div>
 
@@ -718,7 +718,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                 <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-2">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-900">
                     <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                    Pilih Cepat Dari Barang Staging Masuk:
+                    Pilih Cepat dari Area Transit Masuk:
                   </div>
                   <div className="max-h-32 overflow-y-auto divide-y divide-emerald-100 bg-white rounded-lg border border-emerald-200">
                     {putawayPending.slice(0, 5).map((line) => (
@@ -785,7 +785,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
               {/* Quantity */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kuantitas Unit <span className="text-rose-500">*</span>
+                  Jumlah Unit <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"

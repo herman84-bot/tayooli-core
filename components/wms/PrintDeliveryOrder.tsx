@@ -15,6 +15,21 @@ export interface PrintDeliveryOrderProps {
   onClose: () => void
 }
 
+const DELIVERY_ORDER_STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Draf',
+  PENDING: 'Menunggu Persetujuan',
+  APPROVED: 'Disetujui',
+  REJECTED: 'Ditolak',
+  PICKING: 'Pengambilan',
+  PACKING: 'Pengemasan',
+  STAGED: 'Area Transit',
+  IN_TRANSIT: 'Dalam Pengiriman',
+  SHIPPED: 'Dikirim',
+  DELIVERED: 'Diterima',
+  COMPLETED: 'Selesai',
+  CANCELLED: 'Dibatalkan',
+}
+
 function getCompanyInitial(name: string): string {
   const clean = name.trim().replace(/^(PT|PT\.|CV|CV\.|UD|UD\.)\s+/i, '')
   return clean.charAt(0).toUpperCase() || name.charAt(0).toUpperCase() || 'T'
@@ -155,7 +170,7 @@ export function PrintDeliveryOrder({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-medium text-white shadow hover:bg-emerald-500 active:scale-95 transition-all"
               >
                 <Printer className="h-4 w-4" />
-                Cetak / Print PDF
+                Cetak PDF
               </button>
               <button
                 type="button"
@@ -210,7 +225,7 @@ export function PrintDeliveryOrder({
             {/* DOKUMEN JUDUL & INFORMASI HEADER */}
             <div className="text-center my-4">
               <h2 className="text-base font-black uppercase tracking-wider text-zinc-900 border-b inline-block border-zinc-900 pb-0.5">
-                SURAT JALAN PENGIRIMAN (DELIVERY ORDER)
+                SURAT JALAN PENGIRIMAN
               </h2>
               <p className="text-[11px] font-mono font-bold text-zinc-700 mt-1">
                 NOMOR: {deliveryOrder.do_number}
@@ -258,7 +273,7 @@ export function PrintDeliveryOrder({
                     : {formatDate(deliveryOrder.created_at)} ({formatTime(deliveryOrder.created_at)})
                   </span>
 
-                  <span className="text-zinc-500">Ref. Sales Order</span>
+                  <span className="text-zinc-500">Ref. Pesanan Penjualan</span>
                   <span className="col-span-2 font-mono font-bold text-zinc-900">
                     : {deliveryOrder.sales_order_id ?? "— (Surat Jalan langsung)"}
                   </span>
@@ -285,7 +300,7 @@ export function PrintDeliveryOrder({
                     <th className="border-r border-zinc-900 py-1.5 px-2 text-left w-28">Kode SKU</th>
                     <th className="border-r border-zinc-900 py-1.5 px-2 text-left">Deskripsi Barang</th>
                     <th className="border-r border-zinc-900 py-1.5 px-2 text-center w-24">Lokasi Rak</th>
-                    <th className="border-r border-zinc-900 py-1.5 px-2 text-right w-16">Qty</th>
+                    <th className="border-r border-zinc-900 py-1.5 px-2 text-right w-16">Jml</th>
                     <th className="py-1.5 px-2 text-center w-16">Satuan</th>
                   </tr>
                 </thead>
@@ -307,7 +322,7 @@ export function PrintDeliveryOrder({
                         </td>
                         <td className="border-r border-zinc-300 py-1.5 px-2 font-medium text-zinc-900">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span>{item.product_name || `Barang Master (${item.product_id.slice(0, 8)})`}</span>
+                            <span>{item.product_name || `Barang Induk (${item.product_id.slice(0, 8)})`}</span>
                             {item.is_free_item && (
                               <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[9px] uppercase tracking-wider">
                                 BONUS
@@ -316,7 +331,7 @@ export function PrintDeliveryOrder({
                           </div>
                           {item.batch_number && (
                             <div className="text-[9px] font-mono text-zinc-500 mt-0.5">
-                              Batch: {item.batch_number} {item.expiry_date ? `(Exp: ${item.expiry_date.slice(0, 10)})` : ''}
+                              Batch: {item.batch_number} {item.expiry_date ? `(Kedaluwarsa: ${item.expiry_date.slice(0, 10)})` : ''}
                             </div>
                           )}
                         </td>
@@ -336,7 +351,7 @@ export function PrintDeliveryOrder({
                 <tfoot>
                   <tr className="bg-zinc-100 font-bold border-t border-zinc-900 text-zinc-900">
                     <td colSpan={4} className="border-r border-zinc-900 py-1.5 px-3 text-right uppercase tracking-wider text-[10px]">
-                      Total Kuantitas Barang :
+                      Total Jumlah Barang :
                     </td>
                     <td className="border-r border-zinc-900 py-1.5 px-2 text-right font-mono font-black text-sm">
                       {totalQuantity.toLocaleString('id-ID')}
@@ -449,8 +464,8 @@ export function PrintDeliveryOrder({
               </div>
 
               <div className="text-right space-y-0.5 font-mono text-[9px]">
-                <p>Dokumen ID: {deliveryOrder.id}</p>
-                <p>Status: {deliveryOrder.status}</p>
+                <p>ID Dokumen: {deliveryOrder.id}</p>
+                <p>Status: {DELIVERY_ORDER_STATUS_LABELS[deliveryOrder.status] || deliveryOrder.status}</p>
                 <p>Dicetak: {new Date().toLocaleString('id-ID')}</p>
               </div>
             </div>

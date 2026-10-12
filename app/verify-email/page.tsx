@@ -55,7 +55,7 @@ export default function VerifyEmailPage() {
       })
       if (res.ok) {
         setResendCooldown(60)
-        setResendMessage('Link verifikasi dikirim ulang.')
+        setResendMessage('Tautan verifikasi dikirim ulang.')
       } else {
         setResendMessage('Gagal mengirim ulang. Coba lagi nanti.')
       }
@@ -102,7 +102,7 @@ export default function VerifyEmailPage() {
                 Email Terverifikasi
               </h1>
               <p className="mt-2 text-sm text-muted-foreground text-center">
-                Mengalihkan ke setup workspace...
+                Mengalihkan ke penyiapan ruang kerja...
               </p>
             </div>
           )}
@@ -114,7 +114,7 @@ export default function VerifyEmailPage() {
                 Token Tidak Valid
               </h1>
               <p className="mt-2 text-sm text-muted-foreground text-center">
-                Link verifikasi tidak valid atau sudah kedaluwarsa.
+                Tautan verifikasi tidak valid atau sudah kedaluwarsa.
               </p>
               <button
                 onClick={handleResend}
@@ -122,8 +122,8 @@ export default function VerifyEmailPage() {
                 className="mt-4 text-sm font-medium text-primary hover:text-primary/80 disabled:text-muted-foreground disabled:cursor-not-allowed"
               >
                 {resendCooldown > 0
-                  ? `Kirim ulang dalam ${resendCooldown}s`
-                  : 'Kirim Ulang Link'}
+                  ? `Kirim ulang dalam ${resendCooldown} detik`
+                  : 'Kirim Ulang Tautan'}
               </button>
             </div>
           )}
@@ -132,10 +132,10 @@ export default function VerifyEmailPage() {
             <div className="flex flex-col items-center py-8">
               <Mail className="h-12 w-12 text-primary mb-4" />
               <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                Cek Email Anda
+                Periksa Email Anda
               </h1>
               <p className="mt-2 text-sm text-muted-foreground text-center">
-                Kami kirim link verifikasi ke{' '}
+                Kami mengirim tautan verifikasi ke{' '}
                 <span className="font-medium text-foreground">{email}</span>
               </p>
               <button
@@ -144,7 +144,7 @@ export default function VerifyEmailPage() {
                 className="mt-4 text-sm font-medium text-primary hover:text-primary/80 disabled:text-muted-foreground disabled:cursor-not-allowed"
               >
                 {resendCooldown > 0
-                  ? `Kirim ulang dalam ${resendCooldown}s`
+                  ? `Kirim ulang dalam ${resendCooldown} detik`
                   : 'Kirim Ulang'}
               </button>
               {resendMessage && (

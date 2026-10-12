@@ -52,7 +52,7 @@ export default function ChatPanel() {
         <div>
           <h3 className="text-sm font-semibold text-foreground">Tayooli Support</h3>
           <p className="text-xs text-muted-foreground">
-            {isSending ? 'Mengetik...' : 'Online — AI assistant'}
+            {isSending ? 'Mengetik...' : 'Daring — Asisten AI'}
           </p>
         </div>
       </div>
@@ -72,7 +72,7 @@ export default function ChatPanel() {
               {[
                 'Bagaimana cara pakai Kasir POS & cetak struk?',
                 'Bagaimana alur transfer stok antar gudang di WMS?',
-                'Cara buat Surat Jalan (DO) dan Stock Opname?',
+                'Cara buat Surat Jalan dan Stok Opname?',
                 'Bagaimana sinkronisasi stok marketplace bekerja?',
               ].map((suggestion) => (
                 <button
@@ -156,7 +156,7 @@ export default function ChatPanel() {
                   ? 'text-primary hover:bg-primary/10'
                   : 'text-muted-foreground/40'
               )}
-              aria-label="Send message"
+              aria-label="Kirim pesan"
             >
               <Send className="h-4 w-4" />
             </button>

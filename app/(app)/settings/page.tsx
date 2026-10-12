@@ -48,7 +48,7 @@ function WarehousePicker({ warehouses, selected, onChange, loading }: {
 }) {
   if (loading) return <p className="text-[11px] text-muted-foreground">Memuat daftar gudang...</p>
   if (warehouses.length === 0) {
-    return <p className="text-[11px] text-amber-600">Belum ada gudang. Buat gudang dulu di menu Warehouse &amp; Stock.</p>
+    return <p className="text-[11px] text-amber-600">Belum ada gudang. Buat gudang dulu di menu Gudang &amp; Stok.</p>
   }
   const toggle = (id: string) =>
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
@@ -160,7 +160,7 @@ function MemberActions({ member, onEdit, onRemove, onResend }: {
       <button
         onClick={() => setOpen(!open)}
         className="p-1 rounded text-muted-foreground hover:bg-muted transition-colors"
-        aria-label="More options"
+        aria-label="Opsi lainnya"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
@@ -449,7 +449,7 @@ function ProfileTab() {
       <div>
         <h2 className="text-sm font-semibold text-foreground mb-1">Profil Bisnis / Perusahaan</h2>
         <p className="text-xs text-muted-foreground">
-          Informasi ini digunakan otomatis pada kop Surat Jalan (Delivery Order), Faktur Penjualan, Berita Acara, dan Struk Kasir.
+          Informasi ini digunakan otomatis pada kop Surat Jalan, Faktur Penjualan, Berita Acara, dan Struk Kasir.
         </p>
       </div>
 
@@ -613,7 +613,7 @@ export default function SettingsPage() {
     <div className="p-6 max-w-4xl">
       <div className="flex items-center gap-2.5 mb-5">
         <Settings className="h-5 w-5 text-muted-foreground" />
-        <h1 className="text-lg font-semibold text-foreground">Settings</h1>
+        <h1 className="text-lg font-semibold text-foreground">Pengaturan</h1>
       </div>
 
       {/* Tabs */}
@@ -745,7 +745,7 @@ function PaymentsTab() {
           )}
         >
           <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          Pakasir (Fallback UMKM)
+          Pakasir (Alternatif UMKM)
         </button>
       </div>
 
@@ -764,7 +764,7 @@ function PaymentsTab() {
         <div className="text-xs">
           <p className="font-semibold">
             {isLive
-              ? `Gateway ${provider === 'midtrans' ? 'Midtrans' : 'Pakasir'} Aktif (${config?.is_production ? 'Live Production' : 'Sandbox Testing'})`
+              ? `Gateway ${provider === 'midtrans' ? 'Midtrans' : 'Pakasir'} Aktif (${config?.is_production ? 'Produksi' : 'Uji Coba Sandbox'})`
               : 'Mode Demo Aktif'}
           </p>
           <p className="mt-0.5 leading-relaxed opacity-90">
@@ -801,7 +801,7 @@ function PaymentsTab() {
                 onChange={(e) => setIsProduction(e.target.checked)}
                 className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
               />
-              <span>Gunakan Mode Live (Production)</span>
+              <span>Gunakan Mode Produksi</span>
             </label>
           </div>
 
@@ -817,7 +817,7 @@ function PaymentsTab() {
                     rel="noreferrer"
                     className="text-[11px] text-primary hover:underline flex items-center gap-1"
                   >
-                    Buka Midtrans Dashboard <ExternalLink className="h-3 w-3" />
+                    Buka Dasbor Midtrans <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
                 <div className="relative">
@@ -838,7 +838,7 @@ function PaymentsTab() {
                   </button>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Didapat dari menu <em>Settings &gt; Access Keys</em> di dashboard Midtrans merchant Anda.
+                  Didapat dari menu <em>Settings &gt; Access Keys</em> di dasbor merchant Midtrans Anda.
                 </p>
               </div>
 
@@ -883,7 +883,7 @@ function PaymentsTab() {
             <div className="p-3 bg-muted/40 rounded-lg border border-border space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Lock className="h-3.5 w-3.5 text-primary" /> Webhook Notification URL
+                  <Lock className="h-3.5 w-3.5 text-primary" /> URL Notifikasi Webhook
                 </span>
                 <button
                   type="button"
@@ -904,7 +904,7 @@ function PaymentsTab() {
                 </button>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Tempel URL berikut pada dashboard Midtrans (<em>Settings &gt; Configuration &gt; Payment Notification URL</em>) agar kasir menerima notifikasi lunas instan:
+                Tempel URL berikut pada dasbor Midtrans (<em>Settings &gt; Configuration &gt; Payment Notification URL</em>) agar kasir menerima notifikasi lunas instan:
               </p>
               <div className="font-mono text-[11px] bg-background px-2.5 py-1.5 rounded border border-border select-all break-all">
                 {typeof window !== 'undefined' ? `${window.location.origin}/api/v1/webhooks/midtrans` : 'https://tayooli.my.id/api/v1/webhooks/midtrans'}

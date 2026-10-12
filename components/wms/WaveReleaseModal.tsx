@@ -18,6 +18,30 @@ import {
 } from "lucide-react"
 import { api, Warehouse, PickWave, PickWaveDetail } from "@/lib/api"
 
+const ORDER_TYPE_LABELS: Record<string, string> = {
+  DIRECT_DO: "Surat Jalan Langsung",
+  SALES_ORDER: "Pesanan Penjualan B2B",
+  MARKETPLACE: "E-Commerce / Marketplace",
+  TRANSFER: "Transfer Antargudang",
+}
+
+const WAVE_STATUS_LABELS: Record<string, string> = {
+  OPEN: "Terbuka",
+  RELEASED: "Dirilis",
+  IN_PROGRESS: "Sedang Berjalan",
+  COMPLETED: "Selesai",
+  CANCELLED: "Dibatalkan",
+}
+
+const TASK_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Menunggu",
+  ASSIGNED: "Ditugaskan",
+  IN_PROGRESS: "Sedang Berjalan",
+  PICKED: "Diambil",
+  COMPLETED: "Selesai",
+  CANCELLED: "Dibatalkan",
+}
+
 interface WaveReleaseModalProps {
   isOpen: boolean
   onClose: () => void
@@ -64,7 +88,7 @@ export function WaveReleaseModal({
       })
       setWaves(res.data || [])
     } catch (err: any) {
-      setError(err?.message || "Gagal memuat daftar wave")
+      setError(err?.message || "Gagal memuat daftar gelombang")
     } finally {
       setLoading(false)
     }
@@ -90,12 +114,12 @@ export function WaveReleaseModal({
         notes: notes || undefined,
       })
 
-      setSuccessMsg(`Gelombang picking ${res.data.wave_number} berhasil dibuat dengan ${res.data.total_orders} pesanan!`)
+      setSuccessMsg(`Gelombang pengambilan ${res.data.wave_number} berhasil dibuat dengan ${res.data.total_orders} pesanan!`)
       setActiveTab("list")
       await loadWaves()
       if (onWaveUpdated) onWaveUpdated()
     } catch (err: any) {
-      setError(err?.message || "Gagal membuat gelombang picking. Pastikan ada pesanan DRAFT/CONFIRMED yang cocok.")
+      setError(err?.message || "Gagal membuat gelombang pengambilan. Pastikan ada pesanan Draf atau Dikonfirmasi yang cocok.")
     } finally {
       setSubmitting(false)
     }
@@ -106,14 +130,14 @@ export function WaveReleaseModal({
       setSubmitting(true)
       setError(null)
       await api.wms.pickWaves.release(waveId)
-      setSuccessMsg("Gelombang pengambilan berhasil dirilis ke tim gudang (IN_PROGRESS)!")
+      setSuccessMsg("Gelombang pengambilan berhasil dirilis ke tim gudang!")
       await loadWaves()
       if (selectedWaveDetail && selectedWaveDetail.wave.id === waveId) {
         handleViewDetail(waveId)
       }
       if (onWaveUpdated) onWaveUpdated()
     } catch (err: any) {
-      setError(err?.message || "Gagal merilis gelombang picking")
+      setError(err?.message || "Gagal merilis gelombang pengambilan")
     } finally {
       setSubmitting(false)
     }
@@ -125,7 +149,7 @@ export function WaveReleaseModal({
       const res = await api.wms.pickWaves.get(waveId)
       setSelectedWaveDetail(res.data)
     } catch (err: any) {
-      setError(err?.message || "Gagal memuat rincian wave")
+      setError(err?.message || "Gagal memuat rincian gelombang")
     } finally {
       setLoading(false)
     }
@@ -144,10 +168,10 @@ export function WaveReleaseModal({
             </span>
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                Gabung Surat Jalan untuk Picking
+                Gabung Surat Jalan untuk Pengambilan
               </h2>
               <p className="text-xs text-slate-500">
-                Kelompokkan pesanan berdasarkan jenis order & kurir untuk efisiensi pengambilan batch massal
+                Kelompokkan pesanan berdasarkan jenis pesanan & kurir untuk efisiensi pengambilan batch massal
               </p>
             </div>
           </div>
@@ -175,7 +199,7 @@ export function WaveReleaseModal({
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              Daftar Wave Aktif ({waves.length})
+              Daftar Gelombang Aktif ({waves.length})
             </button>
             <button
               type="button"
@@ -189,7 +213,7 @@ export function WaveReleaseModal({
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              + Buat Wave Baru
+              + Buat Gelombang Baru
             </button>
           </div>
 
@@ -241,8 +265,8 @@ export function WaveReleaseModal({
               <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 text-xs text-indigo-900 leading-relaxed">
                 <span className="font-bold">Logika Pengelompokan Otomatis:</span>
                 <p className="mt-1">
-                  Sistem akan mengumpulkan seluruh Surat Jalan berstatus DRAFT atau CONFIRMED di gudang terpilih yang
-                  sesuai dengan kriteria di bawah, lalu mengikatnya ke dalam satu batch instruksi picking.
+                  Sistem akan mengumpulkan seluruh Surat Jalan berstatus Draf atau Dikonfirmasi di gudang terpilih yang
+                  sesuai dengan kriteria di bawah, lalu mengikatnya ke dalam satu batch instruksi pengambilan.
                 </p>
               </div>
 
@@ -255,10 +279,10 @@ export function WaveReleaseModal({
                   onChange={(e) => setOrderType(e.target.value)}
                   className="w-full text-xs border border-slate-200 rounded-lg p-2.5 bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
-                  <option value="DIRECT_DO">Surat Jalan Langsung (DIRECT_DO)</option>
-                  <option value="SALES_ORDER">Pesanan Penjualan B2B (SALES_ORDER)</option>
-                  <option value="MARKETPLACE">E-Commerce / Marketplace (MARKETPLACE)</option>
-                  <option value="TRANSFER">Transfer Antargudang (TRANSFER)</option>
+                  <option value="DIRECT_DO">Surat Jalan Langsung</option>
+                  <option value="SALES_ORDER">Pesanan Penjualan B2B</option>
+                  <option value="MARKETPLACE">E-Commerce / Marketplace</option>
+                  <option value="TRANSFER">Transfer Antargudang</option>
                 </select>
               </div>
 
@@ -291,7 +315,7 @@ export function WaveReleaseModal({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Catatan untuk Tim Picker (Opsional)
+                  Catatan untuk Petugas Pengambil (Opsional)
                 </label>
                 <textarea
                   value={notes}
@@ -316,7 +340,7 @@ export function WaveReleaseModal({
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 shadow-sm"
                 >
                   <Plus className="h-4 w-4" />
-                  {submitting ? "Membuat Wave..." : "Rilis & Buat Wave"}
+                  {submitting ? "Membuat Gelombang..." : "Rilis & Buat Gelombang"}
                 </button>
               </div>
             </form>
@@ -330,12 +354,12 @@ export function WaveReleaseModal({
                     onClick={() => setSelectedWaveDetail(null)}
                     className="text-xs text-indigo-600 hover:underline mb-1 inline-block"
                   >
-                    &larr; Kembali ke daftar wave
+                    &larr; Kembali ke daftar gelombang
                   </button>
                   <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                     {selectedWaveDetail.wave.wave_number}
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      {selectedWaveDetail.wave.order_type}
+                      {ORDER_TYPE_LABELS[selectedWaveDetail.wave.order_type] || selectedWaveDetail.wave.order_type}
                     </span>
                   </h3>
                 </div>
@@ -347,7 +371,7 @@ export function WaveReleaseModal({
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-sm"
                   >
                     <Play className="h-3.5 w-3.5" />
-                    Rilis Wave (IN_PROGRESS)
+                    Rilis Gelombang
                   </button>
                 )}
               </div>
@@ -355,7 +379,9 @@ export function WaveReleaseModal({
               <div className="grid grid-cols-4 gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <div>
                   <span className="text-slate-400 block">Status</span>
-                  <span className="font-bold text-slate-800">{selectedWaveDetail.wave.status}</span>
+                  <span className="font-bold text-slate-800">
+                    {WAVE_STATUS_LABELS[selectedWaveDetail.wave.status] || selectedWaveDetail.wave.status}
+                  </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Kurir / Rute</span>
@@ -386,7 +412,7 @@ export function WaveReleaseModal({
                           <span className="font-mono font-bold text-indigo-600">{pt.task.task_number}</span>
                           <span className="text-slate-500 font-mono">({pt.delivery_order.do_number})</span>
                           <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700">
-                            {pt.task.status}
+                            {TASK_STATUS_LABELS[pt.task.status] || pt.task.status}
                           </span>
                         </div>
                         <div className="text-slate-500">
@@ -409,18 +435,18 @@ export function WaveReleaseModal({
             /* Daftar Wave Aktif */
             <div className="space-y-3">
               {loading ? (
-                <div className="py-12 text-center text-xs text-slate-400">Memuat daftar gelombang picking...</div>
+                <div className="py-12 text-center text-xs text-slate-400">Memuat daftar gelombang pengambilan...</div>
               ) : waves.length === 0 ? (
                 <div className="py-12 text-center text-xs text-slate-400 space-y-2">
                   <Boxes className="h-8 w-8 mx-auto text-slate-300" />
-                  <p>Belum ada gelombang picking untuk gudang ini.</p>
+                  <p>Belum ada gelombang pengambilan untuk gudang ini.</p>
                   <button
                     type="button"
                     onClick={() => setActiveTab("create")}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Buat Wave Pertama
+                    Buat Gelombang Pertama
                   </button>
                 </div>
               ) : (
@@ -439,10 +465,10 @@ export function WaveReleaseModal({
                             ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
                             : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                         }`}>
-                          {w.status}
+                          {WAVE_STATUS_LABELS[w.status] || w.status}
                         </span>
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                          {w.order_type}
+                          {ORDER_TYPE_LABELS[w.order_type] || w.order_type}
                         </span>
                       </div>
                       <div className="text-xs text-slate-500 flex items-center gap-3">
@@ -468,7 +494,7 @@ export function WaveReleaseModal({
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-xs disabled:opacity-50"
                         >
                           <Play className="h-3.5 w-3.5" />
-                          Rilis Wave
+                          Rilis Gelombang
                         </button>
                       )}
                     </div>

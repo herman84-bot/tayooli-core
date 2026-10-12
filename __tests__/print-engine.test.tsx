@@ -55,7 +55,7 @@ describe('Requirement #14: Official Document Generation & Print Engine', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByText('SURAT JALAN PENGIRIMAN (DELIVERY ORDER)')).toBeInTheDocument()
+        expect(screen.getByText('SURAT JALAN PENGIRIMAN')).toBeInTheDocument()
       })
 
       expect(screen.getAllByText('PT TAYOOLI DISTRIBUSI UTAMA').length).toBeGreaterThanOrEqual(1)
@@ -191,7 +191,7 @@ describe('Requirement #14: Official Document Generation & Print Engine', () => {
       expect(screen.getByText('120-00-9988771-2')).toBeInTheDocument()
 
       // Stamp watermark for PAID
-      expect(screen.getByText('LUNAS / PAID')).toBeInTheDocument()
+      expect(screen.getByText('LUNAS')).toBeInTheDocument()
     })
 
     it('applies print isolation CSS rules with A4 dimensions and hidden .no-print elements', async () => {

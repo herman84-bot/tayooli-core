@@ -125,6 +125,16 @@ const CHANNEL_CONFIGS: Record<MarketplaceChannel, ChannelConfig> = {
   },
 }
 
+// Display-only labels for backend order status enums (values unchanged)
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  COMPLETED: "Selesai",
+  UNMAPPED_SKU: "SKU Belum Terpetakan",
+  STOCK_INSUFFICIENT: "Stok Kurang",
+  FAILED: "Gagal",
+  PROCESSING: "Diproses",
+  PENDING_APPROVAL: "Menunggu Persetujuan",
+}
+
 // ── Currency Formatter ──────────────────────────────────────────────────────────
 
 function formatIDR(amount: number | string | undefined | null): string {
@@ -312,7 +322,7 @@ export default function MarketplacePage() {
       showNotification(
         "error",
         "Ukuran File Terlalu Besar",
-        "Batas maksimum upload adalah 5 MB sesuai kebijakan API WMS."
+        "Batas maksimum unggah adalah 5 MB sesuai kebijakan API WMS."
       )
       return
     }
@@ -457,7 +467,7 @@ export default function MarketplacePage() {
     }
     const multNum = parseFloat(mapMultiplier)
     if (isNaN(multNum) || multNum <= 0) {
-      setMapModalError("Faktor pengali (multiplier) harus berupa angka positif > 0.")
+      setMapModalError("Faktor pengali harus berupa angka positif > 0.")
       return
     }
 
@@ -475,7 +485,7 @@ export default function MarketplacePage() {
       showNotification(
         "success",
         "Pemetaan SKU Berhasil Disimpan",
-        `SKU ${mapExternalSku} terhubung ke produk internal. Pesanan tertunda akan otomatis di-reproses.`
+        `SKU ${mapExternalSku} terhubung ke produk internal. Pesanan tertunda akan otomatis diproses ulang.`
       )
       setShowMappingModal(false)
       refetchMappings()
@@ -538,42 +548,42 @@ export default function MarketplacePage() {
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-            COMPLETED
+            {ORDER_STATUS_LABELS.COMPLETED}
           </span>
         )
       case "UNMAPPED_SKU":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
-            UNMAPPED_SKU
+            {ORDER_STATUS_LABELS.UNMAPPED_SKU}
           </span>
         )
       case "STOCK_INSUFFICIENT":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-            STOK KURANG
+            {ORDER_STATUS_LABELS.STOCK_INSUFFICIENT}
           </span>
         )
       case "FAILED":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
             <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
-            FAILED
+            {ORDER_STATUS_LABELS.FAILED}
           </span>
         )
       case "PROCESSING":
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-spin" />
-            PROCESSING
+            {ORDER_STATUS_LABELS.PROCESSING}
           </span>
         )
       default:
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
             <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-            {status}
+            {ORDER_STATUS_LABELS[status] ?? status}
           </span>
         )
     }
@@ -637,7 +647,7 @@ export default function MarketplacePage() {
             <div>
               <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mb-1">
                 <Link href="/wms" className="hover:text-blue-600 transition-colors">
-                  Warehouse & Stock
+                  Gudang & Stok
                 </Link>
                 <span>/</span>
                 <span className="text-slate-900 font-semibold">Marketplace</span>
@@ -648,10 +658,10 @@ export default function MarketplacePage() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                    Marketplace Sales Import & SKU Mapping
+                    Impor Penjualan Marketplace & Pemetaan SKU
                   </h1>
                   <p className="text-sm text-slate-500">
-                    Impor pesanan Shopee, Tokopedia, TikTok Shop, Lazada, resolusi packaging multiplier & potong stok otomatis untuk pelanggan.
+                    Impor pesanan Shopee, Tokopedia, TikTok Shop, Lazada, resolusi faktor pengali kemasan & potong stok otomatis untuk pelanggan.
                   </p>
                 </div>
               </div>
@@ -694,7 +704,7 @@ export default function MarketplacePage() {
               </div>
               <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Terverifikasi dengan Idempotency Batch</span>
+                <span>Terverifikasi dengan Batch Idempoten</span>
               </div>
             </div>
 
@@ -729,7 +739,7 @@ export default function MarketplacePage() {
                 {formatIDR(summaryKpis.netRevenue)}
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                Total belanja bersih setelah fee channel
+                Total belanja bersih setelah biaya kanal
               </div>
             </div>
 
@@ -795,7 +805,7 @@ export default function MarketplacePage() {
               }`}
             >
               <UploadCloud className="w-4 h-4" />
-              <span>Tab 1: Impor Pesanan (Import Orders)</span>
+              <span>Impor Pesanan</span>
             </button>
 
             <button
@@ -807,7 +817,7 @@ export default function MarketplacePage() {
               }`}
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>Tab 2: Daftar Pesanan (Orders Ledger)</span>
+              <span>Daftar Pesanan</span>
               <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700">
                 {orders.length}
               </span>
@@ -822,10 +832,10 @@ export default function MarketplacePage() {
               }`}
             >
               <Boxes className="w-4 h-4" />
-              <span>Tab 3: Pemetaan SKU & Resolver</span>
+              <span>Pemetaan SKU</span>
               {summaryKpis.unmappedSkuCount > 0 ? (
                 <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
-                  {summaryKpis.unmappedSkuCount} Unmapped
+                  {summaryKpis.unmappedSkuCount} Belum Terpetakan
                 </span>
               ) : (
                 <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700">
@@ -906,7 +916,7 @@ export default function MarketplacePage() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
               <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
                 <UploadCloud className="w-5 h-5 text-blue-600" />
-                <span>Upload Berkas Penjualan Marketplace</span>
+                <span>Unggah Berkas Penjualan Marketplace</span>
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -972,7 +982,7 @@ export default function MarketplacePage() {
                     htmlFor="channel-select"
                     className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
                   >
-                    Kanal Penjualan (Marketplace)
+                    Kanal Penjualan Marketplace
                   </label>
                   <select
                     id="channel-select"
@@ -982,13 +992,13 @@ export default function MarketplacePage() {
                     }
                     className="w-full min-h-[48px] px-3.5 py-2.5 rounded-lg bg-white border border-slate-300 text-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   >
-                    <option value="AUTO">✨ Deteksi Otomatis (Auto-Detect Header)</option>
+                    <option value="AUTO">✨ Deteksi Otomatis</option>
                     <option value="SHOPEE">Shopee (Ekspor Pesanan Massal)</option>
                     <option value="TOKOPEDIA">Tokopedia (Daftar Pesanan Tokopedia)</option>
-                    <option value="TIKTOK">TikTok Shop (Order Export)</option>
+                    <option value="TIKTOK">TikTok Shop (Ekspor Pesanan)</option>
                     <option value="LAZADA">Lazada (Lazada Seller Center)</option>
                     <option value="BLIBLI">Blibli</option>
-                    <option value="OTHER">Generic CSV / TSV Standar</option>
+                    <option value="OTHER">CSV / TSV Umum</option>
                   </select>
                   <p className="text-xs text-slate-500 mt-1">
                     Sistem dapat mendeteksi template Shopee, Tokopedia, TikTok, Lazada otomatis dari nama kolom.
@@ -1179,10 +1189,10 @@ export default function MarketplacePage() {
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider border-b border-slate-200">
                       <tr>
-                        <th className="px-4 py-3">Order ID Marketplace</th>
+                        <th className="px-4 py-3">ID Pesanan Marketplace</th>
                         <th className="px-4 py-3">Pembeli & Kontak</th>
                         <th className="px-4 py-3">Kurir & Resi</th>
-                        <th className="px-4 py-3">Barang (Items)</th>
+                        <th className="px-4 py-3">Barang</th>
                         <th className="px-4 py-3 text-right">Total Belanja</th>
                         <th className="px-4 py-3 text-center">Status Validasi</th>
                         <th className="px-4 py-3 text-right">Detail</th>
@@ -1225,7 +1235,7 @@ export default function MarketplacePage() {
 
                               <td className="px-4 py-3">
                                 <div className="text-xs text-slate-700 font-medium">
-                                  {ord.courier || "Standard"}
+                                  {ord.courier || "Standar"}
                                 </div>
                                 {ord.tracking_number && (
                                   <div className="font-mono text-[11px] text-blue-600">
@@ -1260,7 +1270,7 @@ export default function MarketplacePage() {
                                   hasUnmapped ? (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
                                       <AlertTriangle className="w-3 h-3 text-amber-600" />
-                                      SKU Belum Petakan
+                                      SKU Belum Terpetakan
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -1271,7 +1281,7 @@ export default function MarketplacePage() {
                                 ) : (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
                                     <X className="w-3 h-3 text-rose-600" />
-                                    Error
+                                    Galat
                                   </span>
                                 )}
                               </td>
@@ -1324,7 +1334,7 @@ export default function MarketplacePage() {
                                           </div>
 
                                           <div className="flex items-center gap-4 text-slate-600">
-                                            <span>Qty: {it.quantity}</span>
+                                            <span>Jml: {it.quantity}</span>
                                             <span>@{formatIDR(it.unit_price)}</span>
                                             <span className="font-semibold text-slate-900">
                                               Subtotal: {formatIDR(it.subtotal)}
@@ -1387,7 +1397,7 @@ export default function MarketplacePage() {
                       <div className="text-xs">
                         <div className="font-mono font-semibold text-slate-800">{b.batch_number}</div>
                         <div className="text-slate-600">
-                          {b.channel} · {b.processed_orders} pesanan · {b.file_name}
+                          {CHANNEL_CONFIGS[b.channel as MarketplaceChannel]?.label || b.channel} · {b.processed_orders} pesanan · {b.file_name}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -1477,11 +1487,11 @@ export default function MarketplacePage() {
                     className="w-full min-h-[48px] px-3.5 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                   >
                     <option value="ALL">Semua Status Pesanan</option>
-                    <option value="COMPLETED">COMPLETED (Sukses & Potong Stok)</option>
-                    <option value="UNMAPPED_SKU">UNMAPPED_SKU (Perlu Pemetaan)</option>
-                    <option value="STOCK_INSUFFICIENT">STOCK_INSUFFICIENT (Stok Kurang)</option>
-                    <option value="PROCESSING">PROCESSING</option>
-                    <option value="FAILED">FAILED</option>
+                    <option value="COMPLETED">Selesai (Stok Terpotong)</option>
+                    <option value="UNMAPPED_SKU">SKU Belum Terpetakan</option>
+                    <option value="STOCK_INSUFFICIENT">Stok Kurang</option>
+                    <option value="PROCESSING">Diproses</option>
+                    <option value="FAILED">Gagal</option>
                   </select>
                 </div>
 
@@ -1525,10 +1535,10 @@ export default function MarketplacePage() {
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider border-b border-slate-200">
                       <tr>
-                        <th className="px-4 py-3">Kanal & Order ID</th>
+                        <th className="px-4 py-3">Kanal & ID Pesanan</th>
                         <th className="px-4 py-3">Pembeli</th>
                         <th className="px-4 py-3">Kurir & Resi</th>
-                        <th className="px-4 py-3">Produk & Kuantitas</th>
+                        <th className="px-4 py-3">Produk & Jumlah</th>
                         <th className="px-4 py-3 text-right">Omset Bersih</th>
                         <th className="px-4 py-3 text-center">Status</th>
                         <th className="px-4 py-3 text-right">Aksi</th>
@@ -1569,7 +1579,7 @@ export default function MarketplacePage() {
                           {/* Courier & Tracking */}
                           <td className="px-4 py-3">
                             <div className="text-xs text-slate-700 font-medium">
-                              {ord.courier || "Standard"}
+                              {ord.courier || "Standar"}
                             </div>
                             {ord.tracking_number ? (
                               <div className="flex items-center gap-1 mt-0.5">
@@ -1622,7 +1632,7 @@ export default function MarketplacePage() {
                             </div>
                             {Number(ord.marketplace_fee) > 0 && (
                               <div className="text-[10px] text-slate-400">
-                                Fee: {formatIDR(ord.marketplace_fee)}
+                                Biaya: {formatIDR(ord.marketplace_fee)}
                               </div>
                             )}
                           </td>
@@ -1665,7 +1675,7 @@ export default function MarketplacePage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-base font-bold text-amber-950">
-                      Terdapat {summaryKpis.unmappedSkuList.length} External SKU Belum Terpetakan!
+                      Terdapat {summaryKpis.unmappedSkuList.length} SKU Marketplace Belum Terpetakan!
                     </h3>
                     <p className="text-xs text-amber-800 mt-1 leading-relaxed">
                       Pesanan penjualan yang memiliki SKU di bawah ini ditahan sementara. Segera petakan ke produk master internal agar stok gudang dapat dipotong otomatis untuk pesanan pelanggan.
@@ -1758,9 +1768,9 @@ export default function MarketplacePage() {
                     <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3">Kanal</th>
-                        <th className="px-4 py-3">SKU Marketplace (External SKU)</th>
+                        <th className="px-4 py-3">SKU Marketplace</th>
                         <th className="px-4 py-3">Produk Master Internal</th>
-                        <th className="px-4 py-3 text-center">Faktor Pengali (Multiplier)</th>
+                        <th className="px-4 py-3 text-center">Faktor Pengali</th>
                         <th className="px-4 py-3 text-center">Status Resolver</th>
                         <th className="px-4 py-3 text-right">Tanggal Dibuat</th>
                       </tr>
@@ -1802,7 +1812,7 @@ export default function MarketplacePage() {
                           <td className="px-4 py-3 text-center">
                             <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 font-mono">
                               &times; {map.multiplier}{" "}
-                              {Number(map.multiplier) > 1 ? "Pcs (Bundle)" : "Pcs"}
+                              {Number(map.multiplier) > 1 ? "Pcs (Paket)" : "Pcs"}
                             </span>
                           </td>
 
@@ -1927,7 +1937,7 @@ export default function MarketplacePage() {
                           Stok Keluar ke Pelanggan
                         </h4>
                         <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
-                          Saat pesanan berstatus <span className="font-semibold">COMPLETED</span>, mutasi stok WMS diterbitkan secara otomatis dari gudang utama ke lokasi virtual <span className="font-semibold">Pelanggan Tujuan</span> dengan referensi <span className="font-mono font-bold">MARKETPLACE</span>.
+                          Saat pesanan berstatus <span className="font-semibold">Selesai</span>, mutasi stok WMS diterbitkan secara otomatis dari gudang utama ke lokasi virtual <span className="font-semibold">Pelanggan Tujuan</span> dengan referensi <span className="font-mono font-bold">MARKETPLACE</span>.
                         </p>
                       </div>
                     </div>
@@ -1956,7 +1966,7 @@ export default function MarketplacePage() {
                       </span>
                       <div className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                         <Truck className="w-4 h-4 text-slate-500" />
-                        <span>{selectedOrderDetail.courier || "Standard Courier"}</span>
+                        <span>{selectedOrderDetail.courier || "Kurir Standar"}</span>
                       </div>
                       <div className="flex items-center gap-2 pt-0.5">
                         <span className="text-xs text-slate-500">No. Resi:</span>
@@ -1989,7 +1999,7 @@ export default function MarketplacePage() {
                       </span>
                     </div>
                     <div className="flex justify-between text-xs text-slate-600">
-                      <span>Biaya Layanan / Marketplace Fee</span>
+                      <span>Biaya Layanan Marketplace</span>
                       <span className="font-mono text-rose-600 font-medium">
                         - {formatIDR(selectedOrderDetail.marketplace_fee)}
                       </span>
@@ -2013,9 +2023,9 @@ export default function MarketplacePage() {
                       <table className="w-full text-left text-xs">
                         <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                           <tr>
-                            <th className="px-3.5 py-2.5">External SKU & Barang</th>
-                            <th className="px-3.5 py-2.5">Qty Pesanan</th>
-                            <th className="px-3.5 py-2.5">Produk Master & Multiplier</th>
+                            <th className="px-3.5 py-2.5">SKU Marketplace & Barang</th>
+                            <th className="px-3.5 py-2.5">Jml Pesanan</th>
+                            <th className="px-3.5 py-2.5">Produk Master & Pengali</th>
                             <th className="px-3.5 py-2.5 text-right">Subtotal</th>
                           </tr>
                         </thead>
@@ -2156,7 +2166,7 @@ export default function MarketplacePage() {
                   <option value="TIKTOK">TikTok Shop</option>
                   <option value="LAZADA">Lazada</option>
                   <option value="BLIBLI">Blibli</option>
-                  <option value="OTHER">Lainnya / Generic</option>
+                  <option value="OTHER">Lainnya / Umum</option>
                 </select>
               </div>
 
@@ -2166,7 +2176,7 @@ export default function MarketplacePage() {
                   htmlFor="map-external-sku"
                   className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
                 >
-                  Kode SKU di Marketplace (External SKU){" "}
+                  Kode SKU di Marketplace{" "}
                   <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -2231,7 +2241,7 @@ export default function MarketplacePage() {
                   htmlFor="map-multiplier"
                   className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
                 >
-                  Faktor Pengali Kuantitas (Packaging Multiplier)
+                  Faktor Pengali Kuantitas
                 </label>
                 <div className="flex items-center gap-3">
                   <input
@@ -2258,7 +2268,7 @@ export default function MarketplacePage() {
               <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 text-xs text-blue-900 flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <p className="leading-relaxed">
-                  <strong>Otomatisasi Reproses:</strong> Saat disimpan, sistem akan langsung mencari semua pesanan berstatus <span className="font-mono">UNMAPPED_SKU</span>, menautkan produk internal, dan memotong stok untuk pesanan pelanggan secara otomatis.
+                  <strong>Otomatisasi Reproses:</strong> Saat disimpan, sistem akan langsung mencari semua pesanan berstatus <span className="font-semibold">SKU Belum Terpetakan</span>, menautkan produk internal, dan memotong stok untuk pesanan pelanggan secara otomatis.
                 </p>
               </div>
 
@@ -2277,7 +2287,7 @@ export default function MarketplacePage() {
                   className="min-h-[48px] px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-colors shadow-sm"
                 >
                   {createMappingMutation.isPending
-                    ? "Menyimpan & Reproses..."
+                    ? "Menyimpan & Memproses Ulang..."
                     : "Simpan & Hubungkan"}
                 </button>
               </div>

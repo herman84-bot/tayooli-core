@@ -223,7 +223,7 @@ describe("PrintLPNLabel Component", () => {
     expect(screen.getAllByText("LPN-20261008-0001").length).toBeGreaterThan(0)
 
     // Pallet Type & Location
-    expect(screen.getByText(/KAYU \(WOODEN\)/i)).toBeInTheDocument()
+    expect(screen.getByText("KAYU")).toBeInTheDocument()
     expect(screen.getByText("STG-IN-01")).toBeInTheDocument()
 
     // Weight specifications
@@ -285,7 +285,7 @@ describe("LPNManagementModal Component", () => {
 
     expect(screen.getByText(/Manajemen Palet & Kontainer LPN/i)).toBeInTheDocument()
     expect(screen.getByText("LPN-20261008-0001")).toBeInTheDocument()
-    expect(screen.getByText(/Staging \(STAGED\)/i)).toBeInTheDocument()
+    expect(screen.getAllByText("Area Transit").length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText("STG-IN-01")).toBeInTheDocument()
   })
 
@@ -299,7 +299,7 @@ describe("LPNManagementModal Component", () => {
     expect(screen.getByText("Buat Palet LPN Baru")).toBeInTheDocument()
 
     // Location select is available
-    const locationSelect = screen.getByLabelText(/Lokasi Staging/i)
+    const locationSelect = screen.getByLabelText(/Lokasi Area Transit/i)
     fireEvent.change(locationSelect, { target: { value: "loc-staging-1" } })
 
     // Submit form

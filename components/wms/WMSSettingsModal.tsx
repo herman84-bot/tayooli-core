@@ -116,7 +116,7 @@ export function WMSSettingsModal({ isOpen, onClose }: WMSSettingsModalProps) {
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
           <div className="flex items-center gap-2">
             <Settings className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-semibold text-slate-900">Pengaturan Alur WMS Inbound & Rak</h2>
+            <h2 className="text-base font-semibold text-slate-900">Pengaturan Alur WMS Barang Masuk & Rak</h2>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 text-slate-600 transition-colors">
             <X className="h-5 w-5" />
@@ -174,7 +174,7 @@ export function WMSSettingsModal({ isOpen, onClose }: WMSSettingsModalProps) {
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                       Jika diaktifkan, setiap penerimaan barang yang diposting akan
                       membuat lot berstatus <strong>Tertahan</strong>. Stok tidak dapat dialokasikan untuk
-                      penjualan atau Surat Jalan sampai disetujui (Rilis) oleh Supervisor Warehouse.
+                      penjualan atau Surat Jalan sampai disetujui (Rilis) oleh Supervisor Gudang.
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
@@ -193,7 +193,7 @@ export function WMSSettingsModal({ isOpen, onClose }: WMSSettingsModalProps) {
                   <span className="font-semibold text-slate-700">
                     {settings?.require_release_approval
                       ? "AKTIF (Wajib persetujuan rilis oleh Admin / Supervisor)"
-                      : "NONAKTIF (Lot otomatis RELEASED siap jual saat penerimaan)"}
+                      : "NONAKTIF (Lot otomatis DIRILIS siap jual saat penerimaan)"}
                   </span>
                 </div>
               </div>

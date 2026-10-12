@@ -276,7 +276,7 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
       const onClose = jest.fn()
       render(<PrintPickingList detail={dummyTaskDetail} onClose={onClose} />)
 
-      expect(screen.getByText(/DAFTAR AMBIL BARANG \(PICKING LIST\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/DAFTAR PENGAMBILAN BARANG/i)).toBeInTheDocument()
       expect(screen.getByText(/PICK-DO-20261008-0001/i)).toBeInTheDocument()
       expect(screen.getByText('DO-20261008-0001')).toBeInTheDocument()
       expect(screen.getByText(/RCK-A-01/i)).toBeInTheDocument()
@@ -306,7 +306,7 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
       const onClose = jest.fn()
       render(<PrintThermalAWB order={dummyDO} items={dummyItems} onClose={onClose} />)
 
-      expect(screen.getByText(/Label Thermal AWB \(100x150 mm\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/Label Termal AWB \(100x150 mm\)/i)).toBeInTheDocument()
       expect(screen.getByText('JNE')).toBeInTheDocument()
       expect(screen.getByText('JNE88990011')).toBeInTheDocument()
       expect(screen.getByText(/PT Maju Bersama/i)).toBeInTheDocument()
@@ -317,12 +317,12 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
       expect(screen.getByText('BONUS')).toBeInTheDocument()
     })
 
-    it('triggers window.print when Cetak Thermal button is clicked', () => {
+    it('triggers window.print when Cetak Termal button is clicked', () => {
       const printSpy = jest.spyOn(window, 'print').mockImplementation(() => {})
       const onClose = jest.fn()
       render(<PrintThermalAWB order={dummyDO} items={dummyItems} onClose={onClose} />)
 
-      const printBtn = screen.getByRole('button', { name: /Cetak Thermal/i })
+      const printBtn = screen.getByRole('button', { name: /Cetak Termal/i })
       fireEvent.click(printBtn)
       expect(printSpy).toHaveBeenCalled()
       printSpy.mockRestore()
@@ -355,16 +355,16 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
         )
       })
 
-      expect(screen.getByText(/Gabung Surat Jalan untuk Picking/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Daftar Wave Aktif/i })).toBeInTheDocument()
+      expect(screen.getByText(/Gabung Surat Jalan untuk Pengambilan/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Daftar Gelombang Aktif/i })).toBeInTheDocument()
 
-      const createTabBtn = screen.getByRole('button', { name: /\+ Buat Wave Baru/i })
+      const createTabBtn = screen.getByRole('button', { name: /\+ Buat Gelombang Baru/i })
       await React.act(async () => {
         fireEvent.click(createTabBtn)
       })
 
       expect(screen.getByText(/Asal Pesanan/i)).toBeInTheDocument()
-      expect(screen.getByText(/Surat Jalan Langsung \(DIRECT_DO\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/Surat Jalan Langsung/i)).toBeInTheDocument()
     })
   })
 
@@ -376,7 +376,7 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
 
       expect(screen.getByText(/Total Gelombang/i)).toBeInTheDocument()
       expect(screen.getByText(/WAVE-20261008-001/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /\+ Buat Wave Baru/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /\+ Buat Gelombang Baru/i })).toBeInTheDocument()
     })
 
     it('renders PackingStationSubView with order selection, scanner prompt, and audio beeper toggle', async () => {
@@ -411,7 +411,7 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
         fireEvent.click(createDOBtn)
       })
 
-      expect(screen.getByText(/Pilih Pelanggan \(Customer\)/i)).toBeInTheDocument()
+      expect(screen.getByText(/Pilih Pelanggan/i)).toBeInTheDocument()
 
       // Click "+ Cepat"
       const quickAddBtn = screen.getByRole('button', { name: /\+ Cepat/i })
@@ -422,7 +422,7 @@ describe('WMS Outbound Components (FE-06, FE-07, FE-08, CR-02b)', () => {
       expect(screen.getByText(/Tambah Pelanggan Cepat/i)).toBeInTheDocument()
 
       // Fill form
-      const nameInput = screen.getByPlaceholderText(/e\.g\. Toko Berkah Abadi/i)
+      const nameInput = screen.getByPlaceholderText(/Contoh: Toko Berkah Abadi/i)
       await React.act(async () => {
         fireEvent.change(nameInput, { target: { value: 'Toko Berkah Baru' } })
       })

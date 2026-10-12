@@ -93,6 +93,7 @@ export function UndoToast() {
 
           <button
             onClick={() => setLastUndoSnapshot(null)}
+            aria-label="Tutup"
             className="p-1 rounded text-muted-foreground hover:text-foreground cursor-pointer"
           >
             <X className="h-3.5 w-3.5" />

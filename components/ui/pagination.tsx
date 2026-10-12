@@ -74,7 +74,7 @@ export function Pagination({
     <div className="flex items-center justify-between gap-4">
       {pageSizeSelect}
       {totalPages > 1 && (
-        <nav className="flex items-center justify-center gap-1" aria-label="Pagination">
+        <nav className="flex items-center justify-center gap-1" aria-label="Paginasi">
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
@@ -110,7 +110,7 @@ export function Pagination({
         disabled={page >= totalPages}
         className="px-3 py-1 rounded-lg text-sm bg-zinc-100 text-zinc-700 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
-        Selanjutnya
+        Berikutnya
       </button>
         </nav>
       )}

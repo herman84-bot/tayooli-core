@@ -76,7 +76,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
   )
   const putawayError = selectedLine
     ? !destLocationId
-      ? "Pilih rak internal tujuan putaway"
+      ? "Pilih rak internal tujuan penataan rak"
       : validatePutaway({
           qty: putawayQty,
           available: Number(selectedLine.quantity),
@@ -105,13 +105,13 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
       {
         onSuccess: () => {
           setSelectedLine(null)
-          setSuccessToast(`Berhasil putaway ${qtyNum} unit ke rak tujuan`)
+          setSuccessToast(`Berhasil menata ${qtyNum} unit ke rak tujuan`)
           refetch()
           onRefresh?.()
           setTimeout(() => setSuccessToast(null), 4000)
         },
         onError: (err: unknown) => {
-          const msg = err instanceof Error ? err.message : "Gagal memproses putaway"
+          const msg = err instanceof Error ? err.message : "Gagal memproses penataan rak"
           setErrorMsg(msg)
         },
       }
@@ -124,7 +124,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
         <Warehouse className="mx-auto h-12 w-12 text-slate-400" />
         <h3 className="mt-3 text-base font-medium text-slate-800">Pilih Gudang Terlebih Dahulu</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Pilih salah satu gudang pada filter di atas untuk melihat barang di Staging Inbound yang menunggu putaway.
+          Pilih salah satu gudang pada filter di atas untuk melihat barang di Area Transit Masuk yang menunggu penataan rak.
         </p>
       </div>
     )
@@ -152,7 +152,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
           />
         </div>
         <div className="text-xs text-slate-500 font-medium">
-          Total antrean putaway: <span className="font-semibold text-slate-900">{filteredPending.length} baris</span>
+          Total antrean penataan rak: <span className="font-semibold text-slate-900">{filteredPending.length} baris</span>
         </div>
       </div>
 
@@ -166,7 +166,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                 <th className="px-4 py-3">Batch / Lot</th>
                 <th className="px-4 py-3">Kedaluwarsa</th>
                 <th className="px-4 py-3">Status Lot</th>
-                <th className="px-4 py-3 text-right">Qty di Staging</th>
+                <th className="px-4 py-3 text-right">Jml di Area Transit</th>
                 <th className="px-4 py-3">Saran Rak Tujuan</th>
                 <th className="px-4 py-3 text-center">Aksi</th>
               </tr>
@@ -175,14 +175,14 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                    Memuat antrean putaway...
+                    Memuat antrean penataan rak...
                   </td>
                 </tr>
               ) : filteredPending.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                     <Layers className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-                    Tidak ada barang di Staging Inbound yang menunggu putaway untuk gudang ini.
+                    Tidak ada barang di Area Transit Masuk yang menunggu penataan rak untuk gudang ini.
                   </td>
                 </tr>
               ) : (
@@ -195,7 +195,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                         <div className="font-medium text-slate-900">{line.product_name || "Produk Tanpa Nama"}</div>
                         <div className="text-xs text-slate-500 font-mono">{line.product_sku || "-"}</div>
                         {line.source_receipt_number && (
-                          <div className="text-[11px] text-slate-400 mt-0.5">GR: {line.source_receipt_number}</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">Penerimaan Barang: {line.source_receipt_number}</div>
                         )}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs font-medium text-slate-800">
@@ -240,7 +240,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                                   : "bg-slate-50 text-slate-600"
                               }`}
                             >
-                              {isDefaultRack ? "Rak Default" : "Tujuan GR"}
+                              {isDefaultRack ? "Rak Default" : "Tujuan Penerimaan"}
                             </span>
                           </div>
                         ) : (
@@ -253,7 +253,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                           className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors shadow-sm"
                         >
                           <ArrowDownToLine className="h-3.5 w-3.5" />
-                          Putaway ke Rak
+                          Tata ke Rak
                         </button>
                       </td>
                     </tr>
@@ -270,9 +270,9 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl border border-slate-100 space-y-5">
             <div>
-              <h3 className="text-lg font-semibold text-slate-900">Konfirmasi Putaway ke Rak Internal</h3>
+              <h3 className="text-lg font-semibold text-slate-900">Konfirmasi Penataan ke Rak Internal</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Pindahkan barang dari area Staging Inbound ke rak penyimpanan tetap.
+                Pindahkan barang dari Area Transit Masuk ke rak penyimpanan tetap.
               </p>
             </div>
 
@@ -297,7 +297,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                 <span className="font-mono font-medium text-slate-800">{selectedLine.batch_number}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Stok Tersedia di Staging:</span>
+                <span className="text-slate-500">Stok Tersedia di Area Transit:</span>
                 <span className="font-semibold text-slate-900">{selectedLine.quantity} unit</span>
               </div>
             </div>
@@ -312,12 +312,12 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                   min="0"
                   max={Number(selectedLine.quantity) || undefined}
                   step="any"
-                  aria-label="Jumlah putaway"
+                  aria-label="Jumlah penataan rak"
                   value={putawayQty}
                   onChange={(e) => setPutawayQty(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm font-semibold"
                 />
-                <p className="mt-1 text-[11px] text-slate-500">Maksimal {selectedLine.quantity} unit (sisa di Staging).</p>
+                <p className="mt-1 text-[11px] text-slate-500">Maksimal {selectedLine.quantity} unit (sisa di Area Transit).</p>
               </div>
 
               <div>
@@ -384,7 +384,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                 title={putawayError ?? undefined}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 rounded-md transition-colors shadow-sm"
               >
-                {isSubmitting ? "Menyimpan..." : "Konfirmasi Putaway"}
+                {isSubmitting ? "Menyimpan..." : "Konfirmasi Penataan Rak"}
               </button>
             </div>
           </div>

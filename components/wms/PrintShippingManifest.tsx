@@ -11,6 +11,19 @@ export interface PrintShippingManifestProps {
   onClose: () => void
 }
 
+const MANIFEST_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "DRAF",
+  OPEN: "DIBUKA",
+  PENDING: "MENUNGGU",
+  STAGED: "AREA TRANSIT",
+  LOADED: "TERPINDAI",
+  IN_TRANSIT: "DALAM PENGIRIMAN",
+  DISPATCHED: "DIKIRIM",
+  DELIVERED: "TERKIRIM",
+  COMPLETED: "SELESAI",
+  CANCELLED: "DIBATALKAN",
+}
+
 export function PrintShippingManifest({
   manifestDetail,
   companyProfile,
@@ -115,7 +128,7 @@ export function PrintShippingManifest({
                 <Truck className="h-4 w-4" />
               </span>
               <div>
-                <h3 className="text-sm font-semibold">Cetak Manifest Serah Terima Pengiriman (A4)</h3>
+                <h3 className="text-sm font-semibold">Cetak Manifes Serah Terima Pengiriman (A4)</h3>
                 <p className="text-xs text-zinc-400">
                   {manifest.manifest_number} &bull; {manifest.expedition_name} &bull; {manifest.vehicle_plate}
                 </p>
@@ -128,7 +141,7 @@ export function PrintShippingManifest({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow hover:bg-blue-500 active:scale-95 transition"
               >
                 <Printer className="h-3.5 w-3.5" />
-                <span>Cetak / Cetak PDF</span>
+                <span>Cetak PDF</span>
               </button>
               <button
                 type="button"
@@ -163,23 +176,23 @@ export function PrintShippingManifest({
                 </div>
                 <div className="text-right">
                   <div className="inline-block bg-zinc-900 text-white font-mono font-bold text-xs px-2.5 py-1 rounded">
-                    MANIFEST RESMI
+                    MANIFES RESMI
                   </div>
                   <h2 className="text-lg font-bold text-zinc-900 mt-1 font-mono">
                     {manifest.manifest_number}
                   </h2>
                   <p className="text-[11px] text-zinc-500">
-                    Status: <strong className="uppercase">{manifest.status}</strong>
+                    Status: <strong className="uppercase">{manifest.status ? (MANIFEST_STATUS_LABELS[manifest.status] || manifest.status) : "DRAF"}</strong>
                   </p>
                 </div>
               </div>
 
               <div className="mt-4 pt-2 border-t border-zinc-200 text-center">
                 <h2 className="text-base font-extrabold tracking-wide uppercase text-zinc-900">
-                  MANIFEST SERAH TERIMA PENGIRIMAN
+                  MANIFES SERAH TERIMA PENGIRIMAN
                 </h2>
                 <p className="text-[11px] text-zinc-500">
-                  Bukti sah serah terima koli dan Surat Jalan (Delivery Order) dari Gudang ke Ekspedisi Pengangkut
+                  Bukti sah serah terima koli dan Surat Jalan dari Gudang ke Ekspedisi Pengangkut
                 </p>
               </div>
             </div>
@@ -235,19 +248,19 @@ export function PrintShippingManifest({
                 <thead className="bg-zinc-100 border-b border-zinc-300 text-zinc-700 uppercase font-semibold">
                   <tr>
                     <th className="py-2 px-2 text-center w-8 border-r border-zinc-300">No</th>
-                    <th className="py-2 px-2.5 border-r border-zinc-300">No. DO</th>
+                    <th className="py-2 px-2.5 border-r border-zinc-300">No. Surat Jalan</th>
                     <th className="py-2 px-2.5 border-r border-zinc-300">Pelanggan</th>
                     <th className="py-2 px-2.5 border-r border-zinc-300">Kota Tujuan</th>
                     <th className="py-2 px-2 text-right border-r border-zinc-300 w-20">Berat (kg)</th>
                     <th className="py-2 px-2 text-center border-r border-zinc-300 w-24">Tipe Kemasan</th>
-                    <th className="py-2 px-2 text-center w-28">Status Scan</th>
+                    <th className="py-2 px-2 text-center w-28">Status Pindai</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200">
                   {items.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-4 text-center text-zinc-500">
-                        Tidak ada Surat Jalan terdaftar di manifest ini.
+                        Tidak ada Surat Jalan terdaftar di manifes ini.
                       </td>
                     </tr>
                   ) : (
@@ -291,7 +304,7 @@ export function PrintShippingManifest({
                 <tfoot className="bg-zinc-100 border-t-2 border-zinc-300 font-bold text-zinc-900">
                   <tr>
                     <td colSpan={4} className="py-2 px-3 text-right border-r border-zinc-300">
-                      TOTAL SUMMARY:
+                      TOTAL KESELURUHAN:
                     </td>
                     <td className="py-2 px-2 text-right border-r border-zinc-300 font-mono">
                       {totalWeight.toFixed(2)} kg
@@ -324,7 +337,7 @@ export function PrintShippingManifest({
                     <p className="font-medium text-zinc-900">
                       ( {manifest.dispatched_by_name || manifest.created_by_name || "......................................."} )
                     </p>
-                    <p className="text-[10px] text-zinc-500">Petugas Dispatch</p>
+                    <p className="text-[10px] text-zinc-500">Petugas Pengiriman</p>
                   </div>
                 </div>
 
@@ -344,7 +357,7 @@ export function PrintShippingManifest({
                     ) : isDataUrl && manifest.driver_signature_svg ? (
                       <img
                         src={manifest.driver_signature_svg}
-                        alt="Tanda Tangan Driver"
+                        alt="Tanda Tangan Sopir"
                         className="max-h-16 max-w-full object-contain"
                       />
                     ) : (
@@ -364,7 +377,7 @@ export function PrintShippingManifest({
               </div>
 
               <div className="mt-4 text-[10px] text-zinc-400 flex items-center justify-between">
-                <span>Dokumen digenerate otomatis oleh Tayooli ERP WMS Outbound Engine</span>
+                <span>Dokumen dibuat otomatis oleh Modul Barang Keluar Tayooli ERP WMS</span>
                 <span>Waktu Cetak: {new Date().toLocaleString("id-ID")}</span>
               </div>
             </div>

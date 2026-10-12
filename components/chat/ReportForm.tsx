@@ -86,7 +86,7 @@ export default function ReportForm({ onClose }: ReportFormProps) {
         <button
           onClick={onClose}
           className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          aria-label="Close"
+          aria-label="Tutup"
         >
           <X className="h-4 w-4" />
         </button>

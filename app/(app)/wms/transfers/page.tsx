@@ -60,6 +60,16 @@ interface LineItemDraft {
   sourceLocationId?: string
 }
 
+const TRANSFER_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draf",
+  PENDING_APPROVAL: "Menunggu Persetujuan",
+  APPROVED: "Disetujui",
+  IN_TRANSIT: "Dalam Pengiriman",
+  DISPATCHED: "Dikirim",
+  RECEIVED: "Diterima",
+  REJECTED: "Ditolak",
+  CANCELLED: "Dibatalkan",
+}
 export default function TransfersPage() {
   const { data: warehouses = [] } = useWarehouses()
   const { data: transfers = [], isLoading, refetch, dataUpdatedAt } = useStockTransfers()
@@ -200,10 +210,10 @@ export default function TransfersPage() {
     setConfirmModal({
       type: "cancel",
       transferId,
-      title: "Batalkan Draft Transfer",
+      title: "Batalkan Draf Transfer",
       message:
         "Batalkan draft transfer ini? Status menjadi CANCELLED dan tidak bisa diajukan lagi. Karena masih draft, stok gudang tidak pernah berubah.",
-      actionLabel: "Batalkan Draft",
+      actionLabel: "Batalkan Draf",
     })
   }
 
@@ -221,16 +231,16 @@ export default function TransfersPage() {
     try {
       if (type === "submit") {
         await submitMutation.mutateAsync(transferId)
-        setToast({ type: "success", message: "Transfer diajukan untuk persetujuan (PENDING_APPROVAL)." })
+        setToast({ type: "success", message: "Transfer diajukan untuk persetujuan." })
       } else if (type === "approve") {
         await approveMutation.mutateAsync(transferId)
-        setToast({ type: "success", message: "Transfer disetujui. Siap untuk dikirim (dispatch)." })
+        setToast({ type: "success", message: "Transfer disetujui. Siap untuk dikirim." })
       } else if (type === "dispatch") {
         await dispatchMutation.mutateAsync(transferId)
-        setToast({ type: "success", message: "Armada transfer berhasil dikirim (IN_TRANSIT)." })
+        setToast({ type: "success", message: "Armada transfer berhasil dikirim." })
       } else if (type === "cancel") {
         await cancelMutation.mutateAsync(transferId)
-        setToast({ type: "success", message: "Draft transfer dibatalkan (CANCELLED)." })
+        setToast({ type: "success", message: "Draf transfer dibatalkan." })
       } else {
         await receiveMutation.mutateAsync(transferId)
         setToast({ type: "success", message: "Barang transfer berhasil diterima di gudang tujuan." })
@@ -396,7 +406,7 @@ export default function TransfersPage() {
     }
 
     const steps = [
-      { key: "DRAFT", label: "Draft" },
+      { key: "DRAFT", label: "Draf" },
       { key: "PENDING_APPROVAL", label: "Menunggu" },
       { key: "APPROVED", label: "Disetujui" },
       { key: "IN_TRANSIT", label: "Dikirim" },
@@ -489,7 +499,7 @@ export default function TransfersPage() {
               <div className="flex items-center gap-2">
                 <Truck className="w-6 h-6 text-[#2563EB]" />
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Transfer Antar Gudang
+                  Transfer Stok Antar Gudang
                 </h1>
               </div>
               <p className="text-xs sm:text-sm text-slate-500">
@@ -540,11 +550,11 @@ export default function TransfersPage() {
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
             {[
               { label: "Semua", value: "ALL" },
-              { label: "Draft", value: "DRAFT" },
-              { label: "Menunggu Approval", value: "PENDING_APPROVAL" },
-              { label: "Approved", value: "APPROVED" },
-              { label: "In Transit", value: "IN_TRANSIT" },
-              { label: "Received", value: "RECEIVED" },
+              { label: "Draf", value: "DRAFT" },
+              { label: "Menunggu Persetujuan", value: "PENDING_APPROVAL" },
+              { label: "Disetujui", value: "APPROVED" },
+              { label: "Dalam Pengiriman", value: "IN_TRANSIT" },
+              { label: "Diterima", value: "RECEIVED" },
               { label: "Ditolak", value: "REJECTED" },
               { label: "Dibatalkan", value: "CANCELLED" },
             ].map((tab) => (
@@ -675,7 +685,7 @@ export default function TransfersPage() {
                       <div className="flex items-start gap-2 text-xs bg-slate-50 border border-slate-200 text-slate-600 rounded-lg px-3 py-2 max-w-lg">
                         <Ban className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                         <span>
-                          <strong>Dibatalkan:</strong> draft dibatalkan sebelum diajukan. Stok gudang tidak berubah.
+                          <strong>Dibatalkan:</strong> draf dibatalkan sebelum diajukan. Stok gudang tidak berubah.
                         </span>
                       </div>
                     )}
@@ -730,7 +740,7 @@ export default function TransfersPage() {
                           className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 active:scale-95 transition-all"
                         >
                           <Ban className="w-4 h-4" />
-                          <span>Batalkan Draft</span>
+                          <span>Batalkan Draf</span>
                         </button>
                       </>
                     )}
@@ -769,7 +779,7 @@ export default function TransfersPage() {
                         className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-[#EA580C] text-white hover:bg-[#C2410C] active:scale-95 transition-all shadow-xs"
                       >
                         <Send className="w-4 h-4" />
-                        <span>Kirim Armada (Dispatch)</span>
+                        <span>Kirim Armada</span>
                       </button>
                     )}
 
@@ -782,7 +792,7 @@ export default function TransfersPage() {
                         className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-xs"
                       >
                         <PackageCheck className="w-4 h-4" />
-                        <span>Konfirmasi Terima (Receive)</span>
+                        <span>Konfirmasi Terima</span>
                       </button>
                     )}
 
@@ -812,7 +822,7 @@ export default function TransfersPage() {
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Buat Transfer Antar Gudang</h3>
+                  <h3 className="text-lg font-bold text-slate-900">Buat Transfer Stok Antar Gudang</h3>
                   <p className="text-xs text-slate-500">Pindahkan stok antar fasilitas gudang secara resmi</p>
                 </div>
               </div>
@@ -1097,7 +1107,7 @@ export default function TransfersPage() {
                       selectedTransferForDetail.status === "REJECTED" ? "text-rose-600" : "text-[#2563EB]"
                     }`}
                   >
-                    {selectedTransferForDetail.status}
+                    {TRANSFER_STATUS_LABEL[selectedTransferForDetail.status] ?? selectedTransferForDetail.status}
                   </span>
                 </div>
                 {selectedTransferForDetail.status === "REJECTED" && selectedTransferForDetail.rejection_reason && (
@@ -1132,7 +1142,7 @@ export default function TransfersPage() {
                   <span>Status Kuantitas:</span>
                   <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Sent == Received Qty (Match)
+                    Jumlah Kirim & Terima Cocok
                   </span>
                 </div>
               </div>

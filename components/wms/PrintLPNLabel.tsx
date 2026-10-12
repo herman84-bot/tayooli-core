@@ -95,10 +95,22 @@ export function LPNBarcodeSVG({ code, className = "h-16 w-full" }: { code: strin
 }
 
 const PALLET_LABELS: Record<PalletType, { label: string; desc: string }> = {
-  WOODEN: { label: "KAYU (WOODEN)", desc: "Palet kayu standar ISPM-15" },
-  PLASTIC: { label: "PLASTIK (PLASTIC)", desc: "Palet higienis HDPE food grade" },
-  METAL: { label: "LOGAM / BESI (METAL)", desc: "Palet baja heavy duty beban tinggi" },
-  CAGE: { label: "KERANJANG / CAGE", desc: "Palet jaring / collapsible stillage" },
+  WOODEN: { label: "KAYU", desc: "Palet kayu standar ISPM-15" },
+  PLASTIC: { label: "PLASTIK", desc: "Palet higienis HDPE food grade" },
+  METAL: { label: "LOGAM / BESI", desc: "Palet baja beban berat (heavy duty)" },
+  CAGE: { label: "KERANJANG", desc: "Palet keranjang jaring lipat" },
+}
+
+const LPN_STATUS_LABELS: Record<string, string> = {
+  STAGED: "AREA TRANSIT",
+  IN_TRANSIT: "DALAM PENGIRIMAN",
+  STORED: "TERSIMPAN",
+  PUTAWAY: "PENATAAN RAK",
+  PICKED: "DIAMBIL",
+  DEPLETED: "HABIS",
+  DAMAGED: "RUSAK",
+  ACTIVE: "AKTIF",
+  CLOSED: "DITUTUP",
 }
 
 function parseNum(val: unknown): number {
@@ -160,7 +172,7 @@ export function PrintLPNLabel({ lpnDetail, companyProfile, onClose }: PrintLPNLa
             <Box className="w-5 h-5 text-emerald-600" />
             <div>
               <h2 className="text-base font-bold text-zinc-800">Label Palet LPN (100x150 mm)</h2>
-              <p className="text-xs text-zinc-500">Stiker Thermal Container Barcode A6</p>
+              <p className="text-xs text-zinc-500">Stiker Termal Kontainer Barcode A6</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -222,7 +234,7 @@ export function PrintLPNLabel({ lpnDetail, companyProfile, onClose }: PrintLPNLa
                 <div>
                   <span className="text-[9px] font-bold text-zinc-500 uppercase block">Status LPN</span>
                   <span className="inline-block px-1.5 py-0.5 border border-zinc-900 font-bold text-[9px] uppercase bg-zinc-100">
-                    {lpn.status || "STAGED"}
+                    {lpn.status ? (LPN_STATUS_LABELS[lpn.status] || lpn.status) : "AREA TRANSIT"}
                   </span>
                 </div>
               </div>
@@ -232,7 +244,7 @@ export function PrintLPNLabel({ lpnDetail, companyProfile, onClose }: PrintLPNLa
                 <div>
                   <span className="text-[9px] font-bold text-zinc-500 uppercase block">Lokasi Penyimpanan</span>
                   <span className="text-xs font-black font-mono text-zinc-900 block">
-                    {lpn.location_code || lpn.location_name || "STAGING INBOUND"}
+                    {lpn.location_code || lpn.location_name || "AREA TRANSIT MASUK"}
                   </span>
                   {lpn.location_name && lpn.location_code && (
                     <span className="text-[9px] text-zinc-600 truncate block">{lpn.location_name}</span>
@@ -280,7 +292,7 @@ export function PrintLPNLabel({ lpnDetail, companyProfile, onClose }: PrintLPNLa
                       <tr className="border-b border-zinc-300 text-zinc-500 font-bold uppercase text-[8px]">
                         <th className="py-0.5 pr-1">No. Batch / Lot</th>
                         <th className="py-0.5 px-1">SKU & Produk</th>
-                        <th className="py-0.5 pl-1 text-right">Qty</th>
+                        <th className="py-0.5 pl-1 text-right">Jml</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100 font-mono">
@@ -290,7 +302,7 @@ export function PrintLPNLabel({ lpnDetail, companyProfile, onClose }: PrintLPNLa
                             {it.batch_number || it.batch_id || "-"}
                             {it.expiry_date && (
                               <span className="block text-[7px] text-zinc-500 font-sans">
-                                Exp: {it.expiry_date.slice(0, 10)}
+                                Kedaluwarsa: {it.expiry_date.slice(0, 10)}
                               </span>
                             )}
                           </td>
@@ -321,8 +333,8 @@ export function PrintLPNLabel({ lpnDetail, companyProfile, onClose }: PrintLPNLa
 
           {/* Bottom Footer */}
           <div className="pt-2 border-t-2 border-zinc-900 flex justify-between items-center text-[8px] text-zinc-500 font-mono">
-            <span>PALLET CONTAINER STANDARD</span>
-            <span className="font-bold text-zinc-900">TAYOOLI WMS CONTAINER</span>
+            <span>STANDAR KONTAINER PALET</span>
+            <span className="font-bold text-zinc-900">KONTAINER TAYOOLI WMS</span>
           </div>
         </div>
       </div>

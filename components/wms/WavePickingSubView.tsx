@@ -23,6 +23,30 @@ import { useWarehouses } from "@/hooks/useWMS"
 import { WaveReleaseModal } from "@/components/wms/WaveReleaseModal"
 import { PrintPickingList } from "@/components/wms/PrintPickingList"
 
+const ORDER_TYPE_LABELS: Record<string, string> = {
+  DIRECT_DO: "Surat Jalan Langsung",
+  SALES_ORDER: "Pesanan Penjualan B2B",
+  MARKETPLACE: "E-Commerce / Marketplace",
+  TRANSFER: "Transfer Antargudang",
+}
+
+const WAVE_STATUS_LABELS: Record<string, string> = {
+  OPEN: "Terbuka",
+  RELEASED: "Dirilis",
+  IN_PROGRESS: "Sedang Berjalan",
+  COMPLETED: "Selesai",
+  CANCELLED: "Dibatalkan",
+}
+
+const TASK_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Menunggu",
+  ASSIGNED: "Ditugaskan",
+  IN_PROGRESS: "Sedang Berjalan",
+  PICKED: "Diambil",
+  COMPLETED: "Selesai",
+  CANCELLED: "Dibatalkan",
+}
+
 interface WavePickingSubViewProps {
   warehouseId?: string
 }
@@ -69,7 +93,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
       })
       setWaves(res.data || [])
     } catch (err: any) {
-      setError(err?.message || "Gagal memuat daftar gelombang picking")
+      setError(err?.message || "Gagal memuat daftar gelombang pengambilan")
     } finally {
       setLoading(false)
     }
@@ -79,13 +103,13 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
     try {
       setReleasingId(waveId)
       await api.wms.pickWaves.release(waveId)
-      setToastMsg({ type: "success", text: "Gelombang picking berhasil dirilis (IN_PROGRESS)!" })
+      setToastMsg({ type: "success", text: "Gelombang pengambilan berhasil dirilis!" })
       await loadWaves()
       if (selectedWaveDetail && selectedWaveDetail.wave.id === waveId) {
         handleViewWaveDetail(waveId)
       }
     } catch (err: any) {
-      setToastMsg({ type: "error", text: err?.message || "Gagal merilis gelombang picking" })
+      setToastMsg({ type: "error", text: err?.message || "Gagal merilis gelombang pengambilan" })
     } finally {
       setReleasingId(null)
     }
@@ -97,7 +121,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
       const res = await api.wms.pickWaves.get(waveId)
       setSelectedWaveDetail(res.data)
     } catch (err: any) {
-      setToastMsg({ type: "error", text: err?.message || "Gagal memuat rincian wave" })
+      setToastMsg({ type: "error", text: err?.message || "Gagal memuat rincian gelombang" })
     } finally {
       setLoadingDetail(false)
     }
@@ -150,30 +174,30 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
             <Layers className="h-4 w-4 text-slate-400" />
           </div>
           <div className="text-2xl font-bold text-slate-900">{totalWaves}</div>
-          <div className="text-[11px] text-slate-400 mt-1">Seluruh batch picking</div>
+          <div className="text-[11px] text-slate-400 mt-1">Seluruh batch pengambilan</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-amber-600 text-xs mb-1">
-            <span>Menunggu Rilis (OPEN)</span>
+            <span>Menunggu Rilis</span>
             <Clock className="h-4 w-4 text-amber-500" />
           </div>
           <div className="text-2xl font-bold text-amber-600">{openWaves}</div>
-          <div className="text-[11px] text-slate-400 mt-1">Siap dilepas ke picker</div>
+          <div className="text-[11px] text-slate-400 mt-1">Siap dilepas ke petugas pengambil</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-indigo-600 text-xs mb-1">
-            <span>Sedang Dipick</span>
+            <span>Sedang Diambil</span>
             <Boxes className="h-4 w-4 text-indigo-500" />
           </div>
           <div className="text-2xl font-bold text-indigo-600">{inProgressWaves}</div>
-          <div className="text-[11px] text-slate-400 mt-1">Petugas sedang mengambil</div>
+          <div className="text-[11px] text-slate-400 mt-1">Petugas sedang mengambil barang</div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs">
           <div className="flex items-center justify-between text-emerald-600 text-xs mb-1">
-            <span>Selesai Dipick</span>
+            <span>Selesai Diambil</span>
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </div>
           <div className="text-2xl font-bold text-emerald-600">{completedWaves}</div>
@@ -207,19 +231,19 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
             onChange={(e) => setOrderTypeFilter(e.target.value)}
             className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
-            <option value="ALL">Semua Jenis Order</option>
-            <option value="DIRECT_DO">Surat Jalan (DIRECT_DO)</option>
-            <option value="SALES_ORDER">Pesanan Penjualan (SALES_ORDER)</option>
-            <option value="MARKETPLACE">E-Commerce (MARKETPLACE)</option>
-            <option value="TRANSFER">Transfer Antargudang (TRANSFER)</option>
+            <option value="ALL">Semua Jenis Pesanan</option>
+            <option value="DIRECT_DO">Surat Jalan Langsung</option>
+            <option value="SALES_ORDER">Pesanan Penjualan B2B</option>
+            <option value="MARKETPLACE">E-Commerce / Marketplace</option>
+            <option value="TRANSFER">Transfer Antargudang</option>
           </select>
 
           {/* Status */}
           <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
             {[
               { label: "Semua", value: "ALL" },
-              { label: "Open", value: "OPEN" },
-              { label: "Berjalan", value: "IN_PROGRESS" },
+              { label: "Terbuka", value: "OPEN" },
+              { label: "Sedang Berjalan", value: "IN_PROGRESS" },
               { label: "Selesai", value: "COMPLETED" },
             ].map((t) => (
               <button
@@ -240,7 +264,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
             onClick={loadWaves}
             disabled={loading}
             className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
-            title="Segarkan data"
+            title="Muat Ulang"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -252,7 +276,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
             <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Cari no. wave, kurir, zona..."
+              placeholder="Cari no. gelombang, kurir, zona..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -264,7 +288,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-xs bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition shadow-2xs shrink-0"
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>+ Buat Wave Baru</span>
+            <span>+ Buat Gelombang Baru</span>
           </button>
         </div>
       </div>
@@ -274,14 +298,14 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">
             <RefreshCw className="h-6 w-6 animate-spin mx-auto text-slate-300 mb-2" />
-            Memuat daftar gelombang picking...
+            Memuat daftar gelombang pengambilan...
           </div>
         ) : filteredWaves.length === 0 ? (
           <div className="py-16 text-center text-slate-400 space-y-2">
             <Boxes className="h-10 w-10 mx-auto text-slate-300" />
-            <p className="text-sm font-semibold text-slate-700">Belum ada gelombang picking</p>
+            <p className="text-sm font-semibold text-slate-700">Belum ada gelombang pengambilan</p>
             <p className="text-xs text-slate-400 max-w-sm mx-auto">
-              Kelompokkan Surat Jalan berstatus DRAFT/CONFIRMED menjadi satu gelombang picking (Wave) untuk
+              Kelompokkan Surat Jalan berstatus Draf atau Dikonfirmasi menjadi satu gelombang pengambilan untuk
               urutan ambil barang dimulai dari yang paling dekat kedaluwarsa.
             </p>
             <button
@@ -289,7 +313,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
             >
               <Plus className="h-3.5 w-3.5" />
-              Buat Wave Sekarang
+              Buat Gelombang Sekarang
             </button>
           </div>
         ) : (
@@ -297,11 +321,11 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-500 font-semibold uppercase tracking-wider">
-                  <th className="py-3.5 px-4">No. Wave</th>
-                  <th className="py-3.5 px-4">Tipe Order</th>
+                  <th className="py-3.5 px-4">No. Gelombang</th>
+                  <th className="py-3.5 px-4">Tipe Pesanan</th>
                   <th className="py-3.5 px-4">Kurir / Zona Rute</th>
-                  <th className="py-3.5 px-4">Jumlah DO & Baris</th>
-                  <th className="py-3.5 px-4">Picker</th>
+                  <th className="py-3.5 px-4">Jumlah Surat Jalan & Baris</th>
+                  <th className="py-3.5 px-4">Petugas Pengambil</th>
                   <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4 text-right">Aksi</th>
                 </tr>
@@ -317,7 +341,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                        {w.order_type}
+                        {ORDER_TYPE_LABELS[w.order_type] || w.order_type}
                       </span>
                     </td>
                     <td className="py-3.5 px-4">
@@ -348,7 +372,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
                             : "bg-emerald-50 text-emerald-700 border-emerald-200"
                         }`}
                       >
-                        {w.status}
+                        {WAVE_STATUS_LABELS[w.status] || w.status}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right">
@@ -390,7 +414,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{selectedWaveDetail.wave.wave_number}</span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
-                    {selectedWaveDetail.wave.order_type}
+                    {ORDER_TYPE_LABELS[selectedWaveDetail.wave.order_type] || selectedWaveDetail.wave.order_type}
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500">
@@ -408,7 +432,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3">
-              <h4 className="text-xs font-bold text-slate-700">Daftar Instruksi Picking:</h4>
+              <h4 className="text-xs font-bold text-slate-700">Daftar Instruksi Pengambilan:</h4>
               <div className="border border-slate-200 rounded-xl divide-y divide-slate-200 overflow-hidden">
                 {selectedWaveDetail.picking_tasks.map((pt) => (
                   <div key={pt.task.id} className="p-3 bg-white hover:bg-slate-50 transition flex items-center justify-between text-xs">
@@ -417,7 +441,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
                         <span className="font-mono font-bold text-indigo-600">{pt.task.task_number}</span>
                         <span className="text-slate-500 font-mono">({pt.delivery_order.do_number})</span>
                         <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 font-medium">
-                          {pt.task.status}
+                          {TASK_STATUS_LABELS[pt.task.status] || pt.task.status}
                         </span>
                       </div>
                       <div className="text-slate-500 text-[11px]">
@@ -433,7 +457,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
                         className="inline-flex items-center gap-1 px-2.5 py-1 text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition text-[11px] font-medium"
                       >
                         <Printer className="h-3 w-3 text-indigo-600" />
-                        <span>Cetak Picking List</span>
+                        <span>Cetak Daftar Pengambilan</span>
                       </button>
                     </div>
                   </div>
@@ -456,7 +480,7 @@ export function WavePickingSubView({ warehouseId }: WavePickingSubViewProps) {
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-2xs"
                 >
                   <Play className="h-3.5 w-3.5" />
-                  <span>Rilis Seluruh Wave</span>
+                  <span>Rilis Seluruh Gelombang</span>
                 </button>
               )}
             </div>

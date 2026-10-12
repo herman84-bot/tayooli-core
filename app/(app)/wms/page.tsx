@@ -37,6 +37,25 @@ import { Warehouse, WarehouseLocation, LocationType, StockSummary } from "@/lib/
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 import { ActivityTimelineDrawer } from "@/components/wms/ActivityTimelineDrawer"
 
+const LOCATION_TYPE_LABEL: Record<string, string> = {
+  INTERNAL: "Rak Internal",
+  TRANSIT: "Area Transit",
+  VENDOR: "Pemasok",
+  CUSTOMER: "Pelanggan",
+  SCRAP: "Barang Rusak",
+}
+
+const MOVEMENT_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Draf",
+  PENDING: "Menunggu",
+  APPROVED: "Disetujui",
+  REJECTED: "Ditolak",
+  IN_TRANSIT: "Dalam Pengiriman",
+  DONE: "Selesai",
+  COMPLETED: "Selesai",
+  CANCELLED: "Dibatalkan",
+}
+
 export default function WMSDashboardPage() {
   const { data: warehouses = [], isLoading: loadingWarehouses, refetch: refetchWarehouses } = useWarehouses()
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("ALL")
@@ -212,7 +231,7 @@ export default function WMSDashboardPage() {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
           <Truck className="w-3.5 h-3.5" />
-          @TRANSIT (Dalam Perjalanan)
+          @TRANSIT (Dalam Pengiriman)
         </span>
       )
     }
@@ -252,7 +271,7 @@ export default function WMSDashboardPage() {
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                  Warehouse Management System
+                  Gudang & Stok
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500">
                   Monitoring rak penyimpanan, kapasitas multi-gudang, dan pergerakan stok
@@ -268,7 +287,7 @@ export default function WMSDashboardPage() {
               className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-medium text-sm bg-white border border-[#BFDBFE] text-[#2563EB] hover:bg-[#EFF6FF] active:scale-95 transition-all shadow-xs"
             >
               <ScanLine className="w-4 h-4 text-[#2563EB]" />
-              <span>Barcode Scanner</span>
+              <span>Pemindai Barcode</span>
             </Link>
 
             <Link
@@ -276,7 +295,7 @@ export default function WMSDashboardPage() {
               className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-medium text-sm bg-white border border-[#E2E8F0] text-slate-700 hover:bg-slate-50 active:scale-95 transition-all shadow-xs"
             >
               <ArrowRightLeft className="w-4 h-4 text-slate-600" />
-              <span>Transfer Gudang</span>
+              <span>Transfer Stok</span>
             </Link>
 
             <ExportButton onClick={() => setExportingStock(true)} disabled={stockSummary.length === 0} />
@@ -329,7 +348,7 @@ export default function WMSDashboardPage() {
                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
                 className="w-full min-h-[48px] px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent transition-all"
               >
-                <option value="ALL">🌐 Semua Gudang (Regional Multi-Warehouse View)</option>
+                <option value="ALL">🌐 Semua Gudang</option>
                 {warehouses.map((wh) => (
                   <option key={wh.id} value={wh.id}>
                     📦 [{wh.code}] {wh.name} {wh.address ? `— ${wh.address}` : ""}
@@ -351,7 +370,7 @@ export default function WMSDashboardPage() {
           {/* Metric 1: Total Locations / Racks */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between text-slate-500">
-              <span className="text-xs font-semibold uppercase tracking-wider">Total Rak & Bin</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">Total Rak</span>
               <Layers className="w-5 h-5 text-[#2563EB]" />
             </div>
             <div className="mt-2">
@@ -359,7 +378,7 @@ export default function WMSDashboardPage() {
                 {loadingLocations ? "..." : locations.length}
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                {locations.filter((l) => l.is_pallet).length} Pallet LPN terdaftar
+                {locations.filter((l) => l.is_pallet).length} Palet LPN terdaftar
               </p>
             </div>
           </div>
@@ -367,7 +386,7 @@ export default function WMSDashboardPage() {
           {/* Metric 2: Active Transfers */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between text-slate-500">
-              <span className="text-xs font-semibold uppercase tracking-wider">Transfer Dalam Transit</span>
+              <span className="text-xs font-semibold uppercase tracking-wider">Transfer Dalam Pengiriman</span>
               <Truck className="w-5 h-5 text-[#EA580C]" />
             </div>
             <div className="mt-2">
@@ -375,7 +394,7 @@ export default function WMSDashboardPage() {
                 {transfers.filter((t) => t.status === "IN_TRANSIT" || t.status === "DISPATCHED").length}
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                {transfers.filter((t) => t.status === "APPROVED").length} transfer siap dispatch
+                {transfers.filter((t) => t.status === "APPROVED").length} transfer siap dikirim
               </p>
             </div>
           </div>
@@ -430,9 +449,9 @@ export default function WMSDashboardPage() {
                   <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Filter:</span>
                   {[
                     { label: "Semua Tipe", value: "ALL" },
-                    { label: "Internal Bin", value: "INTERNAL" },
-                    { label: "Pallet LPN", value: "PALLET" },
-                    { label: "Transit", value: "TRANSIT" },
+                    { label: "Rak Internal", value: "INTERNAL" },
+                    { label: "Palet LPN", value: "PALLET" },
+                    { label: "Area Transit", value: "TRANSIT" },
                     { label: "Pemasok", value: "VENDOR" },
                   ].map((filter) => (
                     <button
@@ -462,8 +481,7 @@ export default function WMSDashboardPage() {
                   <Box className="w-12 h-12 text-slate-400 mx-auto mb-3" />
                   <h3 className="text-base font-bold text-slate-900">Belum ada lokasi penyimpanan</h3>
                   <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-5">
-                    Buat struktur rak, bin, atau pallet LPN pertama Anda untuk mengoptimalkan penempatan barang
-                    (putaway).
+                    Buat struktur rak atau palet LPN pertama Anda untuk mengoptimalkan penataan rak.
                   </p>
                   <button
                     onClick={() => setShowCreateLocModal(true)}
@@ -500,11 +518,11 @@ export default function WMSDashboardPage() {
                             <div className="flex flex-col items-end gap-1">
                               {loc.is_pallet ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                                  PALLET LPN
+                                  PALET LPN
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                                  {loc.type}
+                                  {LOCATION_TYPE_LABEL[loc.type] ?? loc.type}
                                 </span>
                               )}
                             </div>
@@ -521,11 +539,11 @@ export default function WMSDashboardPage() {
                             {loc.pallet_number && (
                               <div className="flex items-center gap-1.5 text-amber-900 font-semibold">
                                 <Box className="w-3.5 h-3.5 text-amber-600" />
-                                <span>No. Pallet: {loc.pallet_number}</span>
+                                <span>No. Palet: {loc.pallet_number}</span>
                               </div>
                             )}
                             <div className="flex items-center justify-between text-slate-500 pt-1">
-                              <span>Kapasitas Max:</span>
+                              <span>Kapasitas Maks:</span>
                               <span className="font-semibold text-slate-800">{capacityNum.toLocaleString()} unit</span>
                             </div>
                             <div className="flex items-center justify-between text-slate-500">
@@ -601,7 +619,7 @@ export default function WMSDashboardPage() {
                       <th className="px-4 py-3">Produk & SKU</th>
                       <th className="px-4 py-3">Lokasi Asal</th>
                       <th className="px-4 py-3">Lokasi Tujuan</th>
-                      <th className="px-4 py-3 text-right">Kuantitas</th>
+                      <th className="px-4 py-3 text-right">Jml</th>
                       <th className="px-4 py-3 text-center">Status</th>
                       <th className="px-4 py-3">Dibuat / Disetujui / Operator</th>
                       <th className="px-4 py-3 text-right">Riwayat</th>
@@ -652,7 +670,7 @@ export default function WMSDashboardPage() {
                           <td className="px-4 py-3 text-center">
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               <CheckCircle2 className="w-3 h-3" />
-                              {mov.status}
+                              {MOVEMENT_STATUS_LABEL[mov.status] ?? mov.status}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-600">
@@ -691,7 +709,7 @@ export default function WMSDashboardPage() {
           isOpen={!!selectedMovementForAudit}
           onClose={() => setSelectedMovementForAudit(null)}
           title={selectedMovementForAudit.movement_number}
-          subtitle={`Mutasi Stok (${selectedMovementForAudit.reference_type || "WMS Ledger"})`}
+          subtitle={`Mutasi Stok (${selectedMovementForAudit.reference_type || "Buku Besar WMS"})`}
           entityType="stock_movement"
           entityId={selectedMovementForAudit.id}
           actors={{
@@ -817,7 +835,7 @@ export default function WMSDashboardPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">Tambah Rak / Lokasi Baru</h3>
-                  <p className="text-xs text-slate-500">Konfigurasi koordinat Rak, Bin, atau Pallet LPN</p>
+                  <p className="text-xs text-slate-500">Konfigurasi koordinat Rak atau Palet LPN</p>
                 </div>
               </div>
               <button
@@ -907,11 +925,11 @@ export default function WMSDashboardPage() {
                     onChange={(e) => setNewLocType(e.target.value as LocationType)}
                     className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
                   >
-                    <option value="INTERNAL">INTERNAL (Rak/Bin Biasa)</option>
-                    <option value="TRANSIT">TRANSIT (Staging Area)</option>
+                    <option value="INTERNAL">Rak Internal</option>
+                    <option value="TRANSIT">Area Transit</option>
                     <option value="VENDOR">Pemasok (Area Penerimaan)</option>
-                    <option value="CUSTOMER">CUSTOMER (Pengiriman)</option>
-                    <option value="SCRAP">SCRAP (Barang Rusak)</option>
+                    <option value="CUSTOMER">Pelanggan (Pengiriman)</option>
+                    <option value="SCRAP">Barang Rusak</option>
                   </select>
                 </div>
               </div>
@@ -926,14 +944,14 @@ export default function WMSDashboardPage() {
                     className="w-5 h-5 rounded text-[#2563EB] focus:ring-[#2563EB]"
                   />
                   <span className="text-sm font-semibold text-slate-800">
-                    Ini adalah Pallet LPN Bergerak (License Plate Number)
+                    Ini adalah Palet LPN Bergerak
                   </span>
                 </label>
 
                 {newLocIsPallet && (
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1">
-                      Nomor Pallet (LPN ID)
+                      Nomor Palet (LPN)
                     </label>
                     <input
                       type="text"
@@ -992,7 +1010,7 @@ export default function WMSDashboardPage() {
           { header: "Nama Produk", value: (s) => s.product_name, width: 32 },
           { header: "Gudang", value: (s) => s.warehouse_name || "-", width: 22 },
           { header: "Lokasi", value: (s) => s.location_code || "-", width: 18 },
-          { header: "Qty", value: (s) => Number(s.quantity) || 0, width: 12, align: "right" },
+          { header: "Jml", value: (s) => Number(s.quantity) || 0, width: 12, align: "right" },
         ]}
         filters={[
           {

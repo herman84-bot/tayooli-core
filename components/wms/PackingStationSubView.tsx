@@ -27,6 +27,14 @@ interface PackingStationSubViewProps {
   warehouseId?: string
 }
 
+const DO_STATUS_LABEL: Record<string, string> = {
+  CONFIRMED: "Dikonfirmasi",
+  PICKED: "Sudah Diambil",
+  PACKED: "Sudah Dikemas",
+}
+
+const doStatusLabel = (s: string) => DO_STATUS_LABEL[s] ?? s
+
 export function PackingStationSubView({ warehouseId }: PackingStationSubViewProps) {
   const { data: warehouses = [] } = useWarehouses()
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>(
@@ -231,7 +239,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
       setSelectedOrder(res.data)
       setScanMessage({
         type: "success",
-        text: `Pesanan ${res.data.do_number} telah selesai dikemas 100% (PACKED)!`,
+        text: `Pesanan ${res.data.do_number} telah selesai dikemas 100%!`,
       })
       playSound(true)
       await loadOrders()
@@ -275,7 +283,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
                 onClick={loadOrders}
                 disabled={loadingOrders}
                 className="p-1 rounded text-slate-400 hover:text-slate-700 transition"
-                title="Segarkan daftar pesanan"
+                title="Muat ulang daftar pesanan"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${loadingOrders ? "animate-spin" : ""}`} />
               </button>
@@ -284,7 +292,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
               <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Cari No. DO, penerima..."
+                placeholder="Cari No. Surat Jalan, penerima..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500"
@@ -340,7 +348,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
                               : "bg-amber-100 text-amber-800"
                           }`}
                         >
-                          {o.status}
+                          {doStatusLabel(o.status)}
                         </span>
                       </div>
                       <div className="text-[11px] text-slate-600 truncate">
@@ -383,7 +391,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
                           : "bg-indigo-50 text-indigo-700 border-indigo-200"
                       }`}
                     >
-                      {selectedOrder.status}
+                      {doStatusLabel(selectedOrder.status)}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -442,7 +450,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
               {/* ── Scan Barcode Input Prominent (FE-07) ── */}
               <form onSubmit={handleScanSubmit} className="space-y-2">
                 <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Pindai Barcode / SKU Barang (Scan to Verify)
+                  Pindai Barcode / SKU Barang
                 </label>
                 <div className="relative">
                   <Barcode className="h-5 w-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-600" />
@@ -451,7 +459,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
                     type="text"
                     value={barcodeInput}
                     onChange={(e) => setBarcodeInput(e.target.value)}
-                    placeholder="Arahkan barcode scanner fisik atau ketik SKU lalu Enter..."
+                    placeholder="Arahkan pemindai barcode fisik atau ketik SKU lalu Enter..."
                     disabled={loadingScan || isAllPacked}
                     className="w-full pl-11 pr-24 py-3 bg-slate-50 border-2 border-indigo-200 rounded-xl text-sm font-mono text-slate-900 focus:outline-none focus:border-indigo-600 focus:bg-white transition disabled:opacity-50"
                     autoFocus
@@ -530,7 +538,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
                             <div className="font-mono text-slate-700">{it.batch_number || "-"}</div>
                             {it.expiry_date && (
                               <div className="text-[10px] text-slate-400">
-                                Exp: {new Date(it.expiry_date).toLocaleDateString("id-ID")}
+                                Kedaluwarsa: {new Date(it.expiry_date).toLocaleDateString("id-ID")}
                               </div>
                             )}
                           </td>
@@ -601,8 +609,8 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
                       onChange={(e) => setPackagingType(e.target.value)}
                       className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     >
-                      <option value="KARTON">Karton Box</option>
-                      <option value="PLASTIK">Polymailer</option>
+                      <option value="KARTON">Kotak Karton</option>
+                      <option value="PLASTIK">Plastik Polymailer</option>
                       <option value="KAYU">Peti Kayu</option>
                       <option value="BUBBLE">Bubble Wrap</option>
                     </select>
@@ -617,7 +625,7 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    <span>{completing ? "Menyelesaikan..." : "Selesaikan Kemasan (100% PACKED)"}</span>
+                    <span>{completing ? "Menyelesaikan..." : "Selesaikan Pengemasan (100%)"}</span>
                   </button>
                 </div>
               </div>

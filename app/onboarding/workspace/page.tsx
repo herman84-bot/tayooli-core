@@ -30,7 +30,7 @@ export default function WorkspacePage() {
         body: JSON.stringify({ company_name: companyName.trim() }),
       })
       if (!res.ok) {
-        throw new Error(await extractApiErrorMessage(res, 'Gagal membuat workspace'))
+        throw new Error(await extractApiErrorMessage(res, 'Gagal membuat ruang kerja'))
       }
       if (DISABLE_BILLING) {
         router.push('/dashboard')
@@ -38,7 +38,7 @@ export default function WorkspacePage() {
         router.push('/onboarding/trial')
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Gagal membuat workspace')
+      setError(e instanceof Error ? e.message : 'Gagal membuat ruang kerja')
       setIsLoading(false)
     }
   }
@@ -71,7 +71,7 @@ export default function WorkspacePage() {
             Nama Toko / Perusahaan
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            Ditampilkan pada struk kasir, surat jalan, dan dashboard operasional.
+            Ditampilkan pada struk kasir, surat jalan, dan dasbor operasional.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
