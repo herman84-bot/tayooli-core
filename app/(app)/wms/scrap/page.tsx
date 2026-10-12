@@ -35,7 +35,8 @@ import {
   useWarehouses,
   useWarehouseLocations,
 } from "@/hooks/useWMS"
-import { useProducts } from "@/hooks/useProducts"
+import { ProductCombobox } from "@/components/products/ProductCombobox"
+import { resolveScannedProduct } from "@/lib/resolveScannedProduct"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
 import { useAuthStore } from "@/hooks/useAuth"
 import { Product, WarehouseLocation, StockScrap } from "@/lib/api"
@@ -45,7 +46,6 @@ export default function StockScrapPage() {
   const currentRole = (currentUser?.role ?? "").toLowerCase()
 
   const { data: warehouses = [], isLoading: loadingWarehouses, refetch: refetchWarehouses } = useWarehouses()
-  const { data: products = [], isLoading: loadingProducts } = useProducts()
 
   // Filter States
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("ALL")
@@ -112,7 +112,7 @@ export default function StockScrapPage() {
   ]
 
   // Barcode Scan Handler
-  const handleBarcodeScanned = (code: string) => {
+  const handleBarcodeScanned = async (code: string) => {
     const clean = code.trim().toLowerCase()
     if (!clean) return
 
@@ -131,21 +131,19 @@ export default function StockScrapPage() {
       return
     }
 
-    // 2. Check if matches product
-    const matchedProd = products.find(
-      (p) =>
-        p.sku.toLowerCase() === clean ||
-        p.name.toLowerCase().includes(clean) ||
-        p.id.toLowerCase() === clean
-    )
-    if (matchedProd) {
-      setSelectedProduct(matchedProd)
+    // 2. Resolve product server-side so the match works for catalogs larger
+    // than the 1000-row list cap.
+    const result = await resolveScannedProduct(code)
+    if (result.kind === "found") {
+      setSelectedProduct(result.product)
       setBarcodeSearchInput("")
       setToast({
         type: "success",
         title: "Produk Terdeteksi",
-        message: `${matchedProd.name} (${matchedProd.sku})`,
+        message: `${result.product.name} (${result.product.sku})`,
       })
+    } else if (result.kind === "error") {
+      setToast({ type: "error", title: "Gagal Memeriksa Barcode", message: result.message })
     } else {
       setToast({
         type: "error",
@@ -253,9 +251,6 @@ export default function StockScrapPage() {
     return wh ? `${wh.name} (${wh.code})` : id.slice(0, 8)
   }
 
-  const getProduct = (id: string) => {
-    return products.find((p) => p.id === id)
-  }
 
   const getLocation = (id: string) => {
     return modalLocations.find((l) => l.id === id)
@@ -265,16 +260,16 @@ export default function StockScrapPage() {
   const filteredScraps = useMemo(() => {
     return scraps.filter((s) => {
       const wh = warehouses.find((w) => w.id === s.warehouse_id)
-      const prod = products.find((p) => p.id === s.product_id)
+      const q = searchQuery.toLowerCase()
 
       const matchesSearch =
-        searchQuery === "" ||
-        s.scrap_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.reported_by.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (wh && wh.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (prod && prod.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (prod && prod.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+        q === "" ||
+        s.scrap_number.toLowerCase().includes(q) ||
+        s.reason.toLowerCase().includes(q) ||
+        (s.reported_by_name ?? "").toLowerCase().includes(q) ||
+        (wh && wh.name.toLowerCase().includes(q)) ||
+        (s.product_name ?? "").toLowerCase().includes(q) ||
+        (s.product_sku ?? "").toLowerCase().includes(q)
 
       const isVirtual = !s.scrap_location_id || s.scrap_location_id.toLowerCase().includes("scrap")
       const matchesDest =
@@ -284,7 +279,7 @@ export default function StockScrapPage() {
 
       return matchesSearch && matchesDest
     })
-  }, [scraps, searchQuery, destinationFilter, warehouses, products])
+  }, [scraps, searchQuery, destinationFilter, warehouses])
 
   // Summary Metrics
   const metrics = useMemo(() => {
@@ -537,7 +532,6 @@ export default function StockScrapPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredScraps.map((s) => {
-                      const prod = getProduct(s.product_id)
                       const isVirtual =
                         !s.scrap_location_id || s.scrap_location_id.toLowerCase().includes("scrap")
                       return (
@@ -556,10 +550,10 @@ export default function StockScrapPage() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="font-semibold text-slate-900 text-xs">
-                              {prod ? prod.name : `Produk [${s.product_id.slice(0, 8)}]`}
+                              {s.product_name || `Produk [${s.product_id.slice(0, 8)}]`}
                             </div>
-                            {prod && (
-                              <div className="text-[11px] font-mono text-slate-500">{prod.sku}</div>
+                            {s.product_sku && (
+                              <div className="text-[11px] font-mono text-slate-500">{s.product_sku}</div>
                             )}
                           </td>
                           <td className="px-6 py-4 text-xs">
@@ -591,7 +585,7 @@ export default function StockScrapPage() {
                           <td className="px-6 py-4 text-xs text-slate-600">
                             <div className="flex items-center gap-1">
                               <User className="w-3.5 h-3.5 text-slate-400" />
-                              <span>{s.reported_by || "Petugas"}</span>
+                              <span>{s.reported_by_name || "Petugas"}</span>
                             </div>
                           </td>
                         </tr>
@@ -604,7 +598,6 @@ export default function StockScrapPage() {
               {/* Mobile View */}
               <div className="md:hidden divide-y divide-slate-100">
                 {filteredScraps.map((s) => {
-                  const prod = getProduct(s.product_id)
                   const isVirtual =
                     !s.scrap_location_id || s.scrap_location_id.toLowerCase().includes("scrap")
                   return (
@@ -613,7 +606,7 @@ export default function StockScrapPage() {
                         <div>
                           <div className="font-mono font-bold text-xs text-slate-800">{s.scrap_number}</div>
                           <div className="font-semibold text-slate-900 text-sm mt-0.5">
-                            {prod ? prod.name : `Produk [${s.product_id.slice(0, 8)}]`}
+                            {s.product_name || `Produk [${s.product_id.slice(0, 8)}]`}
                           </div>
                         </div>
                         <span className="inline-flex items-center px-2 py-1 rounded font-bold text-xs bg-rose-100 text-rose-800 shrink-0">
@@ -643,7 +636,7 @@ export default function StockScrapPage() {
                       </div>
 
                       <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                        <span>Oleh: {s.reported_by || "Petugas"}</span>
+                        <span>Oleh: {s.reported_by_name || "Petugas"}</span>
                         <span>
                           {new Date(s.created_at).toLocaleDateString("id-ID", {
                             day: "numeric",
@@ -752,22 +745,12 @@ export default function StockScrapPage() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Produk Master Rusak <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  value={selectedProduct?.id || ""}
-                  onChange={(e) => {
-                    const found = products.find((p) => p.id === e.target.value) || null
-                    setSelectedProduct(found)
-                  }}
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] bg-white min-h-[48px]"
-                  required
-                >
-                  <option value="">-- Pilih Produk --</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} [{p.sku}]
-                    </option>
-                  ))}
-                </select>
+                <ProductCombobox
+                  value={selectedProduct}
+                  onSelect={setSelectedProduct}
+                  placeholder="-- Pilih Produk --"
+                  allowClear
+                />
               </div>
 
               {/* Source Rack Location */}

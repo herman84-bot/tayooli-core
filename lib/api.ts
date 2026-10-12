@@ -730,6 +730,8 @@ export interface StockOpnameItem {
   discrepancy_qty: string | number
   notes?: string | null
   created_at: string
+  product_name?: string
+  product_sku?: string
 }
 
 export interface CreateStockOpnameInput {
@@ -763,6 +765,9 @@ export interface StockScrap {
   quantity: string | number
   reason: string
   reported_by: string
+  reported_by_name?: string
+  product_name?: string
+  product_sku?: string
   created_at: string
 }
 

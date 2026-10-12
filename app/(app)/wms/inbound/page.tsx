@@ -26,7 +26,7 @@ import {
   usePostStockReceipt,
   useCancelStockReceipt,
 } from "@/hooks/useWMS"
-import { useProducts } from "@/hooks/useProducts"
+import { useProductSearch } from "@/hooks/useProducts"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 import { api, Product, StockReceipt, StockReceiptInput, StockReceiptStatus, StockReceiptType } from "@/lib/api"
@@ -424,7 +424,6 @@ function ReceiptForm({
   onSaved: (id: string) => void
 }) {
   const { data: warehouses = [] } = useWarehouses()
-  const { data: products = [] } = useProducts()
   const { data: locations = [] } = useWarehouseLocations(form.warehouse_id || null)
   const createMut = useCreateStockReceipt()
   const updateMut = useUpdateStockReceipt()
@@ -444,13 +443,9 @@ function ReceiptForm({
     [warehouses, form.warehouse_id]
   )
 
-  const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return []
-    return products
-      .filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q))
-      .slice(0, 8)
-  }, [search, products])
+  // Server-side search: works for catalogs larger than the 1000-row list cap.
+  const { data: searchData = [] } = useProductSearch(search, 8)
+  const searchResults = search.trim() ? searchData : []
 
   const addProduct = (p: { id: string; name: string; sku: string }, qty = 1) => {
     setForm((f) => {
@@ -479,12 +474,7 @@ function ReceiptForm({
 
   const handleScan = async (code: string) => {
     setError(null)
-    const local = products.find((p) => p.sku.toLowerCase() === code.toLowerCase())
-    if (local) {
-      addProduct(local)
-      setScanInfo(`+1 ${local.name}`)
-      return
-    }
+    // Server-side resolve covers SKU, barcode and marketplace mappings.
     try {
       const r = await api.wms.barcodes.resolve(code)
       const qty = num(r.multiplier) || 1

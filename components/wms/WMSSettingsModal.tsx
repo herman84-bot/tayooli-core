@@ -21,7 +21,8 @@ import {
   useWarehouses,
   useWarehouseLocations,
 } from "@/hooks/useWMS"
-import { useProducts } from "@/hooks/useProducts"
+import { ProductCombobox } from "@/components/products/ProductCombobox"
+import type { Product } from "@/lib/api"
 
 interface WMSSettingsModalProps {
   isOpen: boolean
@@ -42,11 +43,10 @@ export function WMSSettingsModal({ isOpen, onClose }: WMSSettingsModalProps) {
   const { mutate: deleteDefaultLoc } = useDeleteDefaultLocation()
 
   // Masters
-  const { data: products = [] } = useProducts()
   const { data: warehouses = [] } = useWarehouses()
 
   // New Default Rack Form
-  const [selectedProductId, setSelectedProductId] = useState("")
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("")
   const [selectedLocationId, setSelectedLocationId] = useState("")
 
@@ -70,21 +70,21 @@ export function WMSSettingsModal({ isOpen, onClose }: WMSSettingsModalProps) {
 
   const handleAddDefaultRack = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedProductId || !selectedWarehouseId || !selectedLocationId) {
+    if (!selectedProduct || !selectedWarehouseId || !selectedLocationId) {
       setToast({ type: "error", msg: "Lengkapi semua data produk, gudang, dan rak internal." })
       return
     }
 
     setDefaultLoc(
       {
-        product_id: selectedProductId,
+        product_id: selectedProduct.id,
         warehouse_id: selectedWarehouseId,
         location_id: selectedLocationId,
       },
       {
         onSuccess: () => {
           setToast({ type: "success", msg: "Rak default produk berhasil ditetapkan." })
-          setSelectedProductId("")
+          setSelectedProduct(null)
           setSelectedLocationId("")
           refetchDefaultLocs()
           setTimeout(() => setToast(null), 3000)
@@ -210,19 +210,13 @@ export function WMSSettingsModal({ isOpen, onClose }: WMSSettingsModalProps) {
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Pilih Produk</label>
-                    <select
-                      value={selectedProductId}
-                      onChange={(e) => setSelectedProductId(e.target.value)}
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded bg-white"
-                    >
-                      <option value="">-- Pilih Produk --</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.sku})
-                        </option>
-                      ))}
-                    </select>
+                    <span className="block text-[11px] font-medium text-slate-600 mb-1">Pilih Produk</span>
+                    <ProductCombobox
+                      value={selectedProduct}
+                      onSelect={setSelectedProduct}
+                      placeholder="-- Pilih Produk --"
+                      allowClear
+                    />
                   </div>
                   <div>
                     <label className="block text-[11px] font-medium text-slate-600 mb-1">Pilih Gudang</label>

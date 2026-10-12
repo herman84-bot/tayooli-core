@@ -33,7 +33,7 @@ import {
   useCreateDeliveryOrder,
   useDispatchDeliveryOrder,
 } from "@/hooks/useWMS"
-import { useProducts } from "@/hooks/useProducts"
+import { ProductCombobox, productRef } from "@/components/products/ProductCombobox"
 import {
   api,
   DeliveryOrder,
@@ -78,7 +78,6 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
 
   const { data: warehouses = [] } = useWarehouses()
   const { data: deliveryOrders = [], isLoading, refetch, isFetching } = useDeliveryOrders(activeWhId)
-  const { data: products = [] } = useProducts()
 
   const [statusFilter, setStatusFilter] = useState<string>("ALL")
   const [searchQuery, setSearchQuery] = useState("")
@@ -407,18 +406,15 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
 
   // Add Item to Draft
   const handleAddItem = () => {
-    if (products.length === 0) {
-      setModalError("Tidak ada data produk yang tersedia.")
-      return
-    }
-    const defaultProduct = products[0]
+    // Product starts empty and is picked via the server-side combobox, so
+    // catalogs above the 1000-row list cap stay selectable.
     const defaultLocation = modalLocations[0]
     setLineItems((prev) => [
       ...prev,
       {
-        productId: defaultProduct.id,
-        productName: defaultProduct.name,
-        sku: defaultProduct.sku || "",
+        productId: "",
+        productName: "",
+        sku: "",
         quantity: 1,
         locationId: defaultLocation?.id || "",
         locationCode: defaultLocation?.code || "DEFAULT",
@@ -451,6 +447,10 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
 
     for (let i = 0; i < lineItems.length; i++) {
       const it = lineItems[i]
+      if (!it.productId) {
+        setModalError(`Baris ${i + 1}: Produk harus dipilih.`)
+        return
+      }
       const qtyErr = lineChecks[i]?.error ?? validateDOLineQty(it.quantity)
       if (qtyErr) {
         setModalError(`Baris ${i + 1} (${it.productName || it.sku}): ${qtyErr}`)
@@ -1173,24 +1173,19 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                       >
                         {/* Pilih Produk */}
                         <div className="col-span-5">
-                          <select
-                            value={item.productId}
-                            onChange={(e) => {
-                              const found = products.find((p) => p.id === e.target.value)
-                              const updated = [...lineItems]
-                              updated[idx].productId = e.target.value
-                              updated[idx].productName = found?.name || ""
-                              updated[idx].sku = found?.sku || ""
-                              setLineItems(updated)
-                            }}
-                            className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900"
-                          >
-                            {products.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} ({p.sku || "Tanpa SKU"})
-                              </option>
-                            ))}
-                          </select>
+                          <ProductCombobox
+                            value={productRef(item.productId, item.productName, item.sku)}
+                            onSelect={(p) =>
+                              setLineItems((prev) =>
+                                prev.map((line, i) =>
+                                  i === idx
+                                    ? { ...line, productId: p?.id ?? "", productName: p?.name ?? "", sku: p?.sku ?? "" }
+                                    : line
+                                )
+                              )
+                            }
+                            placeholder="Cari produk..."
+                          />
                         </div>
 
                         {/* Pilih Rak Lokasi */}

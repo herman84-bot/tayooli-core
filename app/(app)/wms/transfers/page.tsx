@@ -42,10 +42,9 @@ import {
   useReceiveTransfer,
   useCancelTransfer,
 } from "@/hooks/useWMS"
-import { useProducts } from "@/hooks/useProducts"
-import { ProductCombobox } from "@/components/products/ProductCombobox"
+import { ProductCombobox, productRef } from "@/components/products/ProductCombobox"
 import { useAuthStore } from "@/hooks/useAuth"
-import { StockTransfer, TransferStatus } from "@/lib/api"
+import { Product, StockTransfer, TransferStatus } from "@/lib/api"
 
 /**
  * Roles allowed to approve/reject a stock transfer (segregation of duties).
@@ -75,7 +74,6 @@ export default function TransfersPage() {
   const { data: warehouses = [] } = useWarehouses()
   const { data: transfers = [], isLoading, refetch, dataUpdatedAt } = useStockTransfers()
   const { refresh, status: refreshStatus, refreshError } = useManualRefresh([refetch])
-  const { data: products = [] } = useProducts()
   const currentUser = useAuthStore((s) => s.user)
   const currentRole = (currentUser?.role ?? "").toLowerCase()
   const isApproverRole = APPROVER_ROLES.has(currentRole)
@@ -280,22 +278,37 @@ export default function TransfersPage() {
 
   // Add line item draft in modal
   const handleAddLineItem = () => {
-    if (products.length === 0) return
     if (!fromWhId) {
       setModalError("Pilih Gudang Asal terlebih dahulu sebelum menambah barang.")
       return
     }
-    const firstProduct = products[0]
+    // Product starts empty: the user picks it via the server-side combobox, so
+    // catalogs above the 1000-row list cap stay selectable.
     setLineItems((prev) => [
       ...prev,
       {
-        productId: firstProduct.id,
-        productName: firstProduct.name,
-        sku: firstProduct.sku,
+        productId: "",
+        productName: "",
+        sku: "",
         quantity: 10,
         sourceLocationId: sourceLocations[0]?.id,
       },
     ])
+  }
+
+  const handleSelectLineProduct = (index: number, product: Product | null) => {
+    setLineItems((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              productId: product?.id ?? "",
+              productName: product?.name ?? "",
+              sku: product?.sku ?? "",
+            }
+          : item
+      )
+    )
   }
 
   const handleRemoveLineItem = (index: number) => {
@@ -305,19 +318,7 @@ export default function TransfersPage() {
   const handleUpdateLineItem = (index: number, field: keyof LineItemDraft, value: unknown) => {
     setLineItems((prev) => {
       const updated = [...prev]
-      if (field === "productId") {
-        const prod = products.find((p) => p.id === value)
-        if (prod) {
-          updated[index] = {
-            ...updated[index],
-            productId: prod.id,
-            productName: prod.name,
-            sku: prod.sku,
-          }
-        }
-      } else {
-        updated[index] = { ...updated[index], [field]: value }
-      }
+      updated[index] = { ...updated[index], [field]: value }
       return updated
     })
   }
@@ -341,6 +342,10 @@ export default function TransfersPage() {
     }
     if (lineItems.length === 0) {
       setModalError("Minimal 1 barang harus dimasukkan ke dalam daftar transfer.")
+      return
+    }
+    if (lineItems.some((item) => !item.productId)) {
+      setModalError("Setiap baris wajib memilih produk.")
       return
     }
     const missingLoc = lineItems.some((item) => !effectiveSourceLoc(item))
@@ -986,24 +991,8 @@ export default function TransfersPage() {
                         {/* Product selection */}
                         <div className="flex-1 w-full">
                           <ProductCombobox
-                            value={
-                              products.find((p) => p.id === item.productId) ??
-                              (item.productId
-                                ? {
-                                    id: item.productId,
-                                    name: item.productName || "Produk",
-                                    sku: item.sku || "",
-                                    tenant_id: "",
-                                    price: 0,
-                                    created_at: "",
-                                    updated_at: "",
-                                  }
-                                : null)
-                            }
-                            onSelect={(p) => {
-                              if (!p) return
-                              handleUpdateLineItem(idx, "productId", p.id)
-                            }}
+                            value={productRef(item.productId, item.productName, item.sku)}
+                            onSelect={(p) => handleSelectLineProduct(idx, p)}
                             placeholder="Pilih atau cari produk..."
                           />
                         </div>

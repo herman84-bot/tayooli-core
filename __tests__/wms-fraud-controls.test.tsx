@@ -58,6 +58,36 @@ jest.mock("@/hooks/useProducts", () => ({
   useProducts: () => mockUseProducts(),
 }))
 
+// ProductCombobox searches the server; here it is reduced to a plain select over
+// the mocked catalog so the test stays focused on scrap/opname validation.
+jest.mock("@/components/products/ProductCombobox", () => ({
+  productRef: (id: string, name?: string, sku?: string) => (id ? { id, name, sku } : null),
+  ProductCombobox: ({
+    value,
+    onSelect,
+    placeholder,
+  }: {
+    value: { id: string } | null
+    onSelect: (p: unknown) => void
+    placeholder?: string
+  }) => {
+    const products: Array<{ id: string; name: string; sku: string }> = mockUseProducts().data ?? []
+    return (
+      <select
+        value={value?.id ?? ""}
+        onChange={(e) => onSelect(products.find((p) => p.id === e.target.value) ?? null)}
+      >
+        <option value="">{placeholder}</option>
+        {products.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+    )
+  },
+}))
+
 jest.mock("@/hooks/useBarcodeScanner", () => ({
   useBarcodeScanner: () => ({ triggerScan: jest.fn() }),
 }))

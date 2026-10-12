@@ -32,7 +32,7 @@ import {
   useCancelStockReceipt,
   useReleaseStockReceipt,
 } from "@/hooks/useWMS"
-import { useProducts } from "@/hooks/useProducts"
+import { useProductSearch } from "@/hooks/useProducts"
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 import { validateReceiptLines, isPastDate } from "@/lib/wms/validation"
 import {
@@ -707,7 +707,6 @@ function InboundReceiptForm({
   onSaved: (id: string) => void
 }) {
   const { data: warehouses = [] } = useWarehouses()
-  const { data: products = [] } = useProducts()
   const { data: locations = [] } = useWarehouseLocations(form.warehouse_id || null)
   const createMut = useCreateStockReceipt()
 
@@ -725,13 +724,9 @@ function InboundReceiptForm({
     [warehouses, form.warehouse_id]
   )
 
-  const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return []
-    return products
-      .filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q))
-      .slice(0, 8)
-  }, [search, products])
+  // Server-side search: works for catalogs larger than the 1000-row list cap.
+  const { data: searchData = [] } = useProductSearch(search, 8)
+  const searchResults = search.trim() ? searchData : []
 
   const addProduct = (p: { id: string; name: string; sku: string }, qty = 1) => {
     setForm((f) => {

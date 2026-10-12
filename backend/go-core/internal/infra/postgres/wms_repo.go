@@ -2708,10 +2708,12 @@ func (r *WMSRepo) AddStockOpnameItem(ctx context.Context, item *domain.StockOpna
 }
 
 const listStockOpnameItemsSQL = `
-SELECT id, opname_id, tenant_id, product_id, location_id, system_qty, physical_qty, discrepancy_qty, notes, created_at
-FROM stock_opname_items
-WHERE tenant_id = $1 AND opname_id = $2
-ORDER BY created_at ASC`
+SELECT i.id, i.opname_id, i.tenant_id, i.product_id, i.location_id, i.system_qty, i.physical_qty, i.discrepancy_qty, i.notes, i.created_at,
+       COALESCE(p.name, ''), COALESCE(p.sku, '')
+FROM stock_opname_items i
+LEFT JOIN products p ON p.id = i.product_id AND p.tenant_id = i.tenant_id
+WHERE i.tenant_id = $1 AND i.opname_id = $2
+ORDER BY i.created_at ASC`
 
 func (r *WMSRepo) ListStockOpnameItems(ctx context.Context, tenantID, opnameID uuid.UUID) ([]domain.StockOpnameItem, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -2737,6 +2739,7 @@ func (r *WMSRepo) ListStockOpnameItems(ctx context.Context, tenantID, opnameID u
 		if err := rows.Scan(
 			&item.ID, &item.OpnameID, &item.TenantID, &item.ProductID, &item.LocationID,
 			&item.SystemQty, &item.PhysicalQty, &item.DiscrepancyQty, &notes, &item.CreatedAt,
+			&item.ProductName, &item.ProductSKU,
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListStockOpnameItems: scan: %w", err)
 		}
@@ -2824,17 +2827,18 @@ func (r *WMSRepo) CreateStockScrap(ctx context.Context, scrap *domain.StockScrap
 	return tx.Commit()
 }
 
+// listStockScrapsSQL joins product and reporter names so the client does not
+// need the full product catalog (capped at 1000) to label rows. $2 NULL = all
+// warehouses.
 const listStockScrapsSQL = `
-SELECT id, tenant_id, scrap_number, warehouse_id, product_id, source_location_id, scrap_location_id, quantity, reason, reported_by, approved_by, created_at
-FROM stock_scraps
-WHERE tenant_id = $1
-ORDER BY created_at DESC`
-
-const listStockScrapsByWarehouseSQL = `
-SELECT id, tenant_id, scrap_number, warehouse_id, product_id, source_location_id, scrap_location_id, quantity, reason, reported_by, approved_by, created_at
-FROM stock_scraps
-WHERE tenant_id = $1 AND warehouse_id = $2
-ORDER BY created_at DESC`
+SELECT s.id, s.tenant_id, s.scrap_number, s.warehouse_id, s.product_id, s.source_location_id, s.scrap_location_id,
+       s.quantity, s.reason, s.reported_by, s.approved_by, s.created_at,
+       COALESCE(p.name, ''), COALESCE(p.sku, ''), COALESCE(NULLIF(u.full_name, ''), u.email, '')
+FROM stock_scraps s
+LEFT JOIN products p ON p.id = s.product_id AND p.tenant_id = s.tenant_id
+LEFT JOIN users u ON u.id = s.reported_by AND u.tenant_id = s.tenant_id
+WHERE s.tenant_id = $1 AND ($2::uuid IS NULL OR s.warehouse_id = $2)
+ORDER BY s.created_at DESC`
 
 func (r *WMSRepo) ListStockScraps(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID) ([]domain.StockScrap, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -2847,15 +2851,9 @@ func (r *WMSRepo) ListStockScraps(ctx context.Context, tenantID uuid.UUID, wareh
 		return nil, fmt.Errorf("WMSRepo.ListStockScraps: set tenant: %w", err)
 	}
 
-	var rows *sql.Rows
-	var errQuery error
-	if warehouseID != nil {
-		rows, errQuery = tx.QueryContext(ctx, listStockScrapsByWarehouseSQL, tenantID, *warehouseID)
-	} else {
-		rows, errQuery = tx.QueryContext(ctx, listStockScrapsSQL, tenantID)
-	}
-	if errQuery != nil {
-		return nil, fmt.Errorf("WMSRepo.ListStockScraps: query: %w", errQuery)
+	rows, err := tx.QueryContext(ctx, listStockScrapsSQL, tenantID, ptrToNullUUID(warehouseID))
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListStockScraps: query: %w", err)
 	}
 	defer rows.Close()
 
@@ -2866,6 +2864,7 @@ func (r *WMSRepo) ListStockScraps(ctx context.Context, tenantID uuid.UUID, wareh
 			&scrap.ID, &scrap.TenantID, &scrap.ScrapNumber, &scrap.WarehouseID,
 			&scrap.ProductID, &scrap.SourceLocationID, &scrap.ScrapLocationID,
 			&scrap.Quantity, &scrap.Reason, &scrap.ReportedBy, &scrap.ApprovedBy, &scrap.CreatedAt,
+			&scrap.ProductName, &scrap.ProductSKU, &scrap.ReportedByName,
 		); err != nil {
 			return nil, fmt.Errorf("WMSRepo.ListStockScraps: scan: %w", err)
 		}

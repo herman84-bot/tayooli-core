@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api, type PaginatedResponse, type Product, type ProductSearchParams } from "@/lib/api"
 
@@ -44,6 +45,33 @@ export function useProductsPaged(params: ProductSearchParams) {
       return { data: [], total: 0, page, per_page: perPage }
     },
     placeholderData: (prev) => prev,
+  })
+}
+
+const PRODUCT_SEARCH_DEBOUNCE_MS = 250
+
+/**
+ * useProductSearch returns up to `limit` products matching `query` (name or
+ * SKU) via server-side search, so pickers work on catalogs larger than the
+ * 1000-row cap of useProducts(). An empty query returns no results.
+ */
+export function useProductSearch(query: string, limit = 8) {
+  const trimmed = query.trim()
+  const [debounced, setDebounced] = useState(trimmed)
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebounced(trimmed), PRODUCT_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(handle)
+  }, [trimmed])
+
+  return useQuery<Product[]>({
+    queryKey: ["products", "search", { q: debounced, limit }],
+    queryFn: async (): Promise<Product[]> => {
+      const res = await api.products.list({ q: debounced, page: 1, per_page: limit })
+      return Array.isArray(res?.data) ? res.data : []
+    },
+    enabled: debounced.length > 0,
+    staleTime: 30_000,
   })
 }
 

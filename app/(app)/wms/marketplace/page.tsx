@@ -46,7 +46,7 @@ import {
   useImportMarketplaceOrders,
   useCreateSKUMapping,
 } from "@/hooks/useWMS"
-import { useProducts } from "@/hooks/useProducts"
+import { ProductCombobox } from "@/components/products/ProductCombobox"
 import {
   MarketplaceChannel,
   MarketplaceOrderStatus,
@@ -168,7 +168,6 @@ function formatDate(dateStr: string | undefined | null): string {
 export default function MarketplacePage() {
   // Query data
   const { data: warehouses = [], isLoading: loadingWarehouses } = useWarehouses()
-  const { data: products = [], isLoading: loadingProducts } = useProducts()
   const {
     data: batches = [],
     isLoading: loadingBatches,
@@ -272,7 +271,7 @@ export default function MarketplacePage() {
   const [mapChannel, setMapChannel] = useState<MarketplaceChannel>("SHOPEE")
   const [mapExternalSku, setMapExternalSku] = useState<string>("")
   const [mapExternalName, setMapExternalName] = useState<string>("")
-  const [mapProductId, setMapProductId] = useState<string>("")
+  const [mapProduct, setMapProduct] = useState<Product | null>(null)
   const [mapMultiplier, setMapMultiplier] = useState<string>("1")
   const [mapModalError, setMapModalError] = useState<string | null>(null)
 
@@ -448,7 +447,7 @@ export default function MarketplacePage() {
     setMapChannel(channel || "SHOPEE")
     setMapExternalSku(sku || "")
     setMapExternalName("")
-    setMapProductId(products[0]?.id || "")
+    setMapProduct(null)
     setMapMultiplier("1")
     setMapModalError(null)
     setShowMappingModal(true)
@@ -461,7 +460,7 @@ export default function MarketplacePage() {
       setMapModalError("Kode SKU Marketplace wajib diisi.")
       return
     }
-    if (!mapProductId) {
+    if (!mapProduct) {
       setMapModalError("Pilih Produk Master Internal.")
       return
     }
@@ -476,7 +475,7 @@ export default function MarketplacePage() {
         channel_name: mapChannel,
         external_sku: mapExternalSku.trim(),
         external_name: mapExternalName.trim() || undefined,
-        product_id: mapProductId,
+        product_id: mapProduct.id,
         multiplier: multNum,
         mapping_type: "MARKETPLACE",
       }
@@ -2209,30 +2208,16 @@ export default function MarketplacePage() {
 
               {/* Internal Product Selector */}
               <div>
-                <label
-                  htmlFor="map-product-select"
-                  className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5"
-                >
+                <span className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                   Pilih Produk Master Internal Gudang{" "}
                   <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  id="map-product-select"
-                  value={mapProductId}
-                  onChange={(e) => setMapProductId(e.target.value)}
-                  disabled={loadingProducts}
-                  className="w-full min-h-[48px] px-3.5 py-2.5 rounded-lg border border-slate-300 text-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  {products.length === 0 ? (
-                    <option value="">Memuat produk master...</option>
-                  ) : (
-                    products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.sku}) &mdash; {formatIDR(p.price)}
-                      </option>
-                    ))
-                  )}
-                </select>
+                </span>
+                <ProductCombobox
+                  value={mapProduct}
+                  onSelect={setMapProduct}
+                  placeholder="Cari nama atau SKU produk..."
+                  allowClear
+                />
               </div>
 
               {/* Multiplier */}

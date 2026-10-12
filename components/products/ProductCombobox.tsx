@@ -13,9 +13,29 @@ export interface ProductComboboxProps {
   className?: string
   /** Filter out specific products (e.g. already selected in other lines). */
   excludeIds?: string[]
+  /** Accessible name for the trigger; defaults to the placeholder. */
+  ariaLabel?: string
 }
 
 const DEBOUNCE_MS = 250
+
+/**
+ * productRef builds the minimal Product the combobox needs to display a
+ * selection known only by id/name/sku (e.g. a saved line or a staging row),
+ * without loading the full catalog. Returns null when id is empty.
+ */
+export function productRef(id: string, name?: string, sku?: string): Product | null {
+  if (!id) return null
+  return {
+    id,
+    name: name || "Produk",
+    sku: sku || "",
+    tenant_id: "",
+    price: 0,
+    created_at: "",
+    updated_at: "",
+  }
+}
 
 /**
  * ProductCombobox replaces static <select> with a searchable, paginated
@@ -30,6 +50,7 @@ export function ProductCombobox({
   allowClear = false,
   className,
   excludeIds,
+  ariaLabel,
 }: ProductComboboxProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
@@ -126,6 +147,7 @@ export function ProductCombobox({
         onClick={() => !disabled && setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={value ? `${ariaLabel ?? placeholder}: ${value.name}` : (ariaLabel ?? placeholder)}
         className={cn(
           "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm rounded-lg border bg-white text-zinc-900 transition-colors",
           "border-zinc-300 hover:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600",
@@ -174,6 +196,7 @@ export function ProductCombobox({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Ketik nama atau SKU produk..."
+              aria-label="Cari produk"
               className="w-full px-2.5 py-1.5 text-xs rounded border border-zinc-200 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500"
             />
           </div>

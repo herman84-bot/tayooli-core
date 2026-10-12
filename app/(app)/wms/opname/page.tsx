@@ -38,10 +38,12 @@ import {
   useWarehouses,
   useWarehouseLocations,
 } from "@/hooks/useWMS"
-import { useProducts } from "@/hooks/useProducts"
+import { ProductCombobox } from "@/components/products/ProductCombobox"
+import { resolveScannedProduct } from "@/lib/resolveScannedProduct"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
 import { useAuthStore } from "@/hooks/useAuth"
 import {
+  api,
   StockOpname,
   StockOpnameItem,
   StockOpnameStatus,
@@ -55,7 +57,6 @@ export default function StockOpnamePage() {
   const isApprover = currentRole === "admin" || currentRole === "owner" || currentRole === "regional_manager"
 
   const { data: warehouses = [], isLoading: loadingWarehouses, refetch: refetchWarehouses } = useWarehouses()
-  const { data: products = [], isLoading: loadingProducts } = useProducts()
 
   // Filters
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("ALL")
@@ -138,7 +139,7 @@ export default function StockOpnamePage() {
   const effectiveLocationId = selectedLocationId || defaultLocationId
 
   // Barcode detection handler
-  const handleBarcodeDetected = (code: string) => {
+  const handleBarcodeDetected = async (code: string) => {
     const cleanCode = code.trim().toLowerCase()
     if (!cleanCode) return
 
@@ -157,13 +158,14 @@ export default function StockOpnamePage() {
       return
     }
 
-    // 2. Check if matches product SKU or name
-    const matchedProd = products.find(
-      (p) =>
-        p.sku.toLowerCase() === cleanCode ||
-        p.name.toLowerCase().includes(cleanCode) ||
-        p.id.toLowerCase() === cleanCode
-    )
+    // 2. Resolve product server-side so the match works for catalogs larger
+    // than the 1000-row list cap.
+    const result = await resolveScannedProduct(code)
+    if (result.kind === "error") {
+      setToast({ type: "error", title: "Gagal Memeriksa Barcode", message: result.message })
+      return
+    }
+    const matchedProd = result.kind === "found" ? result.product : null
 
     if (matchedProd) {
       setSelectedProduct(matchedProd)
@@ -349,15 +351,15 @@ export default function StockOpnamePage() {
     if (!drawerSearch.trim()) return countedItems
     const q = drawerSearch.toLowerCase()
     return countedItems.filter((item) => {
-      const prod = products.find((p) => p.id === item.product_id)
       const loc = opnameLocations.find((l) => l.id === item.location_id)
       return (
-        (prod && (prod.name.toLowerCase().includes(q) || prod.sku.toLowerCase().includes(q))) ||
+        (item.product_name ?? "").toLowerCase().includes(q) ||
+        (item.product_sku ?? "").toLowerCase().includes(q) ||
         (loc && (loc.name.toLowerCase().includes(q) || loc.code.toLowerCase().includes(q))) ||
         (item.notes && item.notes.toLowerCase().includes(q))
       )
     })
-  }, [countedItems, drawerSearch, products, opnameLocations])
+  }, [countedItems, drawerSearch, opnameLocations])
 
   // Discrepancy stats for active opname
   const activeStats = useMemo(() => {
@@ -395,10 +397,6 @@ export default function StockOpnamePage() {
     return loc ? `${loc.name} [${loc.code}]` : (id ? id.slice(0, 8) : "-")
   }
 
-  // Helper for product details
-  const getProduct = (id: string) => {
-    return products.find((p) => p.id === id)
-  }
 
   // Helper for Status Badge
   const renderStatusBadge = (status: StockOpnameStatus) => {
@@ -919,22 +917,15 @@ export default function StockOpnamePage() {
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
                           Produk Master <span className="text-rose-500">*</span>
                         </label>
-                        <select
-                          value={selectedProduct?.id || ""}
-                          onChange={(e) => {
-                            const found = products.find((p) => p.id === e.target.value) || null
-                            setSelectedProduct(found)
-                            setSystemCountInput(50) // Default baseline system stock
+                        <ProductCombobox
+                          value={selectedProduct}
+                          onSelect={(p) => {
+                            setSelectedProduct(p)
+                            if (p) setSystemCountInput(50) // Default baseline system stock
                           }}
-                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-h-[48px]"
-                        >
-                          <option value="">-- Pilih atau pindai produk --</option>
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} [{p.sku}]
-                            </option>
-                          ))}
-                        </select>
+                          placeholder="-- Pilih atau pindai produk --"
+                          allowClear
+                        />
                       </div>
 
                       {/* Location Selector */}
@@ -1099,7 +1090,6 @@ export default function StockOpnamePage() {
                 ) : (
                   <div className="space-y-2">
                     {filteredCountedItems.map((item) => {
-                      const prod = getProduct(item.product_id)
                       const disc = Number(item.discrepancy_qty) || 0
                       return (
                         <div
@@ -1109,11 +1099,11 @@ export default function StockOpnamePage() {
                           <div className="space-y-1 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-slate-900 text-sm">
-                                {prod ? prod.name : `Produk [${item.product_id.slice(0, 8)}]`}
+                                {item.product_name || `Produk [${item.product_id.slice(0, 8)}]`}
                               </span>
-                              {prod && (
+                              {item.product_sku && (
                                 <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                                  {prod.sku}
+                                  {item.product_sku}
                                 </span>
                               )}
                             </div>

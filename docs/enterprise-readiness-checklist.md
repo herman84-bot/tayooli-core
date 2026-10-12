@@ -51,7 +51,7 @@ Dibuat: sesi audit setelah komit `a616177`. Status berdasarkan bukti di repo dan
 | B3 | Jejak audit perubahan data | ✅ | Tabel `audit_logs` + `copilot_audit` (cakupan per-modul belum diperiksa) | — |
 | B4 | Transfer / Opname / Scrap / Surat Jalan aman dari klik ganda | ✅ | Idempotent middleware di Chi router WMS (`wms_handler.go`, `cmd/api/main.go`) + forward header di `lib/api.ts` dan auto-generate UUID di `hooks/useWMS.ts`. Diuji di `idempotency_test.go` dan `wms-idempotency-client.test.ts` | — |
 | B5 | Aman dari saling-kunci (deadlock) saat ramai | 🟡 | `ORDER BY id` sebelum `FOR UPDATE` di `wms_manifest_repo.go:53`; retry error 40P01 di usecase belum ada | P1 |
-| B6 | Daftar produk tanpa batas 1.000 di semua modul | ❌ | Halaman Produk & Transfer sudah server-side (komit `e46ba93`); Opname, Scrap, Marketplace, Surat Jalan, Pengaturan WMS, LPN masih terbatas 1.000 | P0 |
+| B6 | Daftar produk tanpa batas 1.000 di semua modul | 🟡 | Modul WMS (Opname, Scrap, Marketplace, Transfer, Barang Masuk, Arus Barang, Surat Jalan, Pengaturan WMS, LPN) memakai `ProductCombobox` / `useProductSearch` (pencarian server); scan barcode lewat `barcodes/resolve`; nama produk & pelapor di daftar Scrap/Opname di-join di backend (`wms_repo.go`). Sisa `useProducts()`: Kasir POS (`pos/page.tsx`), Produk (`products/page.tsx`), `app/dashboard/products` | P1 |
 
 ## C. Skala & performa
 
@@ -100,7 +100,7 @@ Dibuat: sesi audit setelah komit `a616177`. Status berdasarkan bukti di repo dan
 ## Urutan kerja yang disarankan
 
 **Tahap 1 — teknis yang bisa dikerjakan sekarang (P0 teknis)**
-1. B6 — migrasi modul sisa ke pencarian server (`ProductCombobox`).
+1. B6 — modul WMS selesai; sisa Kasir POS & halaman Produk.
 2. B4 — idempotency key untuk Transfer, Opname, Scrap, Surat Jalan.
 3. B5 — urutkan kunci `FOR UPDATE` + retry deadlock.
 4. D2 — aktifkan Sentry (isi `SENTRY_DSN`).

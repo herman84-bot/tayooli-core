@@ -54,9 +54,20 @@ jest.mock('@/hooks/useWMS', () => ({
   useCancelStockReceipt: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }))
 
-jest.mock('@/hooks/useProducts', () => ({
-  useProducts: () => ({ data: [{ id: 'p-1', name: 'Kopi Bubuk 200g', sku: 'KOPI-200', price: 1 }] }),
-}))
+jest.mock('@/hooks/useProducts', () => {
+  const catalog = [{ id: 'p-1', name: 'Kopi Bubuk 200g', sku: 'KOPI-200', price: 1 }]
+  return {
+    // Mirrors the server-side search contract: empty query → no results.
+    useProductSearch: (q: string) => {
+      const needle = q.trim().toLowerCase()
+      return {
+        data: needle
+          ? catalog.filter((p) => p.name.toLowerCase().includes(needle) || p.sku.toLowerCase().includes(needle))
+          : [],
+      }
+    },
+  }
+})
 
 jest.mock('@/hooks/useBarcodeScanner', () => ({
   useBarcodeScanner: () => ({}),

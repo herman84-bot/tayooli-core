@@ -532,6 +532,9 @@ type StockOpnameItem struct {
 	DiscrepancyQty decimal.Decimal `json:"discrepancy_qty"`
 	Notes          *string         `json:"notes,omitempty"`
 	CreatedAt      time.Time       `json:"created_at"`
+	// Read-only display fields joined from products (empty on insert).
+	ProductName string `json:"product_name,omitempty"`
+	ProductSKU  string `json:"product_sku,omitempty"`
 }
 
 // StockScrap represents damaged goods & scrap quarantine ledger entry.
@@ -548,6 +551,10 @@ type StockScrap struct {
 	ReportedBy         uuid.UUID       `json:"reported_by"`
 	ApprovedBy         *uuid.UUID      `json:"approved_by,omitempty"`
 	CreatedAt          time.Time       `json:"created_at"`
+	// Read-only display fields joined on list (empty on insert).
+	ProductName    string `json:"product_name,omitempty"`
+	ProductSKU     string `json:"product_sku,omitempty"`
+	ReportedByName string `json:"reported_by_name,omitempty"`
 }
 
 // StockReceiptType identifies where goods originated: PRODUCTION, TRANSFER, or VENDOR.

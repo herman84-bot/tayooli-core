@@ -28,8 +28,8 @@ import {
   useAddLPNItem,
 } from "@/hooks/useWMSDocksAndLPNs"
 import { useWarehouseLocations, usePutawayPending } from "@/hooks/useWMS"
-import { useProducts } from "@/hooks/useProducts"
-import { api, type StockLPN, type StockLPNDetail, type PalletType, type LPNStatus } from "@/lib/api"
+import { ProductCombobox, productRef } from "@/components/products/ProductCombobox"
+import { api, type Product, type StockLPN, type StockLPNDetail, type PalletType, type LPNStatus } from "@/lib/api"
 import { PrintLPNLabel } from "@/components/wms/PrintLPNLabel"
 
 export interface LPNManagementModalProps {
@@ -86,7 +86,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
   const [isCreating, setIsCreating] = useState<boolean>(false)
 
   // Add Item Form State
-  const [itemProductId, setItemProductId] = useState<string>("")
+  const [itemProduct, setItemProduct] = useState<Product | null>(null)
   const [itemBatchId, setItemBatchId] = useState<string>("")
   const [itemQuantity, setItemQuantity] = useState<string>("")
   const [isAddingItem, setIsAddingItem] = useState<boolean>(false)
@@ -99,7 +99,6 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
   const { data: selectedLpnDetail, isLoading: isLoadingDetail, refetch: refetchDetail } =
     useStockLPNDetail(selectedLpnId)
   const { data: locations = [] } = useWarehouseLocations(warehouseId)
-  const { data: products = [] } = useProducts()
   const { data: putawayPending = [] } = usePutawayPending(warehouseId)
 
   // Mutations
@@ -178,7 +177,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
   // Open Add Item Form
   const handleOpenAddItem = (lpnId: string) => {
     setSelectedLpnId(lpnId)
-    setItemProductId("")
+    setItemProduct(null)
     setItemBatchId("")
     setItemQuantity("")
     setNotice(null)
@@ -190,7 +189,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
     e.preventDefault()
     if (!selectedLpnId) return
     const qty = parseNum(itemQuantity)
-    if (!itemProductId) {
+    if (!itemProduct) {
       setNotice({ type: "error", text: "Pilih produk terlebih dahulu." })
       return
     }
@@ -209,7 +208,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
       await addItemMut.mutateAsync({
         lpnId: selectedLpnId,
         data: {
-          product_id: itemProductId,
+          product_id: itemProduct.id,
           batch_id: itemBatchId,
           quantity: qty,
         },
@@ -726,7 +725,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                         key={`${line.product_id}-${line.batch_id}`}
                         type="button"
                         onClick={() => {
-                          setItemProductId(line.product_id)
+                          setItemProduct(productRef(line.product_id, line.product_name, line.product_sku))
                           setItemBatchId(line.batch_id)
                           setItemQuantity(String(line.quantity))
                         }}
@@ -752,19 +751,12 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Produk <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  value={itemProductId}
-                  onChange={(e) => setItemProductId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:bg-white"
-                  required
-                >
-                  <option value="">-- Pilih Produk Master --</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.sku})
-                    </option>
-                  ))}
-                </select>
+                <ProductCombobox
+                  value={itemProduct}
+                  onSelect={setItemProduct}
+                  placeholder="-- Pilih Produk Master --"
+                  allowClear
+                />
               </div>
 
               {/* Batch ID */}
