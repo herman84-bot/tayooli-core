@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -269,7 +270,8 @@ func (h *TelegramBotHandler) handleApprove(chatID int64, userID int, orderCode s
 	period := domain.BillingPeriodMonthly
 	_, err = h.deps.SubUsecase.Create(ctx, order.TenantID, plan, period)
 	if err != nil {
-		h.deps.TelegramClient.SendMessageToChat(chatID, fmt.Sprintf("Gagal aktifkan subscription: %s", err.Error()))
+		slog.Error("telegram: activate subscription failed", "err", err, "tenant_id", order.TenantID)
+		h.deps.TelegramClient.SendMessageToChat(chatID, "Gagal mengaktifkan langganan. Tim kami akan memeriksanya; silakan hubungi dukungan.")
 		return
 	}
 

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -17,12 +19,40 @@ import (
 type mockChatUsecase struct {
 	lastTenantID string
 	lastUserID   string
+	err          error
 }
 
 func (m *mockChatUsecase) SendMessage(ctx context.Context, tenantID, userID, sessionID, message string) (string, string, error) {
 	m.lastTenantID = tenantID
 	m.lastUserID = userID
+	if m.err != nil {
+		return "", "", m.err
+	}
 	return "mock reply", sessionID, nil
+}
+
+// Regression: an LLM/upstream failure must not expose its raw error text.
+func TestChatHandler_SendMessage_UpstreamErrorNotLeaked(t *testing.T) {
+	uc := &mockChatUsecase{err: errors.New("openai: 401 invalid api key sk-secret123")}
+	h := handler.NewChatHandler(uc)
+
+	body, _ := json.Marshal(map[string]string{"message": "hello"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/chat/message", bytes.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), middleware.TenantIDKey, uuid.New()))
+	rr := httptest.NewRecorder()
+
+	h.SendMessage(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 fallback, got %d", rr.Code)
+	}
+	got := rr.Body.String()
+	if strings.Contains(got, "sk-secret123") || strings.Contains(got, "openai") || strings.Contains(got, `"error"`) {
+		t.Fatalf("response leaks upstream error: %s", got)
+	}
+	if !strings.Contains(got, "Layanan chat sedang tidak tersedia") {
+		t.Fatalf("missing friendly fallback reply: %s", got)
+	}
 }
 
 func (m *mockChatUsecase) GetHistory(tenantID, sessionID string) []chat.Message {

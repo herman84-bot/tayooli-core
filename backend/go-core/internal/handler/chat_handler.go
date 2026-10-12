@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -65,10 +66,12 @@ func (h *ChatHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 	reply, sessionID, err := h.uc.SendMessage(r.Context(), tenantID, userID, req.SessionID, req.Message)
 	if err != nil {
+		// Keep the friendly 200 fallback the chat UI relies on, but never
+		// expose the internal cause; log it server-side instead.
+		slog.Error("chat send message failed", "err", err, "tenant_id", tenantID)
 		respondJSON(w, http.StatusOK, map[string]interface{}{
 			"reply":      "Layanan chat sedang tidak tersedia. Silakan coba lagi.",
 			"session_id": req.SessionID,
-			"error":      err.Error(),
 		})
 		return
 	}

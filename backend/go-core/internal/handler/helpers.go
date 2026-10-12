@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -41,6 +42,18 @@ func RespondError(w http.ResponseWriter, r *http.Request, status int, message st
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// internalErrorMessage is the only text a client sees for an unexpected
+// server failure. The real cause is logged server-side and never sent out,
+// so database/driver details cannot leak to users.
+const internalErrorMessage = "Terjadi kesalahan pada server. Silakan coba lagi."
+
+// respondInternalError logs err with request context and writes a generic
+// 500 JSON error envelope.
+func respondInternalError(w http.ResponseWriter, r *http.Request, op string, err error) {
+	slog.Error("internal error", "op", op, "err", err, "method", r.Method, "path", r.URL.Path)
+	RespondError(w, r, http.StatusInternalServerError, internalErrorMessage)
 }
 
 // parseUUIDParam extracts and validates a UUID URL parameter.

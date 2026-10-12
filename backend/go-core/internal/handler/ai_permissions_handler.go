@@ -28,7 +28,7 @@ func (h *AIPermissionsHandler) GetPermissions(w http.ResponseWriter, r *http.Req
 
 	perms, err := h.repo.GetByTenantID(r.Context(), tenantID)
 	if err != nil {
-		RespondError(w, r, http.StatusInternalServerError, "failed to get ai permissions", err.Error())
+		respondInternalError(w, r, "get ai permissions", err)
 		return
 	}
 
@@ -67,7 +67,7 @@ func (h *AIPermissionsHandler) UpdatePermissions(w http.ResponseWriter, r *http.
 
 	perms, err := h.repo.Update(r.Context(), tenantID, input, updatedBy)
 	if err != nil {
-		RespondError(w, r, http.StatusInternalServerError, "failed to update ai permissions", err.Error())
+		respondInternalError(w, r, "update ai permissions", err)
 		return
 	}
 

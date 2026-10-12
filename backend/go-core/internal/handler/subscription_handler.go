@@ -389,7 +389,7 @@ func (h *SubscriptionHandler) HandlePakasirWebhook(w http.ResponseWriter, r *htt
 	}
 
 	if err := h.uc.HandleWebhook(r.Context(), payload.OrderID, payload.Project, payload.Status, payload.Amount); err != nil {
-		respondError(w, r, http.StatusInternalServerError, err.Error())
+		respondInternalError(w, r, "subscription webhook", err)
 		return
 	}
 

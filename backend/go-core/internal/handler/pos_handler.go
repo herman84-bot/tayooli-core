@@ -205,7 +205,7 @@ func (h *POSHandler) checkout(w http.ResponseWriter, r *http.Request, tenantID u
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, "pos checkout", err)
 		return
 	}
 
@@ -244,7 +244,7 @@ func (h *POSHandler) CreatePayment(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondInternalError(w, r, "pos create charge", err)
 		return
 	}
 	respondJSON(w, http.StatusCreated, charge)
