@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -52,6 +53,14 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/shopspring/decimal"
 )
+
+// envInt reads a positive integer env var, falling back to def.
+func envInt(name string, def int) int {
+	if v, err := strconv.Atoi(os.Getenv(name)); err == nil && v > 0 {
+		return v
+	}
+	return def
+}
 
 func respondJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -103,8 +112,11 @@ func main() {
 	}
 
 	// Limit connection pool to avoid exhausting Postgres max_connections.
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
+	// Size against Postgres max_connections / replica count. Override with
+	// DB_MAX_OPEN_CONNS / DB_MAX_IDLE_CONNS (go.dev/doc/database/manage-connections).
+	maxOpen := envInt("DB_MAX_OPEN_CONNS", 25)
+	db.SetMaxOpenConns(maxOpen)
+	db.SetMaxIdleConns(min(envInt("DB_MAX_IDLE_CONNS", 10), maxOpen))
 	db.SetConnMaxLifetime(5 * time.Minute)
 	db.SetConnMaxIdleTime(5 * time.Minute)
 
@@ -830,8 +842,11 @@ func main() {
 	srv := &http.Server{
 		Addr:         ":" + cfg.ServerPort,
 		Handler:      r,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second, // slow-header (slowloris) guard
+		ReadTimeout:       15 * time.Second,
+		// > handler timeout (15s) so the 503/504 from the timeout middleware
+		// can still be written; < proxy timeout (20s).
+		WriteTimeout: 18 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 

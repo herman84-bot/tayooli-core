@@ -18,10 +18,12 @@ type IdempotencyRepo struct {
 	// stays unfinished only when the process died mid-request (crash, deploy,
 	// power loss); after this window a retry may take the key over.
 	StaleAfter string
+	// RetainFor is how long a key is kept for replay before it is pruned.
+	RetainFor string
 }
 
 func NewIdempotencyRepo(db *sql.DB) *IdempotencyRepo {
-	return &IdempotencyRepo{db: db, StaleAfter: "2 minutes"}
+	return &IdempotencyRepo{db: db, StaleAfter: "2 minutes", RetainFor: "24 hours"}
 }
 
 func (r *IdempotencyRepo) withTenant(ctx context.Context, tenantID uuid.UUID, fn func(tx *sql.Tx) error) error {
@@ -52,7 +54,15 @@ func (r *IdempotencyRepo) Reserve(ctx context.Context, tenantID uuid.UUID, key, 
 		}
 		if n, _ := res.RowsAffected(); n == 1 {
 			fresh = true
-			return nil
+			// Opportunistic retention (Stripe prunes keys after 24h): drop a
+			// small batch of this tenant's expired keys. Runs inside the
+			// tenant's RLS context, so no privileged cleanup job is needed.
+			_, err := tx.ExecContext(ctx, `
+				DELETE FROM idempotency_keys WHERE ctid IN (
+					SELECT ctid FROM idempotency_keys
+					WHERE tenant_id = $1 AND created_at < NOW() - $2::interval
+					LIMIT 100)`, tenantID, r.RetainFor)
+			return err
 		}
 		// Take over an abandoned reservation (same body only).
 		res, err = tx.ExecContext(ctx, `

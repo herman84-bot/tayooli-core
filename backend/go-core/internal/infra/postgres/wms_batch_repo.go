@@ -1331,8 +1331,16 @@ ORDER BY a.created_at ASC, a.id ASC`
 
 // WriteAuditTx appends an entry to audit_logs maintaining the SHA-256 hash chain per tenant.
 func (r *WMSRepo) WriteAuditTx(ctx context.Context, tx *sql.Tx, tenantID uuid.UUID, userID *uuid.UUID, entityType string, entityID uuid.UUID, action string, details json.RawMessage) error {
+	// Serialize chain appends per tenant with a transaction-scoped advisory
+	// lock. Row-level FOR UPDATE locked nothing when the tenant had no audit
+	// rows yet, letting two first writers fork the chain. Two-key form with a
+	// namespace avoids colliding with the stock advisory locks.
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext('audit_chain'), hashtext($1::text))`, tenantID); err != nil {
+		return fmt.Errorf("WriteAuditTx: chain lock: %w", err)
+	}
 	var prevHash sql.NullString
-	queryLock := `SELECT current_hash FROM audit_logs WHERE tenant_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1 FOR UPDATE`
+	// Served by idx_audit_logs_tenant_created (migration 051).
+	queryLock := `SELECT current_hash FROM audit_logs WHERE tenant_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`
 	err := tx.QueryRowContext(ctx, queryLock, tenantID).Scan(&prevHash)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("WriteAuditTx: query prev_hash: %w", err)
