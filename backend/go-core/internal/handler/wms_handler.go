@@ -357,6 +357,10 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusUnprocessableEntity, "Barcode tidak cocok dengan item pesanan ini atau item sudah selesai dikemas")
 	case errors.Is(err, domain.ErrPackQtyExceeded):
 		RespondError(w, r, http.StatusUnprocessableEntity, "Jumlah pemindaian melebihi sisa yang harus dikemas")
+	case errors.Is(err, domain.ErrNoOrdersForWave):
+		RespondError(w, r, http.StatusUnprocessableEntity, "Tidak ada Surat Jalan berstatus Draf/Dikonfirmasi yang cocok dengan gudang, tipe order, dan ekspedisi ini, atau semuanya sudah masuk gelombang lain")
+	case errors.Is(err, domain.ErrPickWaveNotFound):
+		RespondError(w, r, http.StatusNotFound, "Gelombang pengambilan tidak ditemukan")
 	case errors.Is(err, domain.ErrPickingTaskNotFound):
 		RespondError(w, r, http.StatusNotFound, "Dokumen picking task tidak ditemukan")
 	case errors.Is(err, domain.ErrManifestNotFound):
