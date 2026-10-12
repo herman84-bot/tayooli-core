@@ -103,36 +103,41 @@ LIMIT 5`
 // POS checkout — see inventory_repo.go), not the WMS stock-movement ledger,
 // since that is what POS deducts from and what the dashboard must reconcile.
 
+// The stock ledger is split into signed legs with UNION ALL (one leg per
+// location side) instead of joining locations with `dest OR source`: the OR
+// join cannot use the (tenant_id, dest/source_location_id, product_id)
+// indexes and degrades with ledger size. Semantics are identical, including a
+// movement whose source equals its dest (counted once, as +qty, like the CASE
+// in the former OR join). Equivalence is pinned by
+// TestDashboardStockQuery_MatchesLegacyORJoin.
 const dashboardWMSCounts = `
+WITH legs AS (
+  SELECT sm.product_id, sm.dest_location_id AS loc_id, sm.quantity AS qty
+    FROM stock_movements sm
+   WHERE sm.tenant_id = $1 AND sm.status = 'DONE' AND sm.dest_location_id IS NOT NULL
+  UNION ALL
+  SELECT sm.product_id, sm.source_location_id AS loc_id, -sm.quantity AS qty
+    FROM stock_movements sm
+   WHERE sm.tenant_id = $1 AND sm.status = 'DONE' AND sm.source_location_id IS NOT NULL
+     AND sm.source_location_id IS DISTINCT FROM sm.dest_location_id
+),
+on_hand AS (
+  SELECT l.product_id, l.loc_id, SUM(l.qty) AS qty
+    FROM legs l
+    JOIN warehouse_locations loc ON loc.id = l.loc_id AND loc.tenant_id = $1
+   WHERE loc.type NOT IN ('QUARANTINE', 'STAGING_INBOUND', 'STAGING_OUTBOUND')
+   GROUP BY l.product_id, l.loc_id
+  HAVING SUM(l.qty) > 0
+)
 SELECT
   (SELECT COUNT(DISTINCT p.id) FROM products p WHERE p.tenant_id = $1 AND p.deleted_at IS NULL) AS total_skus,
-  (SELECT COALESCE(SUM(sm.qty_total), 0)
-     FROM (
-       SELECT sm.product_id, 
-              SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) AS qty_total
-       FROM stock_movements sm
-       JOIN warehouse_locations loc ON (loc.id = sm.dest_location_id OR loc.id = sm.source_location_id) AND loc.tenant_id = sm.tenant_id
-       WHERE sm.tenant_id = $1 AND sm.status = 'DONE' AND loc.type NOT IN ('QUARANTINE', 'STAGING_INBOUND', 'STAGING_OUTBOUND')
-       GROUP BY sm.product_id, loc.id
-       HAVING SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) > 0
-     ) sm
-   )                                                                                       AS total_units,
-  (SELECT COUNT(*) FROM warehouses WHERE tenant_id = $1 AND is_active = true)             AS total_warehouses,
-  (SELECT COUNT(*) FROM warehouse_locations WHERE tenant_id = $1)                         AS total_locations,
+  (SELECT COALESCE(SUM(oh.qty), 0) FROM on_hand oh)                                         AS total_units,
+  (SELECT COUNT(*) FROM warehouses WHERE tenant_id = $1 AND is_active = true)               AS total_warehouses,
+  (SELECT COUNT(*) FROM warehouse_locations WHERE tenant_id = $1)                           AS total_locations,
   (SELECT COUNT(*) FROM stock_movements WHERE tenant_id = $1 AND created_at >= CURRENT_DATE) AS today_movements,
-  (SELECT COALESCE(SUM(sm.qty_val), 0)
-     FROM (
-       SELECT sm.product_id, p.price,
-              SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) AS qty_on_hand,
-              SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) * COALESCE(p.price, 0) AS qty_val
-       FROM stock_movements sm
-       JOIN warehouse_locations loc ON (loc.id = sm.dest_location_id OR loc.id = sm.source_location_id) AND loc.tenant_id = sm.tenant_id
-       JOIN products p ON p.id = sm.product_id AND p.tenant_id = sm.tenant_id
-       WHERE sm.tenant_id = $1 AND sm.status = 'DONE' AND loc.type NOT IN ('QUARANTINE', 'STAGING_INBOUND', 'STAGING_OUTBOUND')
-       GROUP BY sm.product_id, p.price, loc.id
-       HAVING SUM(CASE WHEN sm.dest_location_id = loc.id THEN sm.quantity ELSE -sm.quantity END) > 0
-     ) sm
-   )                                                                                       AS total_stock_value`
+  (SELECT COALESCE(SUM(oh.qty * COALESCE(p.price, 0)), 0)
+     FROM on_hand oh
+     JOIN products p ON p.id = oh.product_id AND p.tenant_id = $1)                          AS total_stock_value`
 
 const dashboardSalesOrderStats = `
 SELECT
@@ -199,6 +204,8 @@ WITH combined_customer_orders AS (
     JOIN delivery_order_items doi ON doi.delivery_order_id = d.id AND doi.tenant_id = d.tenant_id
     LEFT JOIN products p ON p.id = doi.product_id AND p.tenant_id = doi.tenant_id
     WHERE d.customer_id IS NOT NULL
+      AND d.tenant_id = $1
+      AND d.created_at >= NOW() - ($2 || ' days')::interval
     GROUP BY d.customer_id, d.id, d.tenant_id, d.created_at
     UNION ALL
     SELECT 
@@ -209,6 +216,8 @@ WITH combined_customer_orders AS (
         so.total_amount AS revenue
     FROM sales_orders so
     WHERE so.customer_id IS NOT NULL
+      AND so.tenant_id = $1
+      AND so.created_at >= NOW() - ($2 || ' days')::interval
       AND NOT EXISTS (SELECT 1 FROM delivery_orders d2 WHERE d2.sales_order_id = so.id)
 )
 SELECT 

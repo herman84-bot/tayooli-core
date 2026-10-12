@@ -270,7 +270,9 @@ func main() {
 
 	// Dashboard Analytics
 	dashboardRepo := postgres.NewDashboardRepo(db)
-	dashboardUsecase := dashboardUC.New(dashboardRepo)
+	// 15s per-tenant cache + request coalescing: many open tabs auto-refreshing
+	// share one set of aggregate queries instead of multiplying DB load.
+	dashboardUsecase := dashboardUC.NewWithCache(dashboardRepo, 15*time.Second)
 	dashboardHandler := handler.NewDashboardHandler(dashboardUsecase)
 
 	// Auth
