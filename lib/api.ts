@@ -2,8 +2,12 @@ import { extractErrorMessage } from "@/lib/api/errors"
 
 const BASE = "/api/v1"
 
-/** Default timeout for API requests (ms). */
-const DEFAULT_TIMEOUT = 15_000
+/**
+ * Default timeout for API requests (ms). Must exceed the Next.js proxy timeout
+ * (20s), which exceeds the backend handler timeout (15s), so the innermost
+ * layer always reports first and a write is never abandoned mid-commit.
+ */
+const DEFAULT_TIMEOUT = 25_000
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController()

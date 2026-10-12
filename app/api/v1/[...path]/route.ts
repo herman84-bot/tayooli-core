@@ -3,6 +3,8 @@ import { getDemoResponse } from '@/lib/api/demo-data';
 import { extractClientIp } from '@/lib/api/forward-headers';
 
 const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8081';
+// Timeout chain (outer > inner): browser 25s > proxy 20s > backend handler 15s.
+const PROXY_TIMEOUT_MS = 20_000;
 
 // Proxy catch-all untuk /api/v1/* → backend Go.
 // Menangani auth (login/me/logout), invoices, approvals, accounting, dll.
@@ -131,9 +133,19 @@ async function proxy(req: NextRequest, path: string, init?: RequestInit) {
     res = await fetch(`${BACKEND_URL}/api/v1${path}${req.nextUrl.search}`, {
       ...init,
       headers,
-      signal: AbortSignal.timeout(10000),
+      // Must exceed the backend handler timeout (chi Timeout 15s) so the proxy
+      // never gives up on a write the backend is still committing.
+      signal: AbortSignal.timeout(PROXY_TIMEOUT_MS),
     });
-  } catch {
+  } catch (err) {
+    // Timeout: the backend may still finish the operation. Report 504 (not 502
+    // "unreachable") so the client knows the outcome is unknown.
+    if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+      return NextResponse.json(
+        { error: 'Server sedang sibuk. Periksa data sebelum mencoba lagi.' },
+        { status: 504 },
+      );
+    }
     // Backend unreachable. Generic demo-data fallback is ONLY allowed with
     // explicit AUTH_DEMO=true; otherwise return an honest 502 so the UI never
     // renders fabricated numbers as if they were real database data.

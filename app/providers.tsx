@@ -1,7 +1,8 @@
 'use client'
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
+import { createQueryClient } from '@/lib/query-client'
 import { useAuth, useAuthStore } from '@/hooks/useAuth'
 
 /** Identity key: cache must never outlive the user/tenant that fetched it. */
@@ -44,22 +45,7 @@ function AuthHydrator({ children }: { children: ReactNode }) {
 }
 
 export default function Providers({ children }: ProvidersProps) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 30_000,
-            refetchOnWindowFocus: false,
-            retry: 2,
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10_000),
-          },
-          mutations: {
-            retry: 1,
-          },
-        },
-      }),
-  )
+  const [queryClient] = useState(createQueryClient)
 
   // Drop every cached query whenever the signed-in identity changes
   // (logout, login as another user/tenant). Without this, POS/products/stock
