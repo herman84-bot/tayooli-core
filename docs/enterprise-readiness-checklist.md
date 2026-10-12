@@ -17,7 +17,7 @@ Dibuat: sesi audit setelah komit `a616177`. Status berdasarkan bukti di repo dan
 | Area | ✅ | 🟡 | ❌ | ❓ |
 |---|---|---|---|---|
 | A. Keamanan | 5 | 3 | 2 | 0 |
-| B. Keandalan data | 3 | 2 | 1 | 0 |
+| B. Keandalan data | 4 | 1 | 1 | 0 |
 | C. Skala & performa | 3 | 1 | 1 | 0 |
 | D. Operasional | 1 | 2 | 3 | 0 |
 | E. Mutu kode & tes | 3 | 2 | 1 | 0 |
@@ -49,8 +49,8 @@ Dibuat: sesi audit setelah komit `a616177`. Status berdasarkan bukti di repo dan
 | B1 | Setiap mutasi stok terhubung ke batch | ✅ | Aturan ADR-014; `batch_id` NOT NULL di `stock_movements` | — |
 | B2 | Kasir aman dari klik ganda | ✅ | Idempotency key di `pos_handler.go` + tes `pos_idempotency_test.go` | — |
 | B3 | Jejak audit perubahan data | ✅ | Tabel `audit_logs` + `copilot_audit` (cakupan per-modul belum diperiksa) | — |
-| B4 | Transfer / Opname / Scrap / Surat Jalan aman dari klik ganda | 🟡 | Hanya POS yang punya idempotency key | P0 |
-| B5 | Aman dari saling-kunci (deadlock) saat ramai | 🟡 | `wms_manifest_repo.go:54` belum mengurutkan `FOR UPDATE`; belum ada retry error 40P01 | P0 |
+| B4 | Transfer / Opname / Scrap / Surat Jalan aman dari klik ganda | ✅ | Idempotent middleware di Chi router WMS (`wms_handler.go`, `cmd/api/main.go`) + forward header di `lib/api.ts` dan auto-generate UUID di `hooks/useWMS.ts`. Diuji di `idempotency_test.go` dan `wms-idempotency-client.test.ts` | — |
+| B5 | Aman dari saling-kunci (deadlock) saat ramai | 🟡 | `ORDER BY id` sebelum `FOR UPDATE` di `wms_manifest_repo.go:53`; retry error 40P01 di usecase belum ada | P1 |
 | B6 | Daftar produk tanpa batas 1.000 di semua modul | ❌ | Halaman Produk & Transfer sudah server-side (komit `e46ba93`); Opname, Scrap, Marketplace, Surat Jalan, Pengaturan WMS, LPN masih terbatas 1.000 | P0 |
 
 ## C. Skala & performa

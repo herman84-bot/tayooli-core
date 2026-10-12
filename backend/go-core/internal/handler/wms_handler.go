@@ -146,14 +146,23 @@ type WMSUsecase interface {
 }
 
 type WMSHandler struct {
-	uc WMSUsecase
+	uc   WMSUsecase
+	idem domain.IdempotencyStore
 }
 
 func NewWMSHandler(u WMSUsecase) *WMSHandler {
 	return &WMSHandler{uc: u}
 }
 
+// WithIdempotency enables Idempotency-Key support for mutating WMS endpoints.
+func (h *WMSHandler) WithIdempotency(store domain.IdempotencyStore) *WMSHandler {
+	cpy := *h
+	cpy.idem = store
+	return &cpy
+}
+
 func (h *WMSHandler) RegisterRoutes(r chi.Router) {
+	idem := Idempotent(h.idem)
 	r.Route("/wms", func(r chi.Router) {
 		r.Get("/warehouses", h.ListWarehouses)
 		r.Post("/warehouses", h.CreateWarehouse)
@@ -162,21 +171,21 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Post("/locations", h.CreateLocation)
 		r.Get("/barcodes/resolve", h.ResolveBarcode)
 		r.Get("/transfers", h.ListTransfers)
-		r.Post("/transfers", h.CreateTransfer)
+		r.With(idem).Post("/transfers", h.CreateTransfer)
 		r.Get("/transfers/{id}", h.GetTransfer)
-		r.Post("/transfers/{id}/submit", h.SubmitTransfer)
-		r.Post("/transfers/{id}/approve", h.ApproveTransfer)
-		r.Post("/transfers/{id}/reject", h.RejectTransfer)
-		r.Post("/transfers/{id}/dispatch", h.DispatchTransfer)
-		r.Post("/transfers/{id}/receive", h.ReceiveTransfer)
+		r.With(idem).Post("/transfers/{id}/submit", h.SubmitTransfer)
+		r.With(idem).Post("/transfers/{id}/approve", h.ApproveTransfer)
+		r.With(idem).Post("/transfers/{id}/reject", h.RejectTransfer)
+		r.With(idem).Post("/transfers/{id}/dispatch", h.DispatchTransfer)
+		r.With(idem).Post("/transfers/{id}/receive", h.ReceiveTransfer)
 		r.Delete("/transfers/{id}", h.CancelTransfer)
 		r.Get("/delivery-orders", h.ListDeliveryOrders)
-		r.Post("/delivery-orders", h.CreateDeliveryOrder)
+		r.With(idem).Post("/delivery-orders", h.CreateDeliveryOrder)
 		r.Get("/delivery-orders/{id}", h.GetDeliveryOrder)
-		r.Post("/delivery-orders/{id}/confirm", h.ConfirmDeliveryOrder)
-		r.Post("/delivery-orders/{id}/dispatch", h.DispatchDeliveryOrder)
+		r.With(idem).Post("/delivery-orders/{id}/confirm", h.ConfirmDeliveryOrder)
+		r.With(idem).Post("/delivery-orders/{id}/dispatch", h.DispatchDeliveryOrder)
 		r.Delete("/delivery-orders/{id}", h.CancelDeliveryOrder)
-		r.Post("/delivery-orders/{id}/cancel", h.CancelDeliveryOrder)
+		r.With(idem).Post("/delivery-orders/{id}/cancel", h.CancelDeliveryOrder)
 		// Sprint 3 Outbound Picking & Pack Station
 		r.Get("/delivery-orders/{id}/picking", h.GetPickingTask)
 		r.Post("/delivery-orders/{id}/picking/start", h.StartPickingTask)
@@ -214,27 +223,27 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 
 		// Stock Opnames
 		r.Get("/opnames", h.ListStockOpnames)
-		r.Post("/opnames", h.CreateStockOpname)
+		r.With(idem).Post("/opnames", h.CreateStockOpname)
 		r.Get("/opnames/{id}", h.GetStockOpname)
-		r.Post("/opnames/{id}/items", h.AddOpnameItem)
-		r.Post("/opnames/{id}/complete", h.CompleteStockOpname)
+		r.With(idem).Post("/opnames/{id}/items", h.AddOpnameItem)
+		r.With(idem).Post("/opnames/{id}/complete", h.CompleteStockOpname)
 
 		// Stock Scraps
 		r.Get("/scraps", h.ListStockScraps)
-		r.Post("/scraps", h.CreateStockScrap)
+		r.With(idem).Post("/scraps", h.CreateStockScrap)
 
 		// Stock Receipts (Barang Masuk)
 		r.Get("/receipts", h.ListStockReceipts)
-		r.Post("/receipts", h.CreateStockReceipt)
+		r.With(idem).Post("/receipts", h.CreateStockReceipt)
 		r.Get("/receipts/{id}", h.GetStockReceipt)
 		r.Put("/receipts/{id}", h.UpdateStockReceipt)
-		r.Post("/receipts/{id}/post", h.PostStockReceipt)
+		r.With(idem).Post("/receipts/{id}/post", h.PostStockReceipt)
 		r.Post("/receipts/{id}/cancel", h.CancelStockReceipt)
 		r.Post("/receipts/{id}/release", h.ReleaseStockReceipt)
 
 		// Putaway (sentry-wms §1.2 step 2)
 		r.Get("/putaway/pending", h.GetPutawayPending)
-		r.Post("/putaway/confirm", h.ConfirmPutaway)
+		r.With(idem).Post("/putaway/confirm", h.ConfirmPutaway)
 
 		// QC Inbound & Karantina (Sprint 2, ADR-014 Invariant 3)
 		r.Get("/receipts/{id}/qc", h.GetReceiptQC)
@@ -1253,10 +1262,10 @@ func (h *WMSHandler) CreateStockScrap(w http.ResponseWriter, r *http.Request) {
 type ImportMarketplaceRequest struct {
 	WarehouseID      uuid.UUID                 `json:"warehouse_id"`
 	SourceLocationID uuid.UUID                 `json:"source_location_id"`
-	Channel     domain.MarketplaceChannel `json:"channel"`
-	FileName    string                    `json:"file_name"`
-	CSVData     string                    `json:"csv_data,omitempty"`
-	Orders      []uc.ImportOrderRequest   `json:"orders,omitempty"`
+	Channel          domain.MarketplaceChannel `json:"channel"`
+	FileName         string                    `json:"file_name"`
+	CSVData          string                    `json:"csv_data,omitempty"`
+	Orders           []uc.ImportOrderRequest   `json:"orders,omitempty"`
 }
 
 func parseMarketplaceCSV(r io.Reader, channel domain.MarketplaceChannel) ([]uc.ImportOrderRequest, error) {
@@ -1498,7 +1507,7 @@ func (h *WMSHandler) ImportMarketplaceOrders(w http.ResponseWriter, r *http.Requ
 			SourceLocationID: srcLocID,
 			Channel:          channel,
 			FileName:         header.Filename,
-			Orders:      orders,
+			Orders:           orders,
 		}
 
 	case strings.Contains(contentType, "text/csv"):
@@ -1529,7 +1538,7 @@ func (h *WMSHandler) ImportMarketplaceOrders(w http.ResponseWriter, r *http.Requ
 			SourceLocationID: srcLocID,
 			Channel:          channel,
 			FileName:         fileName,
-			Orders:      orders,
+			Orders:           orders,
 		}
 
 	default: // application/json or fallback
@@ -1567,8 +1576,8 @@ func (h *WMSHandler) ImportMarketplaceOrders(w http.ResponseWriter, r *http.Requ
 			WarehouseID:      jsonReq.WarehouseID,
 			SourceLocationID: jsonReq.SourceLocationID,
 			Channel:          jsonReq.Channel,
-			FileName:    fileName,
-			Orders:      jsonReq.Orders,
+			FileName:         fileName,
+			Orders:           jsonReq.Orders,
 		}
 	}
 

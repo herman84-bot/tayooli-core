@@ -38,6 +38,14 @@ import {
   QuarantineLine,
 } from "@/lib/api"
 
+function autoIdempotencyKey(key?: string): string | undefined {
+  if (key) return key
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+  return undefined
+}
+
 /**
  * Fetch all warehouses accessible to the authenticated user.
  */
@@ -149,7 +157,11 @@ export function useStockTransfer(id: string | null) {
 export function useCreateTransfer() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: CreateTransferInput) => api.wms.transfers.create(data),
+    mutationFn: (data: CreateTransferInput) =>
+      api.wms.transfers.create({
+        ...data,
+        idempotency_key: autoIdempotencyKey(data.idempotency_key),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["wms", "transfers"] })
     },
@@ -276,7 +288,11 @@ export function useDeliveryOrder(id: string | null) {
 export function useCreateDeliveryOrder() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: CreateDeliveryOrderInput) => api.wms.deliveryOrders.create(data),
+    mutationFn: (data: CreateDeliveryOrderInput) =>
+      api.wms.deliveryOrders.create({
+        ...data,
+        idempotency_key: autoIdempotencyKey(data.idempotency_key),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["wms", "delivery-orders"] })
     },
@@ -329,7 +345,11 @@ export function useStockOpname(id: string | null) {
 export function useCreateStockOpname() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: CreateStockOpnameInput) => api.wms.opnames.create(data),
+    mutationFn: (data: CreateStockOpnameInput) =>
+      api.wms.opnames.create({
+        ...data,
+        idempotency_key: autoIdempotencyKey(data.idempotency_key),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["wms", "opnames"] })
     },
@@ -343,7 +363,10 @@ export function useAddOpnameItem() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: AddOpnameItemInput }) =>
-      api.wms.opnames.addItem(id, data),
+      api.wms.opnames.addItem(id, {
+        ...data,
+        idempotency_key: autoIdempotencyKey(data.idempotency_key),
+      }),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ["wms", "opnames"] })
       qc.invalidateQueries({ queryKey: ["wms", "opnames", variables.id] })
@@ -357,7 +380,7 @@ export function useAddOpnameItem() {
 export function useCompleteStockOpname() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => api.wms.opnames.complete(id),
+    mutationFn: (id: string) => api.wms.opnames.complete(id, autoIdempotencyKey()),
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: ["wms", "opnames"] })
       qc.invalidateQueries({ queryKey: ["wms", "opnames", id] })
@@ -386,7 +409,11 @@ export function useStockScraps(warehouseId?: string | null) {
 export function useCreateStockScrap() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: CreateStockScrapInput) => api.wms.scraps.create(data),
+    mutationFn: (data: CreateStockScrapInput) =>
+      api.wms.scraps.create({
+        ...data,
+        idempotency_key: autoIdempotencyKey(data.idempotency_key),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["wms", "scraps"] })
       qc.invalidateQueries({ queryKey: ["wms", "locations"] })
@@ -431,7 +458,11 @@ function invalidateReceipts(qc: ReturnType<typeof useQueryClient>) {
 export function useCreateStockReceipt() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: StockReceiptInput) => api.wms.receipts.create(data),
+    mutationFn: (data: StockReceiptInput) =>
+      api.wms.receipts.create({
+        ...data,
+        idempotency_key: autoIdempotencyKey(data.idempotency_key),
+      }),
     onSuccess: () => invalidateReceipts(qc),
   })
 }
@@ -450,7 +481,7 @@ export function useUpdateStockReceipt() {
 export function usePostStockReceipt() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => api.wms.receipts.post(id),
+    mutationFn: (id: string) => api.wms.receipts.post(id, autoIdempotencyKey()),
     onSuccess: () => {
       invalidateReceipts(qc)
       qc.invalidateQueries({ queryKey: ["wms", "scraps"] })

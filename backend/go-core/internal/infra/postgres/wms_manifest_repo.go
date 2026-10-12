@@ -51,6 +51,7 @@ func (r *WMSRepo) CreateShippingManifest(ctx context.Context, tenantID, userID u
 		SELECT id, warehouse_id, status, COALESCE(package_weight_kg, 0), expedition_name, manifest_id
 		FROM delivery_orders
 		WHERE tenant_id = $1 AND id = ANY($2)
+		ORDER BY id
 		FOR UPDATE`, tenantID, pq.Array(req.DeliveryOrderIDs))
 	if err != nil {
 		return nil, fmt.Errorf("WMSRepo.CreateShippingManifest: query DOs: %w", err)

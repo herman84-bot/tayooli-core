@@ -405,6 +405,7 @@ export interface CreateTransferInput {
   vehicle_plate?: string
   driver_name?: string
   notes?: string
+  idempotency_key?: string
   items: CreateTransferItemInput[]
 }
 
@@ -496,6 +497,7 @@ export interface CreateDeliveryOrderInput {
   driver_name?: string
   vehicle_plate?: string
   recipient_name?: string
+  idempotency_key?: string
   items: CreateDeliveryOrderItemInput[]
 }
 
@@ -734,6 +736,7 @@ export interface CreateStockOpnameInput {
   warehouse_id: string
   opname_number?: string
   notes?: string
+  idempotency_key?: string
 }
 
 export interface AddOpnameItemInput {
@@ -741,6 +744,7 @@ export interface AddOpnameItemInput {
   location_id: string
   physical_qty: number | string
   notes?: string
+  idempotency_key?: string
 }
 
 export interface OpnameDetailResponse {
@@ -903,6 +907,7 @@ export interface CreateStockScrapInput {
   quantity: number | string
   reason: string
   scrap_number?: string
+  idempotency_key?: string
 }
 
 export type StockReceiptStatus = "DRAFT" | "POSTED" | "CANCELLED"
@@ -984,6 +989,7 @@ export interface StockReceiptInput {
   supplier_name?: string
   supplier_ref?: string
   notes?: string
+  idempotency_key?: string
   items: StockReceiptItemInput[]
 }
 
@@ -1475,6 +1481,14 @@ function qs(params: PaginationParams): string {
   return entries.length ? `?${new URLSearchParams(entries.map(([k, v]) => [k, String(v)]))}` : ""
 }
 
+function splitIdempotency<T extends { idempotency_key?: string }>(input: T) {
+  const { idempotency_key, ...rest } = input
+  return {
+    body: JSON.stringify(rest),
+    headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
+  }
+}
+
 export const api = {
   invoices: {
     list: (p?: PaginationParams) => request<PaginatedResponse<Invoice>>(`/invoices${p ? qs(p) : ""}`),
@@ -1608,31 +1622,38 @@ export const api = {
           `/wms/transfers${warehouseId ? `?warehouse_id=${encodeURIComponent(warehouseId)}` : ""}`
         ),
       get: (id: string) => request<TransferDetailResponse>(`/wms/transfers/${id}`),
-      create: (data: CreateTransferInput) =>
-        request<StockTransfer>("/wms/transfers", {
+      create: (data: CreateTransferInput) => {
+        const { body, headers } = splitIdempotency(data)
+        return request<StockTransfer>("/wms/transfers", {
           method: "POST",
-          body: JSON.stringify(data),
-        }),
-      submit: (id: string) =>
+          body,
+          headers,
+        })
+      },
+      submit: (id: string, idempotency_key?: string) =>
         request<StockTransfer>(`/wms/transfers/${id}/submit`, {
           method: "POST",
+          headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
         }),
-      approve: (id: string) =>
+      approve: (id: string, idempotency_key?: string) =>
         request<StockTransfer>(`/wms/transfers/${id}/approve`, {
           method: "POST",
+          headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
         }),
       reject: (id: string, reason: string) =>
         request<StockTransfer>(`/wms/transfers/${id}/reject`, {
           method: "POST",
           body: JSON.stringify({ reason }),
         }),
-      dispatch: (id: string) =>
+      dispatch: (id: string, idempotency_key?: string) =>
         request<StockTransfer>(`/wms/transfers/${id}/dispatch`, {
           method: "POST",
+          headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
         }),
-      receive: (id: string) =>
+      receive: (id: string, idempotency_key?: string) =>
         request<StockTransfer>(`/wms/transfers/${id}/receive`, {
           method: "POST",
+          headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
         }),
       // Cancel a DRAFT transfer. No stock moved, so nothing is reversed.
       cancel: (id: string) =>
@@ -1646,14 +1667,23 @@ export const api = {
           `/wms/delivery-orders${warehouseId ? `?warehouse_id=${encodeURIComponent(warehouseId)}` : ""}`
         ),
       get: (id: string) => request<DeliveryOrderDetailResponse>(`/wms/delivery-orders/${id}`),
-      create: (data: CreateDeliveryOrderInput) =>
-        request<DeliveryOrder>("/wms/delivery-orders", {
+      create: (data: CreateDeliveryOrderInput) => {
+        const { body, headers } = splitIdempotency(data)
+        return request<DeliveryOrder>("/wms/delivery-orders", {
           method: "POST",
-          body: JSON.stringify(data),
+          body,
+          headers,
+        })
+      },
+      confirm: (id: string, idempotency_key?: string) =>
+        request<DeliveryOrder>(`/wms/delivery-orders/${id}/confirm`, {
+          method: "POST",
+          headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
         }),
-      dispatch: (id: string) =>
+      dispatch: (id: string, idempotency_key?: string) =>
         request<DeliveryOrder>(`/wms/delivery-orders/${id}/dispatch`, {
           method: "POST",
+          headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
         }),
       getPickingTask: (id: string) =>
         request<{ data: PickingTaskDetail }>(`/wms/delivery-orders/${id}/picking`),
@@ -1761,19 +1791,26 @@ export const api = {
           `/wms/opnames${warehouseId ? `?warehouse_id=${encodeURIComponent(warehouseId)}` : ""}`
         ),
       get: (id: string) => request<OpnameDetailResponse>(`/wms/opnames/${id}`),
-      create: (data: CreateStockOpnameInput) =>
-        request<StockOpname>("/wms/opnames", {
+      create: (data: CreateStockOpnameInput) => {
+        const { body, headers } = splitIdempotency(data)
+        return request<StockOpname>("/wms/opnames", {
           method: "POST",
-          body: JSON.stringify(data),
-        }),
-      addItem: (id: string, data: AddOpnameItemInput) =>
-        request<StockOpnameItem>(`/wms/opnames/${id}/items`, {
+          body,
+          headers,
+        })
+      },
+      addItem: (id: string, data: AddOpnameItemInput) => {
+        const { body, headers } = splitIdempotency(data)
+        return request<StockOpnameItem>(`/wms/opnames/${id}/items`, {
           method: "POST",
-          body: JSON.stringify(data),
-        }),
-      complete: (id: string) =>
+          body,
+          headers,
+        })
+      },
+      complete: (id: string, idempotency_key?: string) =>
         request<StockOpname>(`/wms/opnames/${id}/complete`, {
           method: "POST",
+          headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
         }),
     },
     scraps: {
@@ -1781,11 +1818,14 @@ export const api = {
         request<{ data: StockScrap[] }>(
           `/wms/scraps${warehouseId ? `?warehouse_id=${encodeURIComponent(warehouseId)}` : ""}`
         ),
-      create: (data: CreateStockScrapInput) =>
-        request<StockScrap>("/wms/scraps", {
+      create: (data: CreateStockScrapInput) => {
+        const { body, headers } = splitIdempotency(data)
+        return request<StockScrap>("/wms/scraps", {
           method: "POST",
-          body: JSON.stringify(data),
-        }),
+          body,
+          headers,
+        })
+      },
     },
     receipts: {
       list: (params?: { warehouseId?: string; status?: StockReceiptStatus; receipt_type?: StockReceiptType }) => {
@@ -1797,18 +1837,24 @@ export const api = {
         return request<{ data: StockReceipt[] }>(`/wms/receipts${s ? `?${s}` : ""}`)
       },
       get: (id: string) => request<StockReceiptDetailResponse>(`/wms/receipts/${id}`),
-      create: (data: StockReceiptInput) =>
-        request<StockReceiptDetailResponse>("/wms/receipts", {
+      create: (data: StockReceiptInput) => {
+        const { body, headers } = splitIdempotency(data)
+        return request<StockReceiptDetailResponse>("/wms/receipts", {
           method: "POST",
-          body: JSON.stringify(data),
-        }),
+          body,
+          headers,
+        })
+      },
       update: (id: string, data: StockReceiptInput) =>
         request<StockReceiptDetailResponse>(`/wms/receipts/${id}`, {
           method: "PUT",
           body: JSON.stringify(data),
         }),
-      post: (id: string) =>
-        request<StockReceipt>(`/wms/receipts/${id}/post`, { method: "POST" }),
+      post: (id: string, idempotency_key?: string) =>
+        request<StockReceipt>(`/wms/receipts/${id}/post`, {
+          method: "POST",
+          headers: idempotency_key ? { "Idempotency-Key": idempotency_key } : undefined,
+        }),
       cancel: (id: string, reason: string) =>
         request<StockReceipt>(`/wms/receipts/${id}/cancel`, {
           method: "POST",

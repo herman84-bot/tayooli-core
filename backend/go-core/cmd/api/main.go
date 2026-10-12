@@ -29,7 +29,6 @@ import (
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/infra/mailer"
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/infra/postgres"
 	tenantMiddleware "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/middleware"
-	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/migrations"
 	approvalUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/approval"
 	authUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/auth"
 	customerUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/customer"
@@ -47,6 +46,7 @@ import (
 	teamUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/team"
 	vendorUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/vendor"
 	wmsUC "github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/usecase/wms"
+	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/migrations"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog"
@@ -229,10 +229,13 @@ func main() {
 	productUsecase := productUC.New(productRepo, inventoryRepo)
 	productHandler := handler.NewProductHandler(productUsecase)
 
+	// Idempotency store for write endpoints (POS, WMS stock mutations)
+	idemRepo := postgres.NewIdempotencyRepo(db)
+
 	// WMS Module
 	wmsRepo := postgres.NewWMSRepo(db)
 	wmsUsecase := wmsUC.New(wmsRepo)
-	wmsHandler := handler.NewWMSHandler(wmsUsecase)
+	wmsHandler := handler.NewWMSHandler(wmsUsecase).WithIdempotency(idemRepo)
 
 	// Payment Gateways (ADR-008 per-tenant provider config & transactions)
 	paymentGatewayRepo := postgres.NewPaymentGatewayRepo(db)
@@ -261,7 +264,7 @@ func main() {
 	// their own gateway credentials (ADR-008 Model B).
 	posPaymentUsecase := posPaymentUC.New(paymentGatewayRepo, nil, cfg.AppURL)
 	posHandler := handler.NewPOSHandlerWithPayments(posUsecase, posPaymentUsecase).
-		WithIdempotency(postgres.NewIdempotencyRepo(db))
+		WithIdempotency(idemRepo)
 
 	// Accounting Module
 	accountRepo := accountingPostgres.NewAccountRepository(db)
@@ -848,8 +851,8 @@ func main() {
 	})
 
 	srv := &http.Server{
-		Addr:         ":" + cfg.ServerPort,
-		Handler:      r,
+		Addr:              ":" + cfg.ServerPort,
+		Handler:           r,
 		ReadHeaderTimeout: 5 * time.Second, // slow-header (slowloris) guard
 		ReadTimeout:       15 * time.Second,
 		// > handler timeout (15s) so the 503/504 from the timeout middleware
