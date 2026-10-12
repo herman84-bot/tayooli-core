@@ -196,12 +196,15 @@ async function proxy(req: NextRequest, path: string, init?: RequestInit) {
 
   // Teruskan Set-Cookie dari backend (mis. lumina_auth) ke browser.
   const setCookie = res.headers.get('set-cookie');
+  // Retry-After (429/503) tells the client how long to back off.
+  const retryAfter = res.headers.get('retry-after');
   return new NextResponse(body, {
     status: res.status,
     statusText: res.statusText,
     headers: {
       'content-type': res.headers.get('content-type') ?? 'application/json',
       ...(setCookie ? { 'set-cookie': setCookie } : {}),
+      ...(retryAfter ? { 'retry-after': retryAfter } : {}),
     },
   });
 }

@@ -554,8 +554,14 @@ func main() {
 	})
 
 	// Core API v1 routes
+	// Per-tenant limit (sustained rps + burst). Generous by default: one page
+	// load fires ~10 calls and a shop may run several cashiers at once.
+	tenantLimiter := tenantMiddleware.NewTenantRateLimiter(
+		float64(envInt("TENANT_RATE_RPS", 20)), envInt("TENANT_RATE_BURST", 100))
+
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(tenantMiddleware.TenantMiddleware)
+		r.Use(tenantLimiter.Middleware)
 
 		// Onboarding / Workspace setup (owner or admin only)
 		r.With(tenantMiddleware.RequireRole("owner", "admin")).Post("/workspaces", authHandler.CreateWorkspace)

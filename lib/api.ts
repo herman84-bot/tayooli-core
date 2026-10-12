@@ -9,6 +9,9 @@ const BASE = "/api/v1"
  */
 const DEFAULT_TIMEOUT = 25_000
 
+/** Error thrown for non-2xx responses; status lets callers decide on retries. */
+export type ApiHttpError = Error & { status?: number; retryAfterSeconds?: number }
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT)
@@ -45,7 +48,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       // so the raw backend error code doesn't leak into the UI.
       message = message.replace(/^[a-z_]+:\s*/i, "").trim()
 
-      throw new Error(message || `Request failed: ${res.status}`)
+      const err = new Error(message || `Request failed: ${res.status}`) as ApiHttpError
+      err.status = res.status
+      const retryAfter = Number(res.headers.get("retry-after"))
+      if (Number.isFinite(retryAfter) && retryAfter > 0) err.retryAfterSeconds = retryAfter
+      throw err
     }
 
     // No-content responses (e.g. DELETE -> 204) have no JSON body to parse.
