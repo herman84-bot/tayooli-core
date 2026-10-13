@@ -83,7 +83,7 @@ interface StatCardProps {
 
 function StatCard({ label, value, icon: Icon, iconClass, bg, subtext }: StatCardProps) {
   return (
-    <div className="border border-border/60 rounded-lg p-4 flex items-center gap-3 bg-card">
+    <div className="border border-border/60 rounded-xl p-4 flex items-center gap-3 bg-card hover:border-[#BFDBFE] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
       <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${bg}`}>
         <Icon className={`h-4 w-4 ${iconClass}`} />
       </div>
@@ -98,7 +98,7 @@ function StatCard({ label, value, icon: Icon, iconClass, bg, subtext }: StatCard
 
 function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="bg-muted/40 rounded-lg p-2.5 text-center border border-border/30">
+    <div className="bg-muted/40 rounded-lg p-2.5 text-center border border-border/30 hover:border-[#BFDBFE] hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 cursor-default">
       <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</div>
       <div className="font-mono font-bold text-sm text-foreground mt-0.5 tabular-nums">{value}</div>
     </div>
@@ -135,7 +135,7 @@ function SOPKPICard({
   const hasValue = typeof value === 'number' && Number.isFinite(value)
   const passed = hasValue ? pass(value) : null
   return (
-    <div className="border border-border/60 rounded-lg p-3.5 bg-card hover:border-border transition-colors">
+    <div className="border border-border/60 rounded-xl p-3.5 bg-card hover:border-[#BFDBFE] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 ${bg}`}>

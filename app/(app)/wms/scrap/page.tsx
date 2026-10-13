@@ -385,7 +385,7 @@ export default function StockScrapPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
         {/* ── Summary Stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-[#BFDBFE] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
             <span className="text-xs font-medium text-slate-500">Total Insiden Barang Rusak</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-slate-900">{metrics.totalRecords}</span>
@@ -395,7 +395,7 @@ export default function StockScrapPage() {
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-rose-200 bg-rose-50/20 shadow-xs">
+          <div className="bg-white p-4 rounded-xl border border-rose-200 bg-rose-50/20 shadow-xs hover:border-rose-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
             <span className="text-xs font-medium text-rose-700">Total Unit Rusak</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-rose-700">{metrics.totalQty}</span>
@@ -405,7 +405,7 @@ export default function StockScrapPage() {
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-orange-200 bg-orange-50/20 shadow-xs">
+          <div className="bg-white p-4 rounded-xl border border-orange-200 bg-orange-50/20 shadow-xs hover:border-orange-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
             <span className="text-xs font-medium text-orange-700">Pemusnahan Virtual (@SCRAP)</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-orange-700">{metrics.virtualCount}</span>
@@ -415,7 +415,7 @@ export default function StockScrapPage() {
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-blue-200 bg-blue-50/20 shadow-xs">
+          <div className="bg-white p-4 rounded-xl border border-blue-200 bg-blue-50/20 shadow-xs hover:border-blue-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
             <span className="text-xs font-medium text-[#2563EB]">Karantina Fisik</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-[#2563EB]">{metrics.physicalCount}</span>
