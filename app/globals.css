@@ -257,6 +257,7 @@
   background-size: 200% 100%;
   animation: shimmer-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   will-change: background-position;
+  transform: translateZ(0);
 }
 
 .dark .shimmer-wave {
@@ -271,6 +272,7 @@
   background-size: 200% 100%;
   animation: shimmer-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   will-change: background-position;
+  transform: translateZ(0);
 }
 
 .animate-arc-spin {
