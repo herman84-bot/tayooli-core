@@ -150,11 +150,18 @@ export default function ArusBarangPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // URL ?mode= is the single source of truth (reactive). localStorage is only
-  // a fallback when the URL carries no mode, and is applied via router.replace
-  // so URL and UI can never diverge.
   const urlMode = searchParams.get("mode")?.toLowerCase()
-  const mode: Mode = urlMode === "keluar" ? "keluar" : "masuk"
+  const [localMode, setLocalMode] = useState<Mode>(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("mode")?.toLowerCase()
+      if (p === "keluar" || p === "masuk") return p
+      const saved = localStorage.getItem("wms_arus_barang_mode")
+      if (saved === "keluar" || saved === "masuk") return saved
+    }
+    return "masuk"
+  })
+
+  const mode: Mode = localMode
   const [masukTab, setMasukTab] = useState<MasukTab>("penerimaan")
   const [keluarTab, setKeluarTab] = useState<KeluarTab>("surat_jalan")
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>("")
@@ -164,12 +171,15 @@ export default function ArusBarangPage() {
 
   useEffect(() => {
     if (urlMode === "masuk" || urlMode === "keluar") {
+      setLocalMode(urlMode)
       localStorage.setItem("wms_arus_barang_mode", urlMode)
       return
     }
     const saved = localStorage.getItem("wms_arus_barang_mode")
-    router.replace(`/wms/arus-barang?mode=${saved === "keluar" ? "keluar" : "masuk"}`)
-  }, [urlMode, router])
+    const target = saved === "keluar" ? "keluar" : "masuk"
+    setLocalMode(target)
+    window.history.replaceState(null, "", `/wms/arus-barang?mode=${target}`)
+  }, [urlMode])
 
   // Select default warehouse if available
   useEffect(() => {
@@ -179,8 +189,9 @@ export default function ArusBarangPage() {
   }, [warehouses, selectedWarehouseId])
 
   const switchMode = (newMode: Mode) => {
+    setLocalMode(newMode)
     localStorage.setItem("wms_arus_barang_mode", newMode)
-    router.replace(`/wms/arus-barang?mode=${newMode}`)
+    window.history.replaceState(null, "", `/wms/arus-barang?mode=${newMode}`)
   }
 
   return (
@@ -353,39 +364,37 @@ export default function ArusBarangPage() {
       </div>
 
       {/* Main Content Area */}
-      {mode === "masuk" ? (
-        <div>
-          {masukTab === "penerimaan" && (
-            <InboundReceivingSubView
-              warehouseId={selectedWarehouseId}
-              onGoToPutaway={() => setMasukTab("putaway")}
-            />
-          )}
-          {masukTab === "dock" && (
-            <DockBoardSubView warehouseId={selectedWarehouseId} />
-          )}
-          {masukTab === "putaway" && (
-            <PutawayView warehouseId={selectedWarehouseId} />
-          )}
-          {masukTab === "trace" && <TraceBatchView />}
-          {masukTab === "qc" && <QCQuarantineView warehouseId={selectedWarehouseId} />}
-        </div>
-      ) : (
-        <div>
-          {keluarTab === "surat_jalan" && (
-            <DeliveryOrdersPanel embedded />
-          )}
-          {keluarTab === "picking" && (
-            <WavePickingSubView warehouseId={selectedWarehouseId} />
-          )}
-          {keluarTab === "packing" && (
-            <PackingStationSubView warehouseId={selectedWarehouseId} />
-          )}
-          {keluarTab === "manifest" && (
-            <ShippingManifestsPanel warehouseId={selectedWarehouseId} />
-          )}
-        </div>
-      )}
+      <div className={mode === "masuk" ? "block" : "hidden"}>
+        {masukTab === "penerimaan" && (
+          <InboundReceivingSubView
+            warehouseId={selectedWarehouseId}
+            onGoToPutaway={() => setMasukTab("putaway")}
+          />
+        )}
+        {masukTab === "dock" && (
+          <DockBoardSubView warehouseId={selectedWarehouseId} />
+        )}
+        {masukTab === "putaway" && (
+          <PutawayView warehouseId={selectedWarehouseId} />
+        )}
+        {masukTab === "trace" && <TraceBatchView />}
+        {masukTab === "qc" && <QCQuarantineView warehouseId={selectedWarehouseId} />}
+      </div>
+
+      <div className={mode === "keluar" ? "block" : "hidden"}>
+        {keluarTab === "surat_jalan" && (
+          <DeliveryOrdersPanel embedded />
+        )}
+        {keluarTab === "picking" && (
+          <WavePickingSubView warehouseId={selectedWarehouseId} />
+        )}
+        {keluarTab === "packing" && (
+          <PackingStationSubView warehouseId={selectedWarehouseId} />
+        )}
+        {keluarTab === "manifest" && (
+          <ShippingManifestsPanel warehouseId={selectedWarehouseId} />
+        )}
+      </div>
 
       {/* Settings Modal */}
       <WMSSettingsModal
