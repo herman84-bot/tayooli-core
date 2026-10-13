@@ -42,6 +42,7 @@ import { ProductCombobox } from "@/components/products/ProductCombobox"
 import { resolveScannedProduct } from "@/lib/resolveScannedProduct"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
 import { useAuthStore } from "@/hooks/useAuth"
+import { TableSkeleton } from "@/components/ui/shimmer-skeleton"
 import {
   api,
   StockOpname,
@@ -661,10 +662,7 @@ export default function StockOpnamePage() {
         {/* ── Opnames List / Table ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           {loadingOpnames ? (
-            <div className="p-12 text-center">
-              <RefreshCw className="w-8 h-8 text-[#2563EB] animate-spin mx-auto mb-3" />
-              <p className="text-sm font-medium text-slate-600">Memuat sesi stok opname...</p>
-            </div>
+            <TableSkeleton rows={6} cols={5} />
           ) : filteredOpnames.length === 0 ? (
             <div className="p-12 text-center">
               <ClipboardCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />

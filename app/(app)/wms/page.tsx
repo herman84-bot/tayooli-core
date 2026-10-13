@@ -36,6 +36,7 @@ import { useWMSMovements, useWMSStock } from "@/hooks/useWMSLedger"
 import { Warehouse, WarehouseLocation, LocationType, StockSummary } from "@/lib/api"
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 import { ActivityTimelineDrawer } from "@/components/wms/ActivityTimelineDrawer"
+import { ShimmerSkeleton } from "@/components/ui/shimmer-skeleton"
 
 const LOCATION_TYPE_LABEL: Record<string, string> = {
   INTERNAL: "Rak Internal",
@@ -473,7 +474,22 @@ export default function WMSDashboardPage() {
               {loadingLocations ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div key={i} className="h-44 bg-slate-100 rounded-xl animate-pulse" />
+                    <div key={i} className="bg-white rounded-xl border border-[#E2E8F0] p-4.5 space-y-4 shadow-xs">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1.5 flex-1">
+                          <ShimmerSkeleton className="h-5 w-24 rounded" />
+                          <ShimmerSkeleton className="h-3.5 w-32 rounded" />
+                        </div>
+                        <ShimmerSkeleton className="h-6 w-16 rounded-full" />
+                      </div>
+                      <div className="space-y-2 pt-2">
+                        <ShimmerSkeleton className="h-2 w-full rounded-full" />
+                        <div className="flex justify-between">
+                          <ShimmerSkeleton className="h-3 w-16 rounded" />
+                          <ShimmerSkeleton className="h-3 w-12 rounded" />
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : filteredLocations.length === 0 ? (

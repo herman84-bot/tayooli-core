@@ -40,6 +40,7 @@ import { resolveScannedProduct } from "@/lib/resolveScannedProduct"
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner"
 import { useAuthStore } from "@/hooks/useAuth"
 import { Product, WarehouseLocation, StockScrap } from "@/lib/api"
+import { TableSkeleton } from "@/components/ui/shimmer-skeleton"
 
 export default function StockScrapPage() {
   const currentUser = useAuthStore((s) => s.user)
@@ -489,10 +490,7 @@ export default function StockScrapPage() {
         {/* ── Scrap Ledger Table ── */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           {loadingScraps ? (
-            <div className="p-12 text-center">
-              <RefreshCw className="w-8 h-8 text-[#EA580C] animate-spin mx-auto mb-3" />
-              <p className="text-sm font-medium text-slate-600">Memuat riwayat barang rusak...</p>
-            </div>
+            <TableSkeleton rows={6} cols={5} />
           ) : filteredScraps.length === 0 ? (
             <div className="p-12 text-center">
               <PackageX className="w-12 h-12 text-slate-300 mx-auto mb-3" />

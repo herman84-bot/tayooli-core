@@ -35,6 +35,7 @@ import {
 import { useProductSearch } from "@/hooks/useProducts"
 import { ExportModal, ExportButton } from "@/components/ui/ExportModal"
 import { validateReceiptLines, isPastDate } from "@/lib/wms/validation"
+import { ShimmerSkeleton } from "@/components/ui/shimmer-skeleton"
 import {
   StockReceipt,
   StockReceiptInput,
@@ -560,11 +561,19 @@ function InboundReceivingSubView({
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {isLoading ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
-                      Memuat data penerimaan...
-                    </td>
-                  </tr>
+                  Array.from({ length: 6 }).map((_, idx) => (
+                    <tr key={idx}>
+                      <td className="px-4 py-3.5"><ShimmerSkeleton className="h-4 w-28 rounded" /></td>
+                      <td className="px-4 py-3.5"><ShimmerSkeleton className="h-4 w-20 rounded" /></td>
+                      <td className="px-4 py-3.5"><ShimmerSkeleton className="h-4 w-32 rounded" /></td>
+                      <td className="px-4 py-3.5"><ShimmerSkeleton className="h-4 w-12 rounded ml-auto" /></td>
+                      <td className="px-4 py-3.5"><ShimmerSkeleton className="h-4 w-12 rounded ml-auto" /></td>
+                      <td className="px-4 py-3.5"><ShimmerSkeleton className="h-4 w-12 rounded ml-auto" /></td>
+                      <td className="px-4 py-3.5"><ShimmerSkeleton className="h-6 w-20 rounded-full" /></td>
+                      <td className="px-4 py-3.5"><ShimmerSkeleton className="h-6 w-16 rounded-full" /></td>
+                      <td className="px-4 py-3.5"><ShimmerSkeleton className="h-4 w-24 rounded" /></td>
+                    </tr>
+                  ))
                 ) : isError ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-8 text-center text-rose-600">

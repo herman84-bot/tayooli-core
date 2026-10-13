@@ -45,6 +45,7 @@ import {
 import { ProductCombobox, productRef } from "@/components/products/ProductCombobox"
 import { useAuthStore } from "@/hooks/useAuth"
 import { Product, StockTransfer, TransferStatus } from "@/lib/api"
+import { ShimmerSkeleton } from "@/components/ui/shimmer-skeleton"
 
 /**
  * Roles allowed to approve/reject a stock transfer (segregation of duties).
@@ -583,7 +584,19 @@ export default function TransfersPage() {
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-36 bg-slate-100 rounded-xl animate-pulse" />
+              <div key={i} className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
+                <div className="flex justify-between items-center">
+                  <div className="space-y-2">
+                    <ShimmerSkeleton className="h-5 w-40 rounded" />
+                    <ShimmerSkeleton className="h-3.5 w-64 rounded" />
+                  </div>
+                  <ShimmerSkeleton className="h-7 w-24 rounded-full" />
+                </div>
+                <div className="flex gap-4 pt-2">
+                  <ShimmerSkeleton className="h-4 w-28 rounded" />
+                  <ShimmerSkeleton className="h-4 w-28 rounded" />
+                </div>
+              </div>
             ))}
           </div>
         ) : filteredTransfers.length === 0 ? (

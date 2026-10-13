@@ -7,6 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import Sidebar from '@/components/layout/Sidebar'
 import { Menu } from 'lucide-react'
 import { canAccessRoute, homeRouteFor } from '@/lib/rbac'
+import { BinanceArcSpinner } from '@/components/ui/shimmer-skeleton'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth()
@@ -52,8 +53,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
 
         {isLoading ? (
-          <div className="flex items-center justify-center h-full min-h-96">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center h-full min-h-96 gap-3">
+            <BinanceArcSpinner size={34} strokeColor="#2563EB" strokeWidth={3.5} />
+            <span className="text-xs font-semibold text-muted-foreground tracking-wide">Menyiapkan sesi...</span>
           </div>
         ) : !isAuthenticated ? null : !allowed ? (
           <div role="alert" className="flex items-center justify-center min-h-96 p-6 text-sm text-muted-foreground">
