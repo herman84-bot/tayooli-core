@@ -550,7 +550,7 @@ export default function StockOpnamePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
         {/* ── Summary Stats ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-[#BFDBFE] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-slate-300 transition-colors duration-150 cursor-default">
             <span className="text-xs font-medium text-slate-500">Total Sesi Opname</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-slate-900">{opnames.length}</span>
@@ -560,7 +560,7 @@ export default function StockOpnamePage() {
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/20 shadow-xs hover:border-amber-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+          <div className="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/20 shadow-xs hover:border-amber-300 transition-colors duration-150 cursor-default">
             <span className="text-xs font-medium text-amber-700">Sedang Dihitung</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-amber-700">
@@ -572,7 +572,7 @@ export default function StockOpnamePage() {
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs hover:border-emerald-300 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+          <div className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs hover:border-emerald-300 transition-colors duration-150 cursor-default">
             <span className="text-xs font-medium text-emerald-700">Telah Diposting (@LOSS)</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-emerald-700">
@@ -584,7 +584,7 @@ export default function StockOpnamePage() {
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-[#BFDBFE] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-slate-300 transition-colors duration-150 cursor-default">
             <span className="text-xs font-medium text-slate-500">Draf Menunggu Audit</span>
             <div className="flex items-baseline justify-between mt-2">
               <span className="text-2xl font-bold text-slate-800">
