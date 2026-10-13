@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import { EMPTY_DASHBOARD_SUMMARY } from '@/lib/schemas/dashboard'
 import { formatCurrency } from '@/lib/currency'
+import { MetricCardSkeleton } from '@/components/ui/shimmer-skeleton'
 
 // Dashboard tayooli-core: 4 area ringkasan.
 // 1) Ribbon keuangan & mutasi fisik (penjualan, kas masuk, valuasi stok, barang keluar)
@@ -255,40 +256,49 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 ${loading ? 'opacity-50' : ''}`}>
-        <StatCard
-          label="Total Penjualan"
-          value={formatCurrency(s.financial_overview.total_revenue, { compact: true })}
-          icon={TrendingUp}
-          iconClass="text-emerald-600"
-          bg="bg-emerald-50 dark:bg-emerald-950/30"
-          subtext={`Piutang: ${formatCurrency(s.financial_overview.accounts_receivable, { compact: true })}`}
-        />
-        <StatCard
-          label="Kas Masuk"
-          value={formatCurrency(s.financial_overview.cash_inflow, { compact: true })}
-          icon={ArrowDownLeft}
-          iconClass="text-emerald-600"
-          bg="bg-emerald-50 dark:bg-emerald-950/30"
-          subtext="Penerimaan POS & faktur lunas"
-        />
-        <StatCard
-          label="Valuasi Stok"
-          value={formatCurrency(s.wms.total_stock_value, { compact: true })}
-          icon={Package}
-          iconClass="text-blue-600"
-          bg="bg-blue-50 dark:bg-blue-950/30"
-          subtext={`${s.wms.total_physical_units} unit di ${s.wms.total_warehouses} gudang`}
-        />
-        <StatCard
-          label="Barang Keluar Hari Ini"
-          value={`${s.outbound.qty_today} unit`}
-          icon={Truck}
-          iconClass="text-indigo-600"
-          bg="bg-indigo-50 dark:bg-indigo-950/30"
-          subtext={`Bulan ini: ${s.outbound.qty_month} unit`}
-        />
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+          <MetricCardSkeleton />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard
+            label="Total Penjualan"
+            value={formatCurrency(s.financial_overview.total_revenue, { compact: true })}
+            icon={TrendingUp}
+            iconClass="text-emerald-600"
+            bg="bg-emerald-50 dark:bg-emerald-950/30"
+            subtext={`Piutang: ${formatCurrency(s.financial_overview.accounts_receivable, { compact: true })}`}
+          />
+          <StatCard
+            label="Kas Masuk"
+            value={formatCurrency(s.financial_overview.cash_inflow, { compact: true })}
+            icon={ArrowDownLeft}
+            iconClass="text-emerald-600"
+            bg="bg-emerald-50 dark:bg-emerald-950/30"
+            subtext="Penerimaan POS & faktur lunas"
+          />
+          <StatCard
+            label="Valuasi Stok"
+            value={formatCurrency(s.wms.total_stock_value, { compact: true })}
+            icon={Package}
+            iconClass="text-blue-600"
+            bg="bg-blue-50 dark:bg-blue-950/30"
+            subtext={`${s.wms.total_physical_units} unit di ${s.wms.total_warehouses} gudang`}
+          />
+          <StatCard
+            label="Barang Keluar Hari Ini"
+            value={`${s.outbound.qty_today} unit`}
+            icon={Truck}
+            iconClass="text-indigo-600"
+            bg="bg-indigo-50 dark:bg-indigo-950/30"
+            subtext={`Bulan ini: ${s.outbound.qty_month} unit`}
+          />
+        </div>
+      )}
 
       <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${loading ? 'opacity-50' : ''}`}>
         <section className="border border-border/60 rounded-lg bg-card">

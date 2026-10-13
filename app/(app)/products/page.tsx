@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/drawer"
 import { CategoryCombobox } from "@/components/products/CategoryCombobox"
 import { useProductCategories } from "@/hooks/useProductCategories"
+import { TableSkeleton } from "@/components/ui/shimmer-skeleton"
 
 function fmtExportDate(iso?: string): string {
   if (!iso) return ""
@@ -443,9 +444,12 @@ export default function ProductsPage() {
 
         {/* ── Main Content Area ── */}
         {isLoading ? (
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center shadow-xs">
-            <div className="w-8 h-8 border-3 border-[#2563EB] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-sm font-medium text-slate-600">Memuat katalog produk...</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs text-slate-500 font-medium px-1">
+              <span>Sinkronisasi master data...</span>
+              <span className="font-mono text-[11px] text-[#2563EB]">Memuat katalog...</span>
+            </div>
+            <TableSkeleton rows={8} cols={6} />
           </div>
         ) : isError ? (
           <div className="bg-white rounded-xl border border-red-200 p-8 text-center shadow-xs">

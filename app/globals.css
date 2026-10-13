@@ -211,3 +211,73 @@
     }
   }
 }
+
+/* ----------------------------------------------------------------------------
+ * Binance-Grade Skeleton Shimmer Waves (GPU Accelerated)
+ * -------------------------------------------------------------------------- */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes arc-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes arc-dash {
+  0% {
+    stroke-dasharray: 1, 200;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 89, 200;
+    stroke-dashoffset: -35px;
+  }
+  100% {
+    stroke-dasharray: 89, 200;
+    stroke-dashoffset: -124px;
+  }
+}
+
+.shimmer-wave {
+  background: linear-gradient(
+    90deg,
+    rgba(241, 245, 249, 0.95) 0%,
+    rgba(226, 232, 240, 0.7) 20%,
+    rgba(255, 255, 255, 0.95) 50%,
+    rgba(226, 232, 240, 0.7) 80%,
+    rgba(241, 245, 249, 0.95) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: background-position;
+}
+
+.dark .shimmer-wave {
+  background: linear-gradient(
+    90deg,
+    rgba(24, 26, 32, 0.95) 0%,
+    rgba(43, 49, 58, 0.7) 20%,
+    rgba(56, 65, 78, 0.95) 50%,
+    rgba(43, 49, 58, 0.7) 80%,
+    rgba(24, 26, 32, 0.95) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: background-position;
+}
+
+.animate-arc-spin {
+  animation: arc-spin 1.5s linear infinite;
+}
+
+.animate-arc-dash {
+  stroke-linecap: round;
+  animation: arc-dash 1.4s ease-in-out infinite;
+}
