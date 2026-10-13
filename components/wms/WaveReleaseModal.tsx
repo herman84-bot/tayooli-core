@@ -112,6 +112,7 @@ export function WaveReleaseModal({
         expedition_name: expeditionName || undefined,
         route_zone: routeZone || undefined,
         notes: notes || undefined,
+        idempotency_key: crypto.randomUUID(),
       })
 
       setSuccessMsg(`Gelombang pengambilan ${res.data.wave_number} berhasil dibuat dengan ${res.data.total_orders} pesanan!`)

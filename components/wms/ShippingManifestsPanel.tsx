@@ -222,6 +222,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
         driver_phone: driverPhone.trim() || undefined,
         delivery_order_ids: selectedDoIds,
         notes: notes.trim() || undefined,
+        idempotency_key: crypto.randomUUID(),
       })
       setShowCreateModal(false)
       setToast({

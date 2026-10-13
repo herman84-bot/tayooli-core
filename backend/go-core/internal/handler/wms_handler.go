@@ -197,27 +197,27 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 
 		// Pick Waves (PDF-05, OCA §1.3)
 		r.Get("/pick-waves", h.ListPickWaves)
-		r.Post("/pick-waves", h.CreatePickWave)
+		r.With(idem).Post("/pick-waves", h.CreatePickWave)
 		r.Get("/pick-waves/{id}", h.GetPickWave)
-		r.Post("/pick-waves/{id}/release", h.ReleasePickWave)
+		r.With(idem).Post("/pick-waves/{id}/release", h.ReleasePickWave)
 
 		// Shipping Manifests (Sprint 4 Outbound Tahap 5-6)
 		r.Get("/manifests", h.ListShippingManifests)
-		r.Post("/manifests", h.CreateShippingManifest)
+		r.With(idem).Post("/manifests", h.CreateShippingManifest)
 		r.Get("/manifests/{id}", h.GetShippingManifest)
-		r.Post("/manifests/{id}/loading-scan", h.ScanDOLoading)
-		r.Post("/manifests/{id}/dispatch", h.DispatchShippingManifest)
+		r.With(idem).Post("/manifests/{id}/loading-scan", h.ScanDOLoading)
+		r.With(idem).Post("/manifests/{id}/dispatch", h.DispatchShippingManifest)
 		r.Get("/kpi", h.GetWMSOutboundKPIs)
 		// Aliases under /delivery-orders/manifests
 		r.Get("/delivery-orders/manifests", h.ListShippingManifests)
-		r.Post("/delivery-orders/manifests", h.CreateShippingManifest)
+		r.With(idem).Post("/delivery-orders/manifests", h.CreateShippingManifest)
 		// Aliases under /outbound
 		r.Route("/outbound", func(r chi.Router) {
 			r.Get("/manifests", h.ListShippingManifests)
-			r.Post("/manifests", h.CreateShippingManifest)
+			r.With(idem).Post("/manifests", h.CreateShippingManifest)
 			r.Get("/manifests/{id}", h.GetShippingManifest)
-			r.Post("/manifests/{id}/loading-scan", h.ScanDOLoading)
-			r.Post("/manifests/{id}/dispatch", h.DispatchShippingManifest)
+			r.With(idem).Post("/manifests/{id}/loading-scan", h.ScanDOLoading)
+			r.With(idem).Post("/manifests/{id}/dispatch", h.DispatchShippingManifest)
 			r.Get("/kpi", h.GetWMSOutboundKPIs)
 		})
 

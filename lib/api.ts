@@ -581,6 +581,7 @@ export interface CreatePickWaveInput {
   picker_id?: string
   notes?: string
   delivery_order_ids?: string[]
+  idempotency_key?: string
 }
 
 export interface PickWaveDetail {
@@ -674,6 +675,7 @@ export interface CreateShippingManifestInput {
   driver_phone?: string
   delivery_order_ids: string[]
   notes?: string
+  idempotency_key?: string
 }
 
 export interface DispatchShippingManifestInput {
@@ -1778,11 +1780,14 @@ export const api = {
         const qs = q.toString() ? `?${q.toString()}` : ""
         return request<{ data: PickWave[] }>(`/wms/pick-waves${qs}`)
       },
-      create: (payload: CreatePickWaveInput) =>
-        request<{ data: PickWave }>("/wms/pick-waves", {
+      create: (payload: CreatePickWaveInput) => {
+        const { body, headers } = splitIdempotency(payload)
+        return request<{ data: PickWave }>("/wms/pick-waves", {
           method: "POST",
-          body: JSON.stringify(payload),
-        }),
+          body,
+          headers,
+        })
+      },
       get: (id: string) =>
         request<{ data: PickWaveDetail }>(`/wms/pick-waves/${id}`),
       release: (id: string, pickerId?: string) =>
@@ -1800,11 +1805,14 @@ export const api = {
         const qs = q.toString() ? `?${q.toString()}` : ""
         return request<{ data: ShippingManifest[] }>(`/wms/manifests${qs}`)
       },
-      create: (payload: CreateShippingManifestInput) =>
-        request<{ data: ShippingManifest }>("/wms/manifests", {
+      create: (payload: CreateShippingManifestInput) => {
+        const { body, headers } = splitIdempotency(payload)
+        return request<{ data: ShippingManifest }>("/wms/manifests", {
           method: "POST",
-          body: JSON.stringify(payload),
-        }),
+          body,
+          headers,
+        })
+      },
       get: (id: string) =>
         request<{ data: ShippingManifestDetail }>(`/wms/manifests/${id}`),
       scanLoading: (id: string, barcode: string) =>
