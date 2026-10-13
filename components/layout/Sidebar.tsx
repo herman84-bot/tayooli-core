@@ -319,12 +319,6 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                       )}
                     />
                     {!collapsed && <span className="text-[13px] truncate">{label}</span>}
-                    {/* Tooltip for collapsed mode */}
-                    {collapsed && (
-                      <span className="pointer-events-none absolute left-full ml-2 z-50 hidden group-hover/item:flex items-center whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background shadow-md">
-                        {label}
-                      </span>
-                    )}
                   </Link>
                 )
               })}
