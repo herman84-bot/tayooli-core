@@ -543,7 +543,7 @@ export default function BarcodeScannerPage() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-5 space-y-5">
         {/* ── Mode Switcher Pills (min 48px touch target) ── */}
-        <div className="bg-white p-1.5 rounded-xl border border-[#E2E8F0] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 shadow-xs">
+        <div className="bg-white p-1.5 rounded-xl border border-[#E2E8F0] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 shadow-xs">
           <button
             type="button"
             onClick={() => {
@@ -553,14 +553,14 @@ export default function BarcodeScannerPage() {
               setPutawayError(null)
               setPutawaySuccessMessage(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "PUTAWAY"
                 ? "bg-[#2563EB] text-white shadow-xs"
-                : "text-slate-600 hover:bg-slate-100"
+                : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Layers className="w-4 h-4 shrink-0" />
-            <span className="truncate">Penataan Rak Masuk</span>
+            <span className="whitespace-normal leading-tight">Penataan Rak</span>
           </button>
 
           <button
@@ -569,14 +569,14 @@ export default function BarcodeScannerPage() {
               setMode("OUTBOUND")
               setOutboundResult(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "OUTBOUND"
                 ? "bg-[#2563EB] text-white shadow-xs"
-                : "text-slate-600 hover:bg-slate-100"
+                : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Package className="w-4 h-4 shrink-0" />
-            <span className="truncate">Pengambilan Barang Keluar</span>
+            <span className="whitespace-normal leading-tight">Ambil Barang</span>
           </button>
 
           <button
@@ -585,14 +585,14 @@ export default function BarcodeScannerPage() {
               setMode("LOADING_TRUCK")
               setLoadingScanResult(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "LOADING_TRUCK"
                 ? "bg-[#2563EB] text-white shadow-xs"
-                : "text-slate-600 hover:bg-slate-100"
+                : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Truck className="w-4 h-4 shrink-0" />
-            <span className="truncate">Loading Truk</span>
+            <span className="whitespace-normal leading-tight">Loading Truk</span>
           </button>
 
           <button
@@ -602,27 +602,27 @@ export default function BarcodeScannerPage() {
               setLpnPutawaySuccessMessage(null)
               setLpnPutawayErrorMessage(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "PALLET_LPN"
                 ? "bg-[#2563EB] text-white shadow-xs"
-                : "text-slate-600 hover:bg-slate-100"
+                : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Box className="w-4 h-4 shrink-0" />
-            <span className="truncate">Penataan Palet LPN</span>
+            <span className="whitespace-normal leading-tight">Palet LPN</span>
           </button>
 
           <button
             type="button"
             onClick={() => setMode("PRICE_CHECK")}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-semibold text-xs sm:text-sm min-h-[48px] transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "PRICE_CHECK"
                 ? "bg-[#2563EB] text-white shadow-xs"
-                : "text-slate-600 hover:bg-slate-100"
+                : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Tag className="w-4 h-4 shrink-0" />
-            <span className="truncate">Cek SKU</span>
+            <span className="whitespace-normal leading-tight">Cek SKU</span>
           </button>
         </div>
 
@@ -683,49 +683,49 @@ export default function BarcodeScannerPage() {
           <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
             <div className="grid grid-cols-2 gap-3 text-center">
               <div
-                className={`p-3 rounded-lg border transition-all ${
+                className={`p-3.5 rounded-xl border-2 transition-all ${
                   putawayRack
-                    ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-bold"
-                    : "bg-blue-50 border-[#2563EB] text-[#2563EB] font-bold ring-2 ring-blue-100"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-950 font-bold"
+                    : "bg-blue-50 border-[#2563EB] text-blue-950 font-bold ring-2 ring-blue-100"
                 }`}
               >
-                <div className="text-[11px] uppercase tracking-wider">Langkah 1: Rak Lokasi</div>
-                <div className="text-sm font-mono mt-1">
-                  {putawayRack ? `✓ ${putawayRack}` : "Menunggu Scan Rak..."}
+                <div className="text-xs uppercase tracking-wider font-bold text-slate-700">Langkah 1: Rak Lokasi</div>
+                <div className="text-sm font-mono font-extrabold mt-1 text-slate-900">
+                  {putawayRack ? `✓ Rak: ${putawayRack}` : "Arahkan & Scan Barcode Rak..."}
                 </div>
               </div>
 
               <div
-                className={`p-3 rounded-lg border transition-all ${
+                className={`p-3.5 rounded-xl border-2 transition-all ${
                   !putawayRack
-                    ? "bg-slate-50 border-slate-200 text-slate-400"
+                    ? "bg-slate-100 border-slate-300 text-slate-700"
                     : putawaySuccessMessage?.includes("BERHASIL")
-                    ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-bold"
-                    : "bg-blue-50 border-[#2563EB] text-[#2563EB] font-bold ring-2 ring-blue-100"
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-950 font-bold"
+                    : "bg-blue-50 border-[#2563EB] text-blue-950 font-bold ring-2 ring-blue-100"
                 }`}
               >
-                <div className="text-[11px] uppercase tracking-wider">Langkah 2: Produk / Barang</div>
-                <div className="text-sm font-mono mt-1">
+                <div className="text-xs uppercase tracking-wider font-bold text-slate-700">Langkah 2: Produk / Barang</div>
+                <div className="text-sm font-mono font-extrabold mt-1 text-slate-900">
                   {putawaySubmitting
                     ? "Memproses..."
                     : putawaySuccessMessage?.includes("BERHASIL")
                     ? `✓ ${lastScannedCode}`
                     : putawayRack
-                    ? "Siap Scan Barang..."
-                    : "Terkunci"}
+                    ? "Siap Scan Barcode Produk..."
+                    : "Menunggu Scan Rak (Langkah 1)"}
                 </div>
               </div>
             </div>
 
             {putawayError && (
-              <div className="mt-3 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2">
+              <div className="mt-3 p-3.5 rounded-lg bg-rose-50 border border-rose-300 text-rose-900 text-xs font-semibold flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                 <span>{putawayError}</span>
               </div>
             )}
 
             {putawaySuccessMessage && (
-              <div className="mt-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex items-center gap-2">
+              <div className="mt-3 p-3.5 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>{putawaySuccessMessage}</span>
               </div>
@@ -739,7 +739,7 @@ export default function BarcodeScannerPage() {
             <div>
               <label
                 htmlFor="outbound-do-select"
-                className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5"
               >
                 Pilih Surat Jalan (Dikonfirmasi / Sudah Diambil)
               </label>
@@ -750,9 +750,9 @@ export default function BarcodeScannerPage() {
                   setOutboundDoId(e.target.value || null)
                   setOutboundResult(null)
                 }}
-                className="w-full min-h-[48px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-medium"
+                className="w-full min-h-[48px] px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-medium text-slate-900"
               >
-                <option value="">-- Pilih Surat Jalan --</option>
+                <option value="">-- Pilih Surat Jalan untuk Verifikasi Pengambilan --</option>
                 {outboundOrders.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.do_number}
@@ -760,6 +760,11 @@ export default function BarcodeScannerPage() {
                   </option>
                 ))}
               </select>
+              {outboundOrders.length === 0 && (
+                <p className="mt-2 text-xs text-amber-800 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+                  Belum ada Surat Jalan dengan status Dikonfirmasi atau Sudah Diambil untuk diverifikasi.
+                </p>
+              )}
             </div>
 
             {outboundResult && (
