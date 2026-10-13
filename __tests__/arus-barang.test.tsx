@@ -11,6 +11,15 @@ const mockRouterReplace = jest.fn((url: string) => {
   }
 })
 
+const mockHistoryReplaceState = jest.fn()
+const origReplaceState = window.history.replaceState
+beforeAll(() => {
+  window.history.replaceState = mockHistoryReplaceState
+})
+afterAll(() => {
+  window.history.replaceState = origReplaceState
+})
+
 const mockSearchParams = {
   get: (key: string) => (key === 'mode' ? currentMode : null),
 }
@@ -158,6 +167,7 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
       localStorage.clear()
     }
     jest.clearAllMocks()
+    mockHistoryReplaceState.mockClear()
   })
 
   it('renders page header and MASUK / KELUAR toggle buttons', () => {
@@ -180,8 +190,10 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
     const keluarBtn = screen.getByRole('button', { name: /BARANG KELUAR/i })
     fireEvent.click(keluarBtn)
 
-    expect(mockRouterReplace).toHaveBeenCalledWith('/wms/arus-barang?mode=keluar')
-    rerender(<ArusBarangPage />) // router.replace updates the search params
+    // Toggle now uses history.replaceState instead of router.replace for instant switching
+    expect(mockHistoryReplaceState).toHaveBeenCalledWith(null, '', '/wms/arus-barang?mode=keluar')
+    currentMode = 'keluar' // simulate URL update for searchParams mock
+    rerender(<ArusBarangPage />)
     expect(screen.getAllByRole('button', { name: /^Surat Jalan$/i })[0]).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Pengambilan Gelombang/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Stasiun Pengemasan/i })).toBeInTheDocument()
@@ -199,11 +211,12 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
     expect(localStorage.getItem('wms_arus_barang_mode')).toBe('keluar')
   })
 
-  it('URL without mode falls back to localStorage via router.replace', () => {
+  it('URL without mode falls back to localStorage via history.replaceState', () => {
     localStorage.setItem('wms_arus_barang_mode', 'keluar')
     currentMode = ''
     render(<ArusBarangPage />)
-    expect(mockRouterReplace).toHaveBeenCalledWith('/wms/arus-barang?mode=keluar')
+    // Now uses history.replaceState instead of router.replace for instant toggle
+    expect(mockHistoryReplaceState).toHaveBeenCalledWith(null, '', '/wms/arus-barang?mode=keluar')
   })
 
   // Regression (prod bug): "Buat Surat Jalan" was a silent no-op.

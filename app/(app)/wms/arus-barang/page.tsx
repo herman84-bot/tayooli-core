@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -148,7 +148,6 @@ type MasukTab = "penerimaan" | "putaway" | "trace" | "qc" | "dock"
 type KeluarTab = "surat_jalan" | "picking" | "packing" | "manifest"
 
 export default function ArusBarangPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const urlMode = searchParams.get("mode")?.toLowerCase()
@@ -170,20 +169,22 @@ export default function ArusBarangPage() {
 
   const { data: warehouses = [] } = useWarehouses()
 
+  // Sync URL → state only on mount or external URL change (e.g. browser back/forward).
+  // Uses history.replaceState ONLY (no router.replace) to avoid triggering a full
+  // Next.js navigation cycle which previously caused a ~2 s delay.
   useEffect(() => {
     if (urlMode === "masuk" || urlMode === "keluar") {
       setLocalMode(urlMode)
       localStorage.setItem("wms_arus_barang_mode", urlMode)
       return
     }
+    // URL has no valid mode param → write the saved/default mode into the address bar
     const saved = localStorage.getItem("wms_arus_barang_mode")
-    const target = saved === "keluar" ? "keluar" : "masuk"
+    const target: Mode = saved === "keluar" ? "keluar" : "masuk"
     setLocalMode(target)
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", `/wms/arus-barang?mode=${target}`)
-    }
-    router.replace(`/wms/arus-barang?mode=${target}`)
-  }, [urlMode, router])
+    window.history.replaceState(null, "", `/wms/arus-barang?mode=${target}`)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlMode])
 
   // Select default warehouse if available
   useEffect(() => {
@@ -195,10 +196,8 @@ export default function ArusBarangPage() {
   const switchMode = (newMode: Mode) => {
     setLocalMode(newMode)
     localStorage.setItem("wms_arus_barang_mode", newMode)
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", `/wms/arus-barang?mode=${newMode}`)
-    }
-    router.replace(`/wms/arus-barang?mode=${newMode}`)
+    // Update URL without triggering Next.js navigation (instant toggle)
+    window.history.replaceState(null, "", `/wms/arus-barang?mode=${newMode}`)
   }
 
   return (
