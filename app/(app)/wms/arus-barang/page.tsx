@@ -179,8 +179,11 @@ export default function ArusBarangPage() {
     const saved = localStorage.getItem("wms_arus_barang_mode")
     const target = saved === "keluar" ? "keluar" : "masuk"
     setLocalMode(target)
-    window.history.replaceState(null, "", `/wms/arus-barang?mode=${target}`)
-  }, [urlMode])
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `/wms/arus-barang?mode=${target}`)
+    }
+    router.replace(`/wms/arus-barang?mode=${target}`)
+  }, [urlMode, router])
 
   // Select default warehouse if available
   useEffect(() => {
@@ -192,7 +195,10 @@ export default function ArusBarangPage() {
   const switchMode = (newMode: Mode) => {
     setLocalMode(newMode)
     localStorage.setItem("wms_arus_barang_mode", newMode)
-    window.history.replaceState(null, "", `/wms/arus-barang?mode=${newMode}`)
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `/wms/arus-barang?mode=${newMode}`)
+    }
+    router.replace(`/wms/arus-barang?mode=${newMode}`)
   }
 
   return (

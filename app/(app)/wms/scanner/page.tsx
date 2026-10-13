@@ -553,14 +553,14 @@ export default function BarcodeScannerPage() {
               setPutawayError(null)
               setPutawaySuccessMessage(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "PUTAWAY"
                 ? "bg-[#2563EB] text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Layers className="w-4 h-4 shrink-0" />
-            <span className="whitespace-normal leading-tight">Penataan Rak</span>
+            <span className="whitespace-normal leading-tight text-center break-words">Penataan Rak Masuk</span>
           </button>
 
           <button
@@ -569,14 +569,14 @@ export default function BarcodeScannerPage() {
               setMode("OUTBOUND")
               setOutboundResult(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "OUTBOUND"
                 ? "bg-[#2563EB] text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Package className="w-4 h-4 shrink-0" />
-            <span className="whitespace-normal leading-tight">Ambil Barang</span>
+            <span className="whitespace-normal leading-tight text-center break-words">Pengambilan Barang Keluar</span>
           </button>
 
           <button
@@ -585,14 +585,14 @@ export default function BarcodeScannerPage() {
               setMode("LOADING_TRUCK")
               setLoadingScanResult(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "LOADING_TRUCK"
                 ? "bg-[#2563EB] text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Truck className="w-4 h-4 shrink-0" />
-            <span className="whitespace-normal leading-tight">Loading Truk</span>
+            <span className="whitespace-normal leading-tight text-center break-words">Loading Truk</span>
           </button>
 
           <button
@@ -602,27 +602,27 @@ export default function BarcodeScannerPage() {
               setLpnPutawaySuccessMessage(null)
               setLpnPutawayErrorMessage(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "PALLET_LPN"
                 ? "bg-[#2563EB] text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Box className="w-4 h-4 shrink-0" />
-            <span className="whitespace-normal leading-tight">Palet LPN</span>
+            <span className="whitespace-normal leading-tight text-center break-words">Penataan Palet LPN</span>
           </button>
 
           <button
             type="button"
             onClick={() => setMode("PRICE_CHECK")}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-xs sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
               mode === "PRICE_CHECK"
                 ? "bg-[#2563EB] text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
             <Tag className="w-4 h-4 shrink-0" />
-            <span className="whitespace-normal leading-tight">Cek SKU</span>
+            <span className="whitespace-normal leading-tight text-center break-words">Cek SKU</span>
           </button>
         </div>
 
