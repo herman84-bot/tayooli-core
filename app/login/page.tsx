@@ -1,5 +1,4 @@
 import { Metadata } from "next"
-import Link from "next/link"
 import { LoginForm } from "@/components/auth/LoginForm"
 import { RedirectIfAuthenticated } from "@/components/auth/RedirectIfAuthenticated"
 import { Logo } from "@/components/brand/Logo"
@@ -35,11 +34,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Belum punya akun?{' '}
-          <Link href="/register" className="font-medium text-primary hover:text-primary/80 transition-colors">
-            Daftar
-          </Link>
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Pendaftaran akun baru saat ini dikelola langsung oleh administrator sistem.
         </p>
 
         {process.env.NODE_ENV === "development" && (

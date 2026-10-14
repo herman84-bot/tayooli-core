@@ -528,7 +528,18 @@ func main() {
 	// Auth routes - public (login, register, verify) and protected (me, logout)
 	r.Route("/api/v1/auth", func(r chi.Router) {
 		r.With(authRateLimiter.Middleware).Post("/login", authHandler.Login)
-		r.With(authRateLimiter.Middleware).Post("/register", authHandler.Register)
+		// Registration is disabled by policy (public self-registration closed).
+		// Accounts must be provisioned by an administrator.
+		r.With(authRateLimiter.Middleware).Post("/register", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]string{
+					"code":    "REGISTRATION_DISABLED",
+					"message": "Pendaftaran akun baru saat ini dinonaktifkan oleh administrator.",
+				},
+			})
+		})
 		r.Get("/verify-email", authHandler.VerifyEmail)
 		r.With(authRateLimiter.Middleware).Post("/resend-verification", authHandler.ResendVerification)
 		r.With(authRateLimiter.Middleware).Post("/forgot-password", authHandler.ForgotPassword)

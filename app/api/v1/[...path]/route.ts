@@ -6,17 +6,36 @@ const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8081';
 // Timeout chain (outer > inner): browser 25s > proxy 20s > backend handler 15s.
 const PROXY_TIMEOUT_MS = 20_000;
 
+const REGISTRATION_DISABLED_PAYLOAD = {
+  error: {
+    code: 'REGISTRATION_DISABLED',
+    message: 'Pendaftaran akun baru saat ini dinonaktifkan oleh administrator.',
+  },
+};
+
+function isRegistrationPath(path: string): boolean {
+  const normalized = path.replace(/\/+$/, '').toLowerCase();
+  return normalized === '/auth/register';
+}
+
 // Proxy catch-all untuk /api/v1/* → backend Go.
 // Menangani auth (login/me/logout), invoices, approvals, accounting, dll.
 // Meneruskan cookie + authorization dari request asli agar sesi backend valid.
 // Ini adalah satu-satunya pintu frontend ke API Go; tanpa ini semua
 // panggilan /api/v1/* di frontend akan 404.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
-  return proxy(req, await joinPath(params));
+  const path = await joinPath(params);
+  if (isRegistrationPath(path)) {
+    return NextResponse.json(REGISTRATION_DISABLED_PAYLOAD, { status: 403 });
+  }
+  return proxy(req, path);
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const path = await joinPath(params);
+  if (isRegistrationPath(path)) {
+    return NextResponse.json(REGISTRATION_DISABLED_PAYLOAD, { status: 403 });
+  }
   const body = await req.json().catch(() => ({}));
   return proxy(req, path, {
     method: 'POST',
@@ -26,7 +45,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
-  return proxy(req, await joinPath(params), {
+  const path = await joinPath(params);
+  if (isRegistrationPath(path)) {
+    return NextResponse.json(REGISTRATION_DISABLED_PAYLOAD, { status: 403 });
+  }
+  return proxy(req, path, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(await req.json().catch(() => ({}))),
@@ -34,7 +57,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ path
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
-  return proxy(req, await joinPath(params), {
+  const path = await joinPath(params);
+  if (isRegistrationPath(path)) {
+    return NextResponse.json(REGISTRATION_DISABLED_PAYLOAD, { status: 403 });
+  }
+  return proxy(req, path, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(await req.json().catch(() => ({}))),
@@ -42,7 +69,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pa
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
-  return proxy(req, await joinPath(params), { method: 'DELETE' });
+  const path = await joinPath(params);
+  if (isRegistrationPath(path)) {
+    return NextResponse.json(REGISTRATION_DISABLED_PAYLOAD, { status: 403 });
+  }
+  return proxy(req, path, { method: 'DELETE' });
 }
 
 async function joinPath(params: Promise<{ path: string[] }>): Promise<string> {
