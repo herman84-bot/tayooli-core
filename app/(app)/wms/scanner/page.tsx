@@ -615,7 +615,7 @@ export default function BarcodeScannerPage() {
           <button
             type="button"
             onClick={() => setMode("PRICE_CHECK")}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all col-span-2 sm:col-span-1 ${
               mode === "PRICE_CHECK"
                 ? "bg-[#2563EB] text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
@@ -1301,7 +1301,7 @@ export default function BarcodeScannerPage() {
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 placeholder="Ketik barcode / SKU lalu Enter..."
-                className="w-full pl-10 pr-4 min-h-[48px] text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-mono"
+                className="w-full pl-10 pr-4 min-h-[48px] text-base sm:text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-mono"
               />
             </div>
             <button

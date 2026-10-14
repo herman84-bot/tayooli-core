@@ -40,15 +40,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 min-w-0 overflow-y-auto">
         {/* Mobile header with hamburger */}
         {isMobile && (
-          <div className="sticky top-0 z-30 flex items-center h-12 px-4 border-b border-border bg-background/95 backdrop-blur">
+          <div className="sticky top-0 z-30 flex items-center h-14 px-3 border-b border-border bg-background/95 backdrop-blur safe-top">
             <button
               onClick={() => setMobileOpen(true)}
-              className="p-1.5 -ml-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
               aria-label="Buka menu"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-6 w-6" />
             </button>
-            <span className="ml-3 text-sm font-semibold text-foreground">Tayooli</span>
+            <span className="ml-2 text-sm font-semibold text-foreground">Tayooli</span>
           </div>
         )}
 

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 // Inter is bundled from npm (@fontsource-variable/inter), not fetched from
 // Google Fonts at build time. next/font/google downloads font files during
 // `next build`; when that fetch flakes inside the Zeabur Docker build, the
@@ -7,6 +7,17 @@ import type { Metadata } from 'next'
 import '@fontsource-variable/inter'
 import './globals.css'
 import Providers from './providers'
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f9f9f9' },
+    { media: '(prefers-color-scheme: dark)', color: '#1f1f1f' },
+  ],
+}
 
 export const metadata: Metadata = {
   title: 'Tayooli — Sistem Manajemen Ritel, Gudang & Kasir POS',

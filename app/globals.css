@@ -255,11 +255,22 @@
   animation: arc-dash 1.4s ease-in-out infinite;
 }
 
-.animate-arc-spin {
-  animation: arc-spin 1.5s linear infinite;
+/* ----------------------------------------------------------------------------
+ * Mobile Safe Area Utilities
+ * -------------------------------------------------------------------------- */
+.safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 0.5rem);
 }
 
-.animate-arc-dash {
-  stroke-linecap: round;
-  animation: arc-dash 1.4s ease-in-out infinite;
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
 }
+
+.safe-left {
+  padding-left: max(env(safe-area-inset-left, 0px), 0.5rem);
+}
+
+.safe-right {
+  padding-right: max(env(safe-area-inset-right, 0px), 0.5rem);
+}
+

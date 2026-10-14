@@ -158,6 +158,7 @@ export default function POSPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showClearCartModal, setShowClearCartModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [showMobileCart, setShowMobileCart] = useState(false)
   const [exportingOrders, setExportingOrders] = useState(false)
 
   const posExportColumns: ExportColumn<POSOrder>[] = [
@@ -358,6 +359,7 @@ export default function POSPage() {
   const confirmClearCart = () => {
     setCart([])
     setShowClearCartModal(false)
+    setShowMobileCart(false)
   }
 
   // Hardware Scanner Integration
@@ -546,6 +548,17 @@ export default function POSPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentStatus.data?.status, paymentStatus.data?.order_id, showPaymentModal, isPaidSuccess])
 
+  // Prevent background scroll when mobile cart drawer is open
+  useEffect(() => {
+    if (showMobileCart) {
+      const originalOverflow = document.body.style.overflow
+      document.body.style.overflow = "hidden"
+      return () => {
+        document.body.style.overflow = originalOverflow
+      }
+    }
+  }, [showMobileCart])
+
   // Kasir Z-Report Reconciliation Summary
   const reconciliationData = useMemo(() => {
     let cashTotal = 0
@@ -614,6 +627,248 @@ export default function POSPage() {
   const handlePrintReceipt = () => {
     window.print()
   }
+
+  const renderCartContent = (isMobileModal = false) => (
+    <>
+      {/* Cart Header */}
+      <div className="p-3.5 border-b border-[#E2E8F0] space-y-2 bg-slate-50/70">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="w-5 h-5 text-[#2563EB]" />
+            <h2 className="font-bold text-sm text-slate-900">
+              Keranjang Kasir ({cart.reduce((s, i) => s + i.quantity, 0)})
+            </h2>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={handleHoldCart}
+                title="Tahan transaksi saat ini"
+                className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 sm:py-1 rounded-md flex items-center gap-1 min-h-[36px] sm:min-h-0"
+              >
+                <PauseCircle className="w-3.5 h-3.5" />
+                <span>Tahan</span>
+              </button>
+            )}
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={clearCart}
+                className="text-xs font-semibold text-rose-600 hover:text-rose-800 px-2 py-1.5 sm:py-1 min-h-[36px] sm:min-h-0"
+              >
+                Kosongkan
+              </button>
+            )}
+            {isMobileModal && (
+              <button
+                type="button"
+                onClick={() => setShowMobileCart(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-700 min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2"
+                aria-label="Tutup keranjang"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Customer Input & Held Carts Selector */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <User className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Nama Pelanggan..."
+              className="w-full pl-8 pr-2 py-1.5 sm:py-1 text-base sm:text-xs bg-white border border-slate-200 rounded-md focus:ring-1 focus:ring-[#2563EB]"
+            />
+          </div>
+
+          {heldCarts.length > 0 && (
+            <div className="relative">
+              <select
+                onChange={(e) => {
+                  if (e.target.value) handleResumeCart(e.target.value)
+                }}
+                value=""
+                className="text-xs font-bold bg-amber-100 border border-amber-300 text-amber-900 rounded-md px-2 py-1 cursor-pointer min-h-[36px] sm:min-h-0"
+              >
+                <option value="" disabled>
+                  Lanjutkan ({heldCarts.length})
+                </option>
+                {heldCarts.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.time} - {h.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Cart Items List */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-slate-100">
+        {cart.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400 space-y-3 min-h-48">
+            <ShoppingCart className="w-12 h-12 stroke-[1.2]" />
+            <div className="text-sm font-semibold text-slate-700">Keranjang Masih Kosong</div>
+            <p className="text-xs max-w-xs">
+              Pindai barcode barang atau klik produk di katalog untuk memulai transaksi kasir.
+            </p>
+          </div>
+        ) : (
+          cart.map((item) => {
+            const lineTotal = item.price * item.quantity - (item.discount || 0)
+            return (
+              <div key={item.id} className="pt-3 first:pt-0 space-y-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold text-xs sm:text-sm text-slate-900 line-clamp-1">
+                        {item.name}
+                      </span>
+                      {item.saleMode === "KONSINYASI" && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 shrink-0">
+                          KONSINYASI
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-mono text-[11px] text-slate-500 mt-0.5">
+                      @ Rp {item.price.toLocaleString("id-ID")}
+                    </div>
+                  </div>
+
+                  {/* Quantity Controller & Delete */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => updateQuantity(item.id, -1)}
+                      className="p-1 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100 min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] flex items-center justify-center active:scale-95 transition"
+                      aria-label="Kurangi kuantitas"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="w-7 text-center font-mono font-bold text-xs sm:text-sm">
+                      {item.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => updateQuantity(item.id, 1)}
+                      className="p-1 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100 min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] flex items-center justify-center active:scale-95 transition"
+                      aria-label="Tambah kuantitas"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeFromCart(item.id)}
+                      className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 min-h-[36px] min-w-[36px] sm:min-h-[32px] sm:min-w-[32px] flex items-center justify-center ml-1 active:scale-95 transition"
+                      title="Hapus baris"
+                      aria-label="Hapus barang"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Total Line Price */}
+                  <div className="font-mono font-bold text-xs sm:text-sm text-slate-900 text-right w-20 shrink-0">
+                    Rp {Math.max(0, lineTotal).toLocaleString("id-ID")}
+                  </div>
+                </div>
+
+                {/* Per-item discount input */}
+                <div className="flex items-center justify-end gap-1.5 text-[11px] text-slate-500">
+                  <Percent className="w-3 h-3 text-slate-400" />
+                  <span>Diskon barang (Rp):</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={item.discount || ""}
+                    onChange={(e) => updateItemDiscount(item.id, parseInt(e.target.value) || 0)}
+                    placeholder="0"
+                    className="w-20 px-1.5 py-1 sm:py-0.5 text-right font-mono text-base sm:text-xs border border-slate-200 rounded focus:ring-1 focus:ring-[#2563EB]"
+                  />
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Cart Footer & Calculations */}
+      <div className={`p-4 bg-slate-50 border-t border-[#E2E8F0] space-y-3 ${isMobileModal ? "safe-bottom" : ""}`}>
+        {/* Discount & Tax controls */}
+        <div className="flex items-center justify-between text-xs gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500">Diskon:</span>
+            <select
+              value={discountPercent}
+              onChange={(e) => setDiscountPercent(parseInt(e.target.value))}
+              className="px-2 py-1 rounded border border-slate-300 bg-white font-semibold text-xs min-h-[34px] sm:min-h-0"
+            >
+              <option value={0}>0%</option>
+              <option value={5}>5%</option>
+              <option value={10}>10%</option>
+              <option value={15}>15%</option>
+            </select>
+          </div>
+
+          <label className="flex items-center gap-1.5 cursor-pointer text-slate-600 min-h-[34px] sm:min-h-0">
+            <input
+              type="checkbox"
+              checked={applyTax}
+              onChange={(e) => setApplyTax(e.target.checked)}
+              className="rounded text-[#2563EB] w-4 h-4"
+            />
+            <span className="text-xs font-semibold">PPN 11%</span>
+          </label>
+        </div>
+
+        {/* Calculations Breakdown */}
+        <div className="space-y-1.5 text-xs text-slate-600 pt-2 border-t border-slate-200">
+          <div className="flex justify-between">
+            <span>Subtotal:</span>
+            <span className="font-mono">Rp {subtotal.toLocaleString("id-ID")}</span>
+          </div>
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-emerald-600 font-semibold">
+              <span>Potongan Diskon:</span>
+              <span className="font-mono">- Rp {discountAmount.toLocaleString("id-ID")}</span>
+            </div>
+          )}
+          {applyTax && (
+            <div className="flex justify-between">
+              <span>PPN 11%:</span>
+              <span className="font-mono">Rp {taxAmount.toLocaleString("id-ID")}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm sm:text-base font-extrabold text-slate-900 pt-2 border-t border-slate-200">
+            <span>Total Belanja:</span>
+            <span className="font-mono text-[#2563EB]">
+              Rp {grandTotal.toLocaleString("id-ID")}
+            </span>
+          </div>
+        </div>
+
+        {/* Pay Button (min 48px touch target) */}
+        <button
+          type="button"
+          disabled={cart.length === 0}
+          onClick={() => {
+            handleOpenPayment()
+            if (isMobileModal) setShowMobileCart(false)
+          }}
+          className="w-full min-h-[48px] rounded-xl font-extrabold text-sm sm:text-base bg-[#EA580C] hover:bg-[#C2410C] active:scale-95 text-white flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50 disabled:pointer-events-none"
+        >
+          <Banknote className="w-5 h-5" />
+          <span>Bayar Sekarang (Rp {grandTotal.toLocaleString("id-ID")})</span>
+        </button>
+      </div>
+    </>
+  )
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
@@ -697,12 +952,28 @@ export default function POSPage() {
                 <span>Konsinyasi</span>
               </button>
             </div>
+
+            {/* Mobile Cart Trigger Button */}
+            <button
+              type="button"
+              onClick={() => setShowMobileCart(true)}
+              className="lg:hidden relative px-3 py-2 rounded-xl text-xs font-bold border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition shadow-xs min-h-[38px]"
+              aria-label="Buka Keranjang Belanja"
+            >
+              <ShoppingCart className="w-4 h-4 text-[#2563EB]" />
+              <span>Keranjang</span>
+              {cart.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-[#EA580C] text-white text-[10px] font-bold">
+                  {cart.reduce((s, i) => s + i.quantity, 0)}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </div>
 
       {/* ── Main Layout: Catalog (Left) + Cart Sidebar (Right) ── */}
-      <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 pb-24 lg:pb-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* ── LEFT COLUMN: Product Catalog & Search (Col 7 or 8) ── */}
         <div className="lg:col-span-7 xl:col-span-8 flex flex-col space-y-4">
           {/* Quick Barcode Scan Input Bar */}
@@ -718,7 +989,7 @@ export default function POSPage() {
                     setScanError(null)
                   }}
                   placeholder="Pindai barcode dengan pemindai USB atau ketik SKU..."
-                  className="w-full pl-11 pr-4 min-h-[48px] text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-mono"
+                  className="w-full pl-11 pr-4 min-h-[48px] text-base sm:text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-mono"
                 />
               </div>
               <button
@@ -745,7 +1016,7 @@ export default function POSPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari nama barang atau SKU..."
-                className="w-full pl-10 pr-4 min-h-[44px] text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                className="w-full pl-10 pr-4 min-h-[44px] text-base sm:text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
               />
             </div>
 
@@ -840,230 +1111,62 @@ export default function POSPage() {
         </div>
 
         {/* ── RIGHT COLUMN: Cart Panel & Checkout (Col 5 or 4) ── */}
-        <div className="lg:col-span-5 xl:col-span-4 flex flex-col bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden h-[calc(100vh-140px)] sticky top-20">
-          {/* Cart Header */}
-          <div className="p-3.5 border-b border-[#E2E8F0] space-y-2 bg-slate-50/70">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-[#2563EB]" />
-                <h2 className="font-bold text-sm text-slate-900">
-                  Keranjang Kasir ({cart.reduce((s, i) => s + i.quantity, 0)})
-                </h2>
-              </div>
-              <div className="flex items-center gap-1.5">
-                {cart.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleHoldCart}
-                    title="Tahan transaksi saat ini"
-                    className="text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-md flex items-center gap-1"
-                  >
-                    <PauseCircle className="w-3.5 h-3.5" />
-                    <span>Tahan</span>
-                  </button>
-                )}
-                {cart.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={clearCart}
-                    className="text-xs font-semibold text-rose-600 hover:text-rose-800 px-1.5 py-1"
-                  >
-                    Kosongkan
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Customer Input & Held Carts Selector */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <User className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Nama Pelanggan..."
-                  className="w-full pl-8 pr-2 py-1 text-xs bg-white border border-slate-200 rounded-md focus:ring-1 focus:ring-[#2563EB]"
-                />
-              </div>
-
-              {heldCarts.length > 0 && (
-                <div className="relative">
-                  <select
-                    onChange={(e) => {
-                      if (e.target.value) handleResumeCart(e.target.value)
-                    }}
-                    value=""
-                    className="text-xs font-bold bg-amber-100 border border-amber-300 text-amber-900 rounded-md px-2 py-1 cursor-pointer"
-                  >
-                    <option value="" disabled>
-                      Lanjutkan ({heldCarts.length})
-                    </option>
-                    {heldCarts.map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {h.time} - {h.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Cart Items List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 divide-y divide-slate-100">
-            {cart.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400 space-y-3">
-                <ShoppingCart className="w-12 h-12 stroke-[1.2]" />
-                <div className="text-sm font-semibold text-slate-700">Keranjang Masih Kosong</div>
-                <p className="text-xs max-w-xs">
-                  Pindai barcode barang atau klik produk di katalog sebelah kiri untuk memulai transaksi kasir.
-                </p>
-              </div>
-            ) : (
-              cart.map((item) => {
-                const lineTotal = item.price * item.quantity - (item.discount || 0)
-                return (
-                  <div key={item.id} className="pt-3 first:pt-0 space-y-1.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-xs text-slate-900 line-clamp-1">
-                            {item.name}
-                          </span>
-                          {item.saleMode === "KONSINYASI" && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 shrink-0">
-                              KONSINYASI
-                            </span>
-                          )}
-                        </div>
-                        <div className="font-mono text-[11px] text-slate-500 mt-0.5">
-                          @ Rp {item.price.toLocaleString("id-ID")}
-                        </div>
-                      </div>
-
-                      {/* Quantity Controller & Delete */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => updateQuantity(item.id, -1)}
-                          className="p-1 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100 min-h-[32px] min-w-[32px] flex items-center justify-center"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="w-7 text-center font-mono font-bold text-xs">
-                          {item.quantity}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => updateQuantity(item.id, 1)}
-                          className="p-1 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-100 min-h-[32px] min-w-[32px] flex items-center justify-center"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeFromCart(item.id)}
-                          className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 min-h-[32px] min-w-[32px] flex items-center justify-center ml-1"
-                          title="Hapus baris"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Total Line Price */}
-                      <div className="font-mono font-bold text-xs text-slate-900 text-right w-20 shrink-0">
-                        Rp {Math.max(0, lineTotal).toLocaleString("id-ID")}
-                      </div>
-                    </div>
-
-                    {/* Per-item discount input */}
-                    <div className="flex items-center justify-end gap-1.5 text-[11px] text-slate-500">
-                      <Percent className="w-3 h-3 text-slate-400" />
-                      <span>Diskon barang (Rp):</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={item.discount || ""}
-                        onChange={(e) => updateItemDiscount(item.id, parseInt(e.target.value) || 0)}
-                        placeholder="0"
-                        className="w-16 px-1.5 py-0.5 text-right font-mono text-xs border border-slate-200 rounded focus:ring-1 focus:ring-[#2563EB]"
-                      />
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-
-          {/* Cart Footer & Calculations */}
-          <div className="p-4 bg-slate-50 border-t border-[#E2E8F0] space-y-3">
-            {/* Discount & Tax controls */}
-            <div className="flex items-center justify-between text-xs gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500">Diskon:</span>
-                <select
-                  value={discountPercent}
-                  onChange={(e) => setDiscountPercent(parseInt(e.target.value))}
-                  className="px-2 py-1 rounded border border-slate-300 bg-white font-semibold text-xs"
-                >
-                  <option value={0}>0%</option>
-                  <option value={5}>5%</option>
-                  <option value={10}>10%</option>
-                  <option value={15}>15%</option>
-                </select>
-              </div>
-
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={applyTax}
-                  onChange={(e) => setApplyTax(e.target.checked)}
-                  className="rounded text-[#2563EB]"
-                />
-                <span>PPN 11%</span>
-              </label>
-            </div>
-
-            {/* Calculations Breakdown */}
-            <div className="space-y-1.5 text-xs text-slate-600 pt-2 border-t border-slate-200">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span className="font-mono">Rp {subtotal.toLocaleString("id-ID")}</span>
-              </div>
-              {discountAmount > 0 && (
-                <div className="flex justify-between text-emerald-600 font-semibold">
-                  <span>Potongan Diskon:</span>
-                  <span className="font-mono">- Rp {discountAmount.toLocaleString("id-ID")}</span>
-                </div>
-              )}
-              {applyTax && (
-                <div className="flex justify-between">
-                  <span>PPN 11%:</span>
-                  <span className="font-mono">Rp {taxAmount.toLocaleString("id-ID")}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm sm:text-base font-extrabold text-slate-900 pt-2 border-t border-slate-200">
-                <span>Total Belanja:</span>
-                <span className="font-mono text-[#2563EB]">
-                  Rp {grandTotal.toLocaleString("id-ID")}
-                </span>
-              </div>
-            </div>
-
-            {/* Pay Button (min 48px touch target) */}
-            <button
-              type="button"
-              disabled={cart.length === 0}
-              onClick={handleOpenPayment}
-              className="w-full min-h-[48px] rounded-xl font-extrabold text-sm sm:text-base bg-[#EA580C] hover:bg-[#C2410C] active:scale-95 text-white flex items-center justify-center gap-2 transition-all shadow-md disabled:opacity-50 disabled:pointer-events-none"
-            >
-              <Banknote className="w-5 h-5" />
-              <span>Bayar Sekarang (Rp {grandTotal.toLocaleString("id-ID")})</span>
-            </button>
-          </div>
+        <div className="hidden lg:flex lg:col-span-5 xl:col-span-4 flex-col bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden h-[calc(100vh-140px)] sticky top-20">
+          {renderCartContent(false)}
         </div>
       </div>
+
+      {/* ── Mobile Floating Cart Bar (appears when items in cart) ── */}
+      {cart.length > 0 && (
+        <div
+          onClick={() => setShowMobileCart(true)}
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 safe-bottom shadow-2xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 duration-150 cursor-pointer active:bg-slate-50 transition-colors"
+          role="button"
+          tabIndex={0}
+          aria-label="Lihat ringkasan keranjang"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              setShowMobileCart(true)
+            }
+          }}
+        >
+          <div className="min-w-0 flex-1 pl-1">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              {cart.reduce((s, i) => s + i.quantity, 0)} Barang di Keranjang
+            </div>
+            <div className="text-base font-black font-mono text-slate-900 truncate">
+              Rp {grandTotal.toLocaleString("id-ID")}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowMobileCart(true)
+            }}
+            className="shrink-0 min-h-[44px] px-4 py-2.5 rounded-xl font-bold text-sm bg-[#EA580C] hover:bg-[#C2410C] text-white flex items-center gap-2 shadow-md active:scale-95 transition-all"
+            aria-label="Lihat Keranjang dan Pembayaran"
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <span>Lihat Keranjang</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── Mobile Cart Bottom Sheet / Drawer ── */}
+      {showMobileCart && (
+        <div className="fixed inset-0 z-50 lg:hidden flex flex-col justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div
+            className="fixed inset-0"
+            onClick={() => setShowMobileCart(false)}
+            aria-hidden="true"
+          />
+          <div className="relative z-10 bg-white rounded-t-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-200">
+            {renderCartContent(true)}
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL: Payment (Cash / QRIS) ── */}
       {showPaymentModal && (

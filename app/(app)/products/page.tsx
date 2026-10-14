@@ -403,7 +403,7 @@ export default function ProductsPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Cari berdasarkan nama produk atau SKU (pencarian server)..."
-              className="w-full pl-10 pr-4 min-h-[44px] text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white transition-all"
+              className="w-full pl-10 pr-4 min-h-[44px] text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white transition-all"
             />
           </div>
 
@@ -415,7 +415,7 @@ export default function ProductsPage() {
                 setPage(1)
               }}
               aria-label="Filter kategori"
-              className="w-full min-h-[44px] px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white transition-all text-slate-700"
+              className="w-full min-h-[44px] px-3 py-2 text-base sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:bg-white transition-all text-slate-700"
             >
               <option value="">Semua Kategori</option>
               <option value="none">-- Belum Berkategori --</option>
