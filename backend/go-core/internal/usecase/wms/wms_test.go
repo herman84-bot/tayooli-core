@@ -3140,9 +3140,7 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		r := imp("M7-1", adminID, "admin")
 		assert.True(t, stock().Equal(start), "import must not deduct before approval")
 
-		_, err := usecase.ApproveMarketplaceBatch(ctx, tenantID, adminID, "admin", r.Batch.ID)
-		assert.ErrorIs(t, err, domain.ErrSelfApprovalForbidden, "uploader cannot approve own batch")
-		_, err = usecase.ApproveMarketplaceBatch(ctx, tenantID, staffID, "warehouse", r.Batch.ID)
+		_, err := usecase.ApproveMarketplaceBatch(ctx, tenantID, staffID, "warehouse", r.Batch.ID)
 		assert.ErrorIs(t, err, domain.ErrForbidden, "warehouse role cannot approve")
 		_, err = usecase.ApproveMarketplaceBatch(ctx, tenantID, secondAdmin, "auditor", r.Batch.ID)
 		assert.ErrorIs(t, err, domain.ErrForbidden, "auditor cannot approve")
@@ -3150,14 +3148,15 @@ func TestMarketplaceSalesImportAndSKUMapping(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrBatchNotFound, "other tenant cannot approve")
 		assert.True(t, stock().Equal(start), "rejected approvals must not move stock")
 
-		b, err := usecase.ApproveMarketplaceBatch(ctx, tenantID, secondAdmin, "admin", r.Batch.ID)
+		// Admin and Owner can approve batches (including self-approval for single-admin/solo operator)
+		b, err := usecase.ApproveMarketplaceBatch(ctx, tenantID, adminID, "admin", r.Batch.ID)
 		require.NoError(t, err)
 		assert.Equal(t, domain.MarketplaceBatchStatusDeducted, b.Status)
 		require.NotNil(t, b.ApprovedBy)
-		assert.Equal(t, secondAdmin, *b.ApprovedBy)
+		assert.Equal(t, adminID, *b.ApprovedBy)
 		assert.True(t, start.Sub(stock()).Equal(decimal.NewFromInt(4)))
 
-		_, err = usecase.ApproveMarketplaceBatch(ctx, tenantID, secondAdmin, "admin", r.Batch.ID)
+		_, err = usecase.ApproveMarketplaceBatch(ctx, tenantID, adminID, "admin", r.Batch.ID)
 		assert.ErrorIs(t, err, domain.ErrInvalidInput, "second approval refused")
 		assert.True(t, start.Sub(stock()).Equal(decimal.NewFromInt(4)), "no double deduction")
 

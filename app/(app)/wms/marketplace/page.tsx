@@ -46,6 +46,7 @@ import {
   useImportMarketplaceOrders,
   useCreateSKUMapping,
 } from "@/hooks/useWMS"
+import { useAuthStore } from "@/hooks/useAuth"
 import { ProductCombobox } from "@/components/products/ProductCombobox"
 import {
   MarketplaceChannel,
@@ -166,6 +167,10 @@ function formatDate(dateStr: string | undefined | null): string {
 // ── Main Page Component ─────────────────────────────────────────────────────────
 
 export default function MarketplacePage() {
+  const currentUser = useAuthStore((s) => s.user)
+  const userRole = (currentUser?.role || "").toLowerCase()
+  const canApprove = userRole === "admin" || userRole === "owner"
+
   // Query data
   const { data: warehouses = [], isLoading: loadingWarehouses } = useWarehouses()
   const {
@@ -1388,7 +1393,7 @@ export default function MarketplacePage() {
                   Batch Menunggu Persetujuan ({pendingBatches.length})
                 </h3>
                 <p className="text-xs text-amber-800">
-                  Stok baru dipotong setelah batch disetujui owner/admin yang bukan pengunggah.
+                  Stok baru dipotong setelah batch disetujui oleh Owner atau Admin.
                 </p>
                 <ul className="divide-y divide-amber-200">
                   {pendingBatches.map((b) => (
@@ -1399,39 +1404,47 @@ export default function MarketplacePage() {
                           {CHANNEL_CONFIGS[b.channel as MarketplaceChannel]?.label || b.channel} · {b.processed_orders} pesanan · {b.file_name}
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          disabled={decideBatch.isPending}
-                          onClick={() =>
-                            decideBatch.mutate(
-                              { id: b.id, action: "approve" },
-                              {
-                                onSuccess: () => showNotification("success", "Batch Disetujui", `${b.batch_number}: stok telah dipotong.`),
-                                onError: (err) => showNotification("error", "Gagal Menyetujui", err instanceof Error ? err.message : "Gagal menyetujui batch"),
+                      <div className="flex gap-2 items-center">
+                        {canApprove ? (
+                          <>
+                            <button
+                              type="button"
+                              disabled={decideBatch.isPending}
+                              onClick={() =>
+                                decideBatch.mutate(
+                                  { id: b.id, action: "approve" },
+                                  {
+                                    onSuccess: () => showNotification("success", "Batch Disetujui", `${b.batch_number}: stok telah dipotong.`),
+                                    onError: (err) => showNotification("error", "Gagal Menyetujui", err instanceof Error ? err.message : "Gagal menyetujui batch"),
+                                  }
+                                )
                               }
-                            )
-                          }
-                          className="min-h-[40px] px-3 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:opacity-50"
-                        >
-                          Setujui & Potong Stok
-                        </button>
-                        <button
-                          type="button"
-                          disabled={decideBatch.isPending}
-                          onClick={() =>
-                            decideBatch.mutate(
-                              { id: b.id, action: "reject" },
-                              {
-                                onSuccess: () => showNotification("success", "Batch Ditolak", `${b.batch_number}: tidak ada stok yang dipotong.`),
-                                onError: (err) => showNotification("error", "Gagal Menolak", err instanceof Error ? err.message : "Gagal menolak batch"),
+                              className="min-h-[40px] px-3 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:opacity-50 hover:bg-emerald-700 transition-colors"
+                            >
+                              Setujui & Potong Stok
+                            </button>
+                            <button
+                              type="button"
+                              disabled={decideBatch.isPending}
+                              onClick={() =>
+                                decideBatch.mutate(
+                                  { id: b.id, action: "reject" },
+                                  {
+                                    onSuccess: () => showNotification("success", "Batch Ditolak", `${b.batch_number}: tidak ada stok yang dipotong.`),
+                                    onError: (err) => showNotification("error", "Gagal Menolak", err instanceof Error ? err.message : "Gagal menolak batch"),
+                                  }
+                                )
                               }
-                            )
-                          }
-                          className="min-h-[40px] px-3 rounded-lg border border-rose-300 text-rose-700 text-xs font-semibold disabled:opacity-50"
-                        >
-                          Tolak
-                        </button>
+                              className="min-h-[40px] px-3 rounded-lg border border-rose-300 text-rose-700 text-xs font-semibold disabled:opacity-50 hover:bg-rose-50 transition-colors"
+                            >
+                              Tolak
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-amber-700 italic">
+                            Menunggu persetujuan Admin/Owner
+                          </span>
+                        )}
                       </div>
                     </li>
                   ))}

@@ -2103,9 +2103,8 @@ func (u *Usecase) ResolveSKUMapping(ctx context.Context, tenantID, userID uuid.U
 }
 
 // ApproveMarketplaceBatch deducts stock for every PENDING order of a batch
-// (M7). Only owner/admin may approve and never the uploader (segregation of
-// duties). The PENDING_APPROVAL->APPROVED claim makes concurrent approvals
-// deduct once.
+// (M7). Only owner/admin may approve. The PENDING_APPROVAL->APPROVED claim makes
+// concurrent approvals deduct once.
 func (u *Usecase) ApproveMarketplaceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.MarketplaceImportBatch, error) {
 	batch, err := u.authorizeMarketplaceBatchDecision(ctx, tenantID, userID, role, batchID)
 	if err != nil {
@@ -2185,9 +2184,6 @@ func (u *Usecase) authorizeMarketplaceBatchDecision(ctx context.Context, tenantI
 	batch, err := u.repo.GetMarketplaceBatchByID(ctx, tenantID, batchID)
 	if err != nil {
 		return nil, err
-	}
-	if batch.UploadedBy == userID {
-		return nil, domain.ErrMarketplaceSelfApproval
 	}
 	return batch, nil
 }
