@@ -1,14 +1,90 @@
-import { getCustomerServiceReply, findBestTopic, TAYOOLI_KNOWLEDGE_TOPICS } from '../lib/chat/knowledge-engine'
+import { getCustomerServiceReply, findBestTopic } from '../lib/chat/knowledge-engine'
 
 interface TestCase {
   query: string
   expectedTopicId?: string
   mustContainText?: string
+  mustContainAll?: string[]
   mustNotContainText?: string
   description: string
 }
 
 const testCases: TestCase[] = [
+  // ── 1. USER CORE MANDATE: CAPABILITY & INTERROGATIVE QUERIES ──
+  {
+    query: 'apakah aplikasi ini bisa transfer gudang?',
+    expectedTopicId: 'stock_transfers',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Mandat Pengguna: "apakah aplikasi ini bisa transfer gudang?" harus langsung jawab tegas "Ya, tentu saja bisa!" dan panduan transfer stok',
+  },
+  {
+    query: 'bisa transfer barang antar cabang?',
+    expectedTopicId: 'stock_transfers',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Variasi kapabilitas: "bisa transfer barang antar cabang?"',
+  },
+  {
+    query: 'apakah bisa multi gudang?',
+    expectedTopicId: 'warehouse_wms',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas multi-gudang: "apakah bisa multi gudang?"',
+  },
+  {
+    query: 'apakah aplikasi ini bisa kasir?',
+    expectedTopicId: 'pos_cashier',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas POS: "apakah aplikasi ini bisa kasir?"',
+  },
+  {
+    query: 'bisa cetak struk kasir?',
+    expectedTopicId: 'pos_receipt_print',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas cetak struk: "bisa cetak struk kasir?"',
+  },
+  {
+    query: 'apakah bisa cetak surat jalan?',
+    expectedTopicId: 'delivery_order',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas Surat Jalan DO: "apakah bisa cetak surat jalan?"',
+  },
+  {
+    query: 'bisa catat barang masuk dari supplier?',
+    expectedTopicId: 'inbound_workflow',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas Inbound: "bisa catat barang masuk dari supplier?"',
+  },
+  {
+    query: 'apakah mendukung barcode scanner hp?',
+    expectedTopicId: 'barcode_scanner',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas Barcode Scanner: "apakah mendukung barcode scanner hp?"',
+  },
+  {
+    query: 'apakah ada fitur barang rusak?',
+    expectedTopicId: 'scrap_damaged',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas Scrap / Afkir: "apakah ada fitur barang rusak?"',
+  },
+  {
+    query: 'bisa integrasi shopee dan tokopedia?',
+    expectedTopicId: 'marketplace_sync',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas Marketplace: "bisa integrasi shopee dan tokopedia?"',
+  },
+  {
+    query: 'bisa stok opname?',
+    expectedTopicId: 'stock_opname',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas Stock Opname: "bisa stok opname?"',
+  },
+  {
+    query: 'bisa lihat omzet toko?',
+    expectedTopicId: 'dashboard_analytics',
+    mustContainText: 'Ya, tentu saja bisa!',
+    description: 'Kapabilitas Dasbor: "bisa lihat omzet toko?"',
+  },
+
+  // ── 2. SALAM, SAPAAN & POLITE RESPONSE ──
   {
     query: 'Halo min selamat pagi',
     expectedTopicId: 'greetings',
@@ -21,6 +97,14 @@ const testCases: TestCase[] = [
     mustContainText: 'Sama-sama kak!',
     description: 'Ucapan terima kasih ramah CS',
   },
+  {
+    query: 'siapa kamu sebenarnya?',
+    expectedTopicId: 'identity_about',
+    mustContainText: 'Tayooli ERP',
+    description: 'Identitas bot asisten resmi Tayooli',
+  },
+
+  // ── 3. DISAMBIGUASI PENCETAKAN & KATA AMBIGU ──
   {
     query: 'Bagaimana cara cetak surat jalan?',
     expectedTopicId: 'delivery_order',
@@ -36,11 +120,48 @@ const testCases: TestCase[] = [
     description: 'Disambiguasi: Cetak struk kasir harus ke Kasir POS, BUKAN Surat Jalan',
   },
   {
+    query: 'gimana cara cetak?',
+    mustContainAll: ['Struk Kasir (POS)', 'Surat Jalan (DO)'],
+    description: 'Query ambigu "cara cetak" harus memunculkan klarifikasi ramah',
+  },
+  {
+    query: 'gimana cara ngeprint?',
+    mustContainText: 'Struk Kasir (POS)',
+    description: 'Colloquial affix "ngeprint" harus terdeteksi disambiguasi struk vs surat jalan',
+  },
+  {
+    query: 'alur barang di tayooli',
+    mustContainText: 'Barang Masuk & Keluar',
+    description: 'Query ambigu "alur barang" harus memunculkan pilihan alur',
+  },
+
+  // ── 4. PROSEDUR & TUTORIAL ──
+  {
     query: 'Bagaimana alur transfer barang antar gudang cabang?',
     expectedTopicId: 'stock_transfers',
     mustContainText: 'Transfer Stok Antar Gudang',
     description: 'Panduan transfer stok antar cabang',
   },
+  {
+    query: 'bagaimana cara tambah produk baru dan isi SKU?',
+    expectedTopicId: 'products_master',
+    mustContainText: 'Master Produk & Katalog SKU',
+    description: 'Master data produk dan SKU',
+  },
+  {
+    query: 'bagaimana alur penerimaan barang masuk dari supplier?',
+    expectedTopicId: 'inbound_workflow',
+    mustContainText: 'Penerimaan Barang Masuk',
+    description: 'Alur penerimaan barang masuk supplier (Inbound)',
+  },
+  {
+    query: 'bagaimana cara ganti password dan atur tarif pajak ppn?',
+    expectedTopicId: 'settings_account',
+    mustContainText: 'Pengaturan Usaha, Pajak & Akun',
+    description: 'Pengaturan akun, profil usaha, dan pajak PPN',
+  },
+
+  // ── 5. TROUBLESHOOTING & KENDALA TEKNIS ──
   {
     query: 'kamera scanner barcode saya tidak bisa dibuka di hp',
     expectedTopicId: 'troubleshooting_camera',
@@ -54,65 +175,31 @@ const testCases: TestCase[] = [
     description: 'Troubleshooting printer thermal kasir',
   },
   {
+    query: 'kenapa stok di kasir tidak berkurang setelah transaksi?',
+    expectedTopicId: 'troubleshooting_stock',
+    mustContainText: 'Stok Selisih atau Tidak Terpotong',
+    description: 'Troubleshooting stok selisih/tidak terpotong',
+  },
+  {
     query: 'ada barang pecah dan kadaluwarsa mau dicatat afkir',
     expectedTopicId: 'scrap_damaged',
-    mustContainText: 'Barang Rusak / Scrap',
+    mustContainText: 'Barang Rusak / Afkir / Scrap',
     description: 'Pencatatan barang rusak / scrap / write-off',
   },
-  {
-    query: 'bagaimana cara tambah produk baru dan isi SKU?',
-    expectedTopicId: 'products_master',
-    mustContainText: 'Menambahkan Master Produk',
-    description: 'Master data produk dan SKU',
-  },
-  {
-    query: 'bagaimana cara sinkronisasi stok toko shopee tokopedia tiktok?',
-    expectedTopicId: 'marketplace_sync',
-    mustContainText: 'Marketplace Omnichannel',
-    description: 'Integrasi omnichannel marketplace',
-  },
-  {
-    query: 'gimana cara cetak?',
-    mustContainText: '**Struk Kasir** atau **Surat Jalan**',
-    description: 'Query ambigu "cetak" harus memunculkan klarifikasi ramah',
-  },
-  {
-    query: 'alur barang di tayooli',
-    mustContainText: 'Barang Masuk',
-    description: 'Query ambigu "alur barang" harus memunculkan pilihan alur',
-  },
+
+  // ── 6. ENTERPRISE DECOUPLED MODULES (KO-3) ──
   {
     query: 'bagaimana cara buat chart of accounts dan entri jurnal debit kredit?',
     expectedTopicId: 'legacy_accounting_faq',
     mustContainText: '12 Modul Operasional Inti',
     description: 'Permintaan modul akuntansi lama (CoA/Jurnal) ditolak dengan edukasi 12 modul inti',
   },
+
+  // ── 7. FALLBACK / DI LUAR DOMAIN ──
   {
     query: 'siapa pemenang piala dunia sepak bola 2022?',
-    mustContainText: 'Terima kasih atas pertanyaannya',
+    mustContainText: 'Mohon maaf, kami belum dapat memahami pertanyaan Anda secara spesifik',
     description: 'Pertanyaan di luar domain ERP menghasilkan smart fallback yang ramah',
-  },
-  {
-    query: 'bagaimana cara penerimaan barang masuk dari supplier?',
-    expectedTopicId: 'inbound_workflow',
-    mustContainText: 'Barang Masuk',
-    description: 'Alur penerimaan barang masuk supplier (Inbound)',
-  },
-  {
-    query: 'bagaimana cara ganti password dan atur tarif pajak ppn?',
-    expectedTopicId: 'settings_account',
-    mustContainText: 'Pengaturan',
-    description: 'Pengaturan akun, profil usaha, dan pajak PPN',
-  },
-  {
-    query: 'gimana cara ngeprint?',
-    mustContainText: 'Struk Belanja Kasir',
-    description: 'Colloquial affix "ngeprint" harus terdeteksi disambiguasi struk vs surat jalan',
-  },
-  {
-    query: 'bagaimana mencetak dokumen?',
-    mustContainText: 'Surat Jalan',
-    description: 'Colloquial affix "mencetak" harus terdeteksi disambiguasi struk vs surat jalan',
   },
 ]
 
@@ -140,6 +227,15 @@ for (const tc of testCases) {
   if (tc.mustContainText && !reply.includes(tc.mustContainText)) {
     passed = false
     errors.push(`Balasan tidak mengandung teks wajib: '${tc.mustContainText}'`)
+  }
+
+  if (tc.mustContainAll) {
+    for (const requiredText of tc.mustContainAll) {
+      if (!reply.includes(requiredText)) {
+        passed = false
+        errors.push(`Balasan tidak mengandung teks wajib: '${requiredText}'`)
+      }
+    }
   }
 
   if (tc.mustNotContainText && reply.includes(tc.mustNotContainText)) {
