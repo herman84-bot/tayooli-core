@@ -10,9 +10,28 @@ interface ChatMessageProps {
   timestamp?: string
 }
 
+function sanitizeStreamingLine(line: string): string {
+  let sanitized = line
+  // Auto-close unclosed markdown markers while streaming so raw markers are never exposed
+  const boldMatches = (sanitized.match(/\*\*/g) || []).length
+  if (boldMatches % 2 !== 0) {
+    sanitized += '**'
+  }
+  const codeMatches = (sanitized.match(/`/g) || []).length
+  if (codeMatches % 2 !== 0) {
+    sanitized += '`'
+  }
+  // Auto-close unclosed single asterisk italic (excluding double asterisks)
+  const remainingSingles = (sanitized.replace(/\*\*/g, '').match(/\*/g) || []).length
+  if (remainingSingles % 2 !== 0) {
+    sanitized += '*'
+  }
+  return sanitized
+}
+
 function renderInlineMarkdown(cleanLine: string, keyPrefix: string): React.ReactNode[] {
   const parts: React.ReactNode[] = []
-  const regex = /(\*\*.*?\*\*|`.*?`|\*.*?\*)/g
+  const regex = /(\*\*.*?\*\*|`.*?`|\*.*?\*|\[.*?\]\(.*?\))/g
   let lastIndex = 0
   let match: RegExpExecArray | null
 
@@ -42,6 +61,24 @@ function renderInlineMarkdown(cleanLine: string, keyPrefix: string): React.React
           {token.slice(1, -1)}
         </span>
       )
+    } else if (token.startsWith('[') && token.endsWith(')')) {
+      const linkMatch = token.match(/^\[(.*?)\]\((.*?)\)$/)
+      if (linkMatch) {
+        const [, label, url] = linkMatch
+        parts.push(
+          <a
+            key={`${keyPrefix}-${match.index}`}
+            href={url}
+            target={url.startsWith('/') ? undefined : '_blank'}
+            rel={url.startsWith('/') ? undefined : 'noopener noreferrer'}
+            className="text-primary underline hover:text-primary/80 font-medium inline-flex items-center gap-0.5"
+          >
+            {label}
+          </a>
+        )
+      } else {
+        parts.push(token)
+      }
     }
     lastIndex = regex.lastIndex
   }
@@ -68,6 +105,9 @@ function renderFormattedContent(content: string, isUser: boolean) {
           return <div key={idx} className="h-1" />
         }
 
+        const indentMatch = line.match(/^(\s+)/)
+        const isNested = (indentMatch?.[0].length ?? 0) >= 2
+
         // Check if bullet point or ordered list
         const isBullet = trimmed.startsWith('- ') || trimmed.startsWith('• ')
         const isNumbered = /^\d+\.\s+/.test(trimmed)
@@ -77,16 +117,16 @@ function renderFormattedContent(content: string, isUser: boolean) {
           const prefix = isBullet ? '• ' : trimmed.match(/^\d+\.\s+/)?.[0] ?? ''
 
           return (
-            <div key={idx} className="flex items-start gap-1.5 pl-1">
+            <div key={idx} className={cn('flex items-start gap-1.5', isNested ? 'pl-4' : 'pl-1')}>
               <span className="font-semibold text-primary shrink-0 select-none">{prefix}</span>
-              <div className="flex-1">{renderInlineMarkdown(cleanText, `line-${idx}`)}</div>
+              <div className="flex-1">{renderInlineMarkdown(sanitizeStreamingLine(cleanText), `line-${idx}`)}</div>
             </div>
           )
         }
 
         return (
           <div key={idx} className="text-foreground">
-            {renderInlineMarkdown(trimmed, `line-${idx}`)}
+            {renderInlineMarkdown(sanitizeStreamingLine(trimmed), `line-${idx}`)}
           </div>
         )
       })}

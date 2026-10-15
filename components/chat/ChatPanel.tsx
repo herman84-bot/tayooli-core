@@ -18,11 +18,11 @@ export default function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const { messages, sendMessage, isSending } = useChat()
+  const { messages, sendMessage, isSending, isThinking } = useChat()
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: isSending ? 'auto' : 'smooth' })
+  }, [messages, isSending])
 
   useEffect(() => {
     setTimeout(() => inputRef.current?.focus(), 200)
@@ -97,7 +97,7 @@ export default function ChatPanel() {
           />
         ))}
 
-        {isSending && (
+        {isThinking && (
           <div className="flex gap-3">
             <div className="h-8 w-8 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
               <Loader2 className="h-4 w-4 text-zinc-500 animate-spin" />

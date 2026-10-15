@@ -69,5 +69,6 @@ scripts/*
 !scripts/cancel-transfer-draft.js
 !scripts/verify-cancel-feature.js
 !scripts/verify-cancel-ui.js
+!scripts/test-knowledge-engine.ts
 
 .gotmp/

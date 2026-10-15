@@ -14,12 +14,12 @@ export default function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const { messages, sendMessage, isSending } = useChat()
+  const { messages, sendMessage, isSending, isThinking } = useChat()
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: isSending ? 'auto' : 'smooth' })
+  }, [messages, isSending])
 
   // Focus input when panel opens
   useEffect(() => {
@@ -122,7 +122,7 @@ export default function ChatWidget() {
               />
             ))}
 
-            {isSending && (
+            {isThinking && (
               <div className="flex gap-2.5">
                 <div className="h-7 w-7 rounded-full bg-zinc-100 flex items-center justify-center">
                   <Loader2 className="h-3.5 w-3.5 text-zinc-500 animate-spin" />
