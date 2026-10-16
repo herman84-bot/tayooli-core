@@ -14,15 +14,6 @@ func TestLockedPasswordHashRejectsEveryPassword(t *testing.T) {
 	}
 }
 
-func TestSeedAdminPasswordHashMatchesPassword123(t *testing.T) {
-	if err := bcrypt.CompareHashAndPassword([]byte(SeedAdminPasswordHash), []byte("password123")); err != nil {
-		t.Fatalf("seed admin hash does not match password123: %v", err)
-	}
-	if SeedAdminID != SeedAccountIDs[0] {
-		t.Fatalf("SeedAdminID must be admin@test.com")
-	}
-}
-
 func TestSeedAccountIDsCoverSeedMigrations(t *testing.T) {
 	want := map[string]bool{
 		"550e8400-e29b-41d4-a716-446655440001": true,

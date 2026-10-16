@@ -264,6 +264,12 @@ func (u *Usecase) ForgotPassword(ctx context.Context, email string) error {
 		// Don't reveal if email exists
 		return nil
 	}
+	if isLockedPasswordHash(user.PasswordHash) {
+		// Locked accounts (e.g. the public @test.com seed accounts in
+		// production) must not be re-enabled through a reset link.
+		log.Printf("[AUTH] forgot-password ignored for locked account: %s", email)
+		return nil
+	}
 
 	// Generate reset token
 	resetToken := uuid.New().String()
@@ -285,6 +291,13 @@ func (u *Usecase) ForgotPassword(ctx context.Context, email string) error {
 		}()
 	}
 	return nil
+}
+
+// isLockedPasswordHash reports whether an account has been deliberately locked
+// by storing a non-bcrypt sentinel starting with "!" as its password hash
+// (postgres.LockedPasswordHash). bcrypt hashes always start with "$".
+func isLockedPasswordHash(hash string) bool {
+	return strings.HasPrefix(hash, "!")
 }
 
 // lookupResetToken returns the user owning a usable reset token.
@@ -316,6 +329,9 @@ func (u *Usecase) ResetPassword(ctx context.Context, token, newPassword string) 
 	user, err := u.lookupResetToken(ctx, token)
 	if err != nil {
 		return err
+	}
+	if isLockedPasswordHash(user.PasswordHash) {
+		return domain.ErrInvalidToken
 	}
 
 	// Hash new password

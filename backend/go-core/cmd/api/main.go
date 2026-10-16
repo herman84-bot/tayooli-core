@@ -137,16 +137,6 @@ func main() {
 			log.Fatal().Err(err).Msg("failed to lock seed test accounts")
 		}
 		log.Info().Int64("changed", n).Msg("seed test accounts locked (production)")
-
-		// Opt-in: re-open admin@test.com for demo/QA. Remove the env var and
-		// restart to lock it again.
-		if os.Getenv("ALLOW_SEED_LOGIN") == "true" {
-			n, err := postgres.UnlockSeedAdmin(context.Background(), db)
-			if err != nil {
-				log.Fatal().Err(err).Msg("failed to unlock seed admin")
-			}
-			log.Warn().Int64("changed", n).Msg("ALLOW_SEED_LOGIN=true: admin@test.com login enabled")
-		}
 	}
 
 	// Kafka Producer: Decoupled with graceful fallback to no-op producer

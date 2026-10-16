@@ -656,6 +656,41 @@ func TestAuthUsecase_ForgotPassword_NonExistentEmail(t *testing.T) {
 	assert.False(t, mailer.resetEmailSent)
 }
 
+func TestAuthUsecase_ForgotPassword_LockedAccount(t *testing.T) {
+	user, _ := seedTestUser(t)
+	user.PasswordHash = "!locked-seed-account"
+	repo := newMockUserRepo()
+	repo.addUser(user)
+
+	mailer := &mockMailer{}
+	uc := New(repo, "test-secret", time.Hour, nil, mailer)
+
+	err := uc.ForgotPassword(context.Background(), user.Email)
+	require.NoError(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+	assert.False(t, mailer.resetEmailSent)
+	assert.Nil(t, user.PasswordResetToken)
+}
+
+func TestAuthUsecase_ResetPassword_LockedAccount(t *testing.T) {
+	user, _ := seedTestUser(t)
+	user.PasswordHash = "!locked-seed-account"
+	repo := newMockUserRepo()
+	repo.addUser(user)
+
+	token := "valid-reset-token"
+	expiresAt := time.Now().Add(time.Hour)
+	user.PasswordResetToken = &token
+	user.PasswordResetExpiresAt = &expiresAt
+
+	uc := New(repo, "test-secret", time.Hour, nil, nil)
+
+	err := uc.ResetPassword(context.Background(), token, "newpassword123")
+	assert.ErrorIs(t, err, domain.ErrInvalidToken)
+	assert.Equal(t, "!locked-seed-account", user.PasswordHash)
+}
+
 func TestAuthUsecase_ResetPassword_Success(t *testing.T) {
 	user, _ := seedTestUser(t)
 	repo := newMockUserRepo()
