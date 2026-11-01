@@ -20,15 +20,24 @@ type BatchAllocation struct {
 // AllocateFEFO picks batches First-Expired-First-Out (OCA §1.3: expiry_date ASC).
 // Batches without expiry go last; ties fall back to oldest batch, then location code.
 // ON_HOLD batches are skipped unless includeOnHold (adjustments such as scrap/opname
-// may touch held stock; sales may not). It never allocates more than a balance holds
-// and returns ErrInsufficientStock without a partial result when the total is short.
+// may touch held stock; sales may not). Expired batches (IsBatchExpired) are skipped
+// under the same rule, so they can only leave through scrap/opname/quarantine.
+// It never allocates more than a balance holds and returns ErrInsufficientStock
+// without a partial result when the total is short, or ErrExpiredStockBlocked when
+// the shortfall would have been covered by expired batches.
 func AllocateFEFO(balances []BatchBalance, qty decimal.Decimal, includeOnHold bool) ([]BatchAllocation, error) {
 	if !qty.IsPositive() {
 		return nil, ErrInvalidInput
 	}
+	now := ExpiryClock()
+	expiredQty := decimal.Zero
 	cands := make([]BatchBalance, 0, len(balances))
 	for _, b := range balances {
 		if !b.Quantity.IsPositive() {
+			continue
+		}
+		if !includeOnHold && IsBatchExpired(b.ExpiryDate, now) {
+			expiredQty = expiredQty.Add(b.Quantity)
 			continue
 		}
 		if b.Status == StockBatchStatusOnHold && !includeOnHold {
@@ -70,6 +79,9 @@ func AllocateFEFO(balances []BatchBalance, qty decimal.Decimal, includeOnHold bo
 		remaining = remaining.Sub(take)
 	}
 	if remaining.IsPositive() {
+		if expiredQty.GreaterThanOrEqual(remaining) {
+			return nil, ErrExpiredStockBlocked
+		}
 		return nil, ErrInsufficientStock
 	}
 	return out, nil
@@ -216,6 +228,8 @@ type WMSBatchRepository interface {
 	GetOrCreateBatch(ctx context.Context, b *StockBatch) (*StockBatch, error)
 	GetBatchByID(ctx context.Context, tenantID, id uuid.UUID) (*StockBatch, error)
 	ListBatchBalances(ctx context.Context, tenantID uuid.UUID, f BatchBalanceFilter) ([]BatchBalance, error)
+	// ListExpiringBatchBalances lists on-hand batches in the warehouses that expire on or before until.
+	ListExpiringBatchBalances(ctx context.Context, tenantID uuid.UUID, warehouseIDs []uuid.UUID, until time.Time) ([]ExpiringBatchLine, error)
 	// CreateStockMovements writes several movements in one transaction (all or nothing).
 	CreateStockMovements(ctx context.Context, tenantID uuid.UUID, movs []StockMovement) error
 	ListMovementsByReference(ctx context.Context, tenantID uuid.UUID, refType string, refID uuid.UUID) ([]StockMovement, error)

@@ -29,6 +29,10 @@ jest.mock('@/hooks/useWMSManifests', () => ({
   useWMSOutboundKPI: () => mockKPIResult,
 }))
 
+jest.mock('@/hooks/useExpiryReport', () => ({
+  useExpiryReport: () => ({ data: null, isLoading: false, error: null }),
+}))
+
 jest.mock('@/lib/queries/dashboard', () => ({
   useDashboardSummary: () => ({
     data: EMPTY_DASHBOARD_SUMMARY,

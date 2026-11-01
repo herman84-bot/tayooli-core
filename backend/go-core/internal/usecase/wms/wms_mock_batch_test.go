@@ -308,3 +308,11 @@ func (m *mockWMSRepo) ListAuditTrail(ctx context.Context, tenantID uuid.UUID, en
 	}
 	return entries, nil
 }
+
+func (m *mockWMSRepo) ListExpiringBatchBalances(ctx context.Context, tenantID uuid.UUID, warehouseIDs []uuid.UUID, until time.Time) ([]domain.ExpiringBatchLine, error) {
+	m.expiringWarehouseIDs = warehouseIDs
+	m.expiringUntil = until
+	out := make([]domain.ExpiringBatchLine, len(m.expiringLines))
+	copy(out, m.expiringLines)
+	return out, nil
+}

@@ -587,5 +587,13 @@ Submodul dan halaman baru di `app/(app)/wms/`:
 - [x] **TEST-05:** Pengujian menyeluruh unit, HTTP handler, dan komponen frontend (33 test case domain, 15 usecase/handler Go, 38 Jest test suites / 375 frontend tests) dengan audit AI Debt clean — commit `4b82f7f`, `067e01f`, `ed219b1`, `f966397`, `753673c`, `25c149b`.
 - [x] **DEPLOY-05:** Push commit ke `main`, verifikasi CI GitHub Actions, dan verifikasi endpoint live produksi Zeabur (`https://tayooli-backend.zeabur.app/health` & `https://tayooli.my.id`) — commit `481d6d5`.
 
+### KONTROL EXPIRED PER BATCH (permintaan klien 2026-11-01)
+> Pola acuan: OCA wms §1.3 (FEFO, `expiry_date ASC`, lot lewat expired tidak boleh di-pick) dan ADR-014 Invariant 1 (expired dinilai per batch, bukan per produk). Tanggal "hari ini" memakai kalender WIB (Asia/Jakarta); batch masih boleh dipakai pada tanggal expired-nya dan diblokir mulai hari berikutnya, konsisten dengan aturan rilis `expiry_date >= CURRENT_DATE`.
+- [x] **EXP-01 (BE):** Batch yang lewat expired **setelah** diterima diblokir dari jalur keluar. `AllocateFEFO` melewati batch expired untuk Surat Jalan, POS, transfer, marketplace, manifest, dan re-pick; batch yang dipilih eksplisit dicek di `deductLocationStockTx` dan `DispatchShippingManifest`. Error baru `ErrExpiredStockBlocked` (WMS 422, POS 409). Scrap/Opname/Karantina tetap boleh mengeluarkan stok expired.
+- [x] **EXP-02 (BE):** `GET /api/v1/wms/expiry-report?days=30&warehouse_id=` mendaftar saldo per batch × lokasi yang sudah expired / akan expired dalam N hari (1–365, default 30), dengan kategori `EXPIRED` / `CRITICAL` (≤ 7 hari) / `WARNING` dan ringkasan qty. Mematuhi akses gudang per role dan RLS tenant.
+- [x] **EXP-03 (FE):** Panel "Kontrol Expired per Batch" di Dasbor (`components/wms/ExpiryControlPanel.tsx`) dengan pilihan 30/60/90 hari dan tautan ke menu Scrap. Tidak menambah modul baru (tetap 12 modul).
+- [x] **EXP-04 (TEST):** Unit domain (batas hari WIB, FEFO), usecase, handler, Jest komponen, dan integrasi PostgreSQL nyata `TestExpiryControlRealPostgres` (DO dispatch diblokir, FEFO melewati batch expired, POS diblokir, scrap tetap jalan, laporan + RLS). Tes integrasi terbukti gagal bila pengecekan expired dimatikan.
+- [ ] **EXP-05 (opsional):** Minimal sisa umur simpan per customer (mis. ≥ 6 bulan) saat alokasi Surat Jalan, serta cetak label Batch + Exp (lihat FE-02).
+
 ---
 *Dokumen ini merupakan properti arsitektur resmi Tayooli ERP Core. Seluruh modifikasi wajib melalui peninjauan arsitektur tim CTO.*

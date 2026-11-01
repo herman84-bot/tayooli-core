@@ -117,6 +117,7 @@ type WMSUsecase interface {
 	SetDefaultLocation(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.SetDefaultLocationRequest) error
 	DeleteDefaultLocation(ctx context.Context, tenantID, userID uuid.UUID, role string, productID, warehouseID uuid.UUID) error
 	TraceBatch(ctx context.Context, tenantID, userID uuid.UUID, role string, batchID uuid.UUID) (*domain.BatchTrace, error)
+	GetExpiryReport(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, days int) (*domain.ExpiryReport, error)
 	TraceDocument(ctx context.Context, tenantID, userID uuid.UUID, role string, refType string, refID uuid.UUID) (*domain.DocumentTrace, error)
 	ListAuditTrail(ctx context.Context, tenantID, userID uuid.UUID, role string, entityType string, entityID uuid.UUID) ([]domain.AuditTrailEntry, error)
 
@@ -265,6 +266,9 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		// Traceability (KO-1c) & Audit
 		r.Get("/trace/batch/{id}", h.TraceBatch)
 		r.Get("/trace/document", h.TraceDocument)
+
+		// Expiry control per batch (OCA wms §1.3)
+		r.Get("/expiry-report", h.GetExpiryReport)
 		r.Get("/audit-trail", h.ListAuditTrail)
 
 		// Stock movements & Ledger
@@ -349,6 +353,8 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusConflict, "Jumlah rusak melebihi stok yang masih di staging (sebagian mungkin sudah di-putaway)")
 	case errors.Is(err, domain.ErrQuarantineQtyInvalid):
 		RespondError(w, r, http.StatusConflict, "Jumlah melebihi stok karantina batch ini")
+	case errors.Is(err, domain.ErrExpiredStockBlocked):
+		RespondError(w, r, http.StatusUnprocessableEntity, "Stok yang tersisa sudah kedaluwarsa (expired) dan diblokir dari pengeluaran. Pindahkan batch expired ke Scrap atau Karantina.")
 	case errors.Is(err, domain.ErrQuarantineStockBlocked):
 		RespondError(w, r, http.StatusConflict, "Stok di area karantina tidak bisa diambil, dijual, atau dipindahkan. Gunakan menu QC & Karantina untuk rilis atau musnahkan.")
 	case errors.Is(err, domain.ErrPackStationIncomplete):

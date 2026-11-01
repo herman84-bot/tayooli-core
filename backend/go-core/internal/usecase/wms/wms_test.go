@@ -47,6 +47,10 @@ type mockWMSRepo struct {
 	wmsSettings      map[uuid.UUID]*domain.WMSSettings
 	defaultLocations map[string]*domain.ProductDefaultLocation
 	auditLogs        []domain.AuditTrailEntry
+	// Expiry report (expiry_usecase_test.go)
+	expiringLines        []domain.ExpiringBatchLine
+	expiringWarehouseIDs []uuid.UUID
+	expiringUntil        time.Time
 }
 
 func newMockWMSRepo() *mockWMSRepo {

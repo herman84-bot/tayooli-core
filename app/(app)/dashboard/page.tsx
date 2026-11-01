@@ -6,6 +6,7 @@ import { useManualRefresh, AUTO_REFRESH_MS } from '@/hooks/useManualRefresh'
 import { RefreshButton } from '@/components/ui/RefreshButton'
 import { useDashboardSummary } from '@/lib/queries/dashboard'
 import { useWMSOutboundKPI } from '@/hooks/useWMSManifests'
+import { ExpiryControlPanel } from '@/components/wms/ExpiryControlPanel'
 import { TooltipWalkthrough } from '@/components/tutorial/TooltipWalkthrough'
 import {
   TrendingUp,
@@ -403,6 +404,9 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
+
+      {/* Kontrol expired per batch (FEFO) */}
+      <ExpiryControlPanel />
 
       {/* 8 Enterprise WMS SOP KPIs */}
       <section className={`border border-border/60 rounded-lg bg-card ${loading ? 'opacity-50' : ''}`}>

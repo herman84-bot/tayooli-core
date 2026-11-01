@@ -630,6 +630,9 @@ func (r *WMSRepo) DispatchShippingManifest(ctx context.Context, tenantID, manife
 
 			// If specific batch requested
 			if item.batchID != nil && *item.batchID != uuid.Nil {
+				if err := ensureBatchNotExpiredTx(ctx, tx, tenantID, *item.batchID); err != nil {
+					return nil, err
+				}
 				var currentStock decimal.Decimal
 				err := tx.QueryRowContext(ctx, `
 					SELECT COALESCE(

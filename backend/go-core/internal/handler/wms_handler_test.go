@@ -23,6 +23,7 @@ import (
 )
 
 type mockWMSUsecase struct {
+	getExpiryReportFn func(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, days int) (*domain.ExpiryReport, error)
 	createWarehouseFn     func(ctx context.Context, tenantID, userID uuid.UUID, role string, req uc.CreateWarehouseRequest) (*domain.Warehouse, error)
 	getWarehouseFn        func(ctx context.Context, tenantID, userID uuid.UUID, role string, id uuid.UUID) (*domain.Warehouse, error)
 	listWarehousesFn      func(ctx context.Context, tenantID, userID uuid.UUID, role string) ([]domain.Warehouse, error)

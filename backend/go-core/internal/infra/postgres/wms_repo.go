@@ -1030,6 +1030,26 @@ WHERE tenant_id = $1
 
 // DeductLocationStock atomically checks stock and inserts movement under an advisory transaction lock.
 // If mov.BatchID is nil, it allocates stock via FEFO (OCA §1.3) from on-hand batches at locationID.
+// ensureBatchNotExpiredTx returns domain.ErrExpiredStockBlocked when the batch
+// has passed its expiry date (business calendar, WIB). Unknown batches are left
+// to the balance check that follows.
+func ensureBatchNotExpiredTx(ctx context.Context, tx *sql.Tx, tenantID, batchID uuid.UUID) error {
+	var exp sql.NullTime
+	err := tx.QueryRowContext(ctx,
+		`SELECT expiry_date FROM stock_batches WHERE id = $1 AND tenant_id = $2`,
+		batchID, tenantID).Scan(&exp)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("ensureBatchNotExpired: %w", err)
+	}
+	if exp.Valid && domain.IsBatchExpired(&exp.Time, domain.ExpiryClock()) {
+		return domain.ErrExpiredStockBlocked
+	}
+	return nil
+}
+
 func (r *WMSRepo) deductLocationStockTx(ctx context.Context, tx *sql.Tx, tenantID, locationID, productID uuid.UUID, qty decimal.Decimal, mov *domain.StockMovement) error {
 	if !qty.IsPositive() {
 		return domain.ErrInvalidInput
@@ -1063,6 +1083,13 @@ func (r *WMSRepo) deductLocationStockTx(ctx context.Context, tx *sql.Tx, tenantI
 
 	// 2) If specific BatchID is requested: check that batch's balance directly
 	if mov.BatchID != nil && *mov.BatchID != uuid.Nil {
+		// Expiry control: an explicitly chosen batch past its expiry date may not
+		// leave through a sale/shipment/transfer (OCA wms §1.3).
+		if domain.IsOutboundStockRef(mov.ReferenceType) {
+			if err := ensureBatchNotExpiredTx(ctx, tx, tenantID, *mov.BatchID); err != nil {
+				return err
+			}
+		}
 		var currentStock decimal.Decimal
 		batchCalcSQL := `
 SELECT COALESCE(

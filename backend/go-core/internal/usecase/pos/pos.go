@@ -208,6 +208,9 @@ func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req 
 					CreatedAt:      time.Now().UTC(),
 				}
 				if err := u.wmsRepo.DeductWarehouseStock(ctx, tenantID, whID, item.ProductID, item.Quantity, mov); err != nil {
+					if errors.Is(err, domain.ErrExpiredStockBlocked) {
+						return nil, fmt.Errorf("%w (SKU %s)", domain.ErrExpiredStockBlocked, p.SKU)
+					}
 					if errors.Is(err, domain.ErrInsufficientStock) {
 						return nil, fmt.Errorf("%w: stok gudang tidak mencukupi untuk SKU %s", domain.ErrInsufficientStock, p.SKU)
 					}

@@ -197,7 +197,7 @@ func (h *POSHandler) checkout(w http.ResponseWriter, r *http.Request, tenantID u
 			// (e.g. after fixing a stock shortage) instead of losing it.
 			_ = h.payments.Release(r.Context(), tenantID, claimed)
 		}
-		if errors.Is(err, domain.ErrInsufficientStock) {
+		if errors.Is(err, domain.ErrInsufficientStock) || errors.Is(err, domain.ErrExpiredStockBlocked) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}

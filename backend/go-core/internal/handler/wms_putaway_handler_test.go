@@ -246,3 +246,10 @@ func TestSprint1Endpoints(t *testing.T) {
 		assert.Equal(t, http.StatusOK, auditDoRec.Code)
 	})
 }
+
+func (m *mockWMSUsecase) GetExpiryReport(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, days int) (*domain.ExpiryReport, error) {
+	if m.getExpiryReportFn != nil {
+		return m.getExpiryReportFn(ctx, tenantID, userID, role, warehouseID, days)
+	}
+	return &domain.ExpiryReport{Days: days, Lines: []domain.ExpiringBatchLine{}}, nil
+}

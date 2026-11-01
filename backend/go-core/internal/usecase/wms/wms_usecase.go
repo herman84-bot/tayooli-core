@@ -1021,6 +1021,11 @@ func (u *Usecase) CreateDeliveryOrder(ctx context.Context, tenantID, userID uuid
 			return nil, fmt.Errorf("auto FEFO allocation: list balances: %w", err)
 		}
 		allocs, err := domain.AllocateFEFO(balances, itemReq.Quantity, false)
+		if errors.Is(err, domain.ErrExpiredStockBlocked) {
+			// Only expired lots could cover this line: say so instead of
+			// falling back to an unbatched line (OCA wms §1.3).
+			return nil, err
+		}
 		if err == nil && len(allocs) > 0 {
 			for _, al := range allocs {
 				bID := al.BatchID

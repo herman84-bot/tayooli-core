@@ -1095,6 +1095,45 @@ export interface QuarantineLine {
   quantity: string
 }
 
+/** Expiry severity per batch (backend domain.ExpirySeverity*). */
+export type ExpirySeverity = "EXPIRED" | "CRITICAL" | "WARNING"
+
+/** One on-hand batch at one location in GET /wms/expiry-report. */
+export interface ExpiringBatchLine {
+  batch_id: string
+  batch_number: string
+  expiry_date: string
+  days_left: number
+  severity: ExpirySeverity
+  batch_status: string
+  product_id: string
+  product_name: string
+  product_sku: string
+  warehouse_id: string
+  warehouse_name: string
+  location_id: string
+  location_code: string
+  location_type: string
+  quantity: string
+}
+
+export interface ExpiryReportSummary {
+  expired_batches: number
+  expired_qty: string
+  critical_batches: number
+  critical_qty: string
+  warning_batches: number
+  warning_qty: string
+}
+
+/** GET /wms/expiry-report?days=&warehouse_id= (batch expiry control). */
+export interface ExpiryReport {
+  days: number
+  as_of: string
+  summary: ExpiryReportSummary
+  lines: ExpiringBatchLine[]
+}
+
 export interface QuarantineActionInput {
   warehouse_id: string
   product_id: string
@@ -1963,6 +2002,13 @@ export const api = {
           `/wms/default-locations?product_id=${encodeURIComponent(productId)}&warehouse_id=${encodeURIComponent(warehouseId)}`,
           { method: "DELETE" }
         ),
+    },
+    expiry: {
+      report: (days: number, warehouseId?: string) => {
+        const params = new URLSearchParams({ days: String(days) })
+        if (warehouseId) params.set("warehouse_id", warehouseId)
+        return request<{ data: ExpiryReport }>(`/wms/expiry-report?${params.toString()}`)
+      },
     },
     trace: {
       batch: (id: string) => request<{ data: BatchTrace }>(`/wms/trace/batch/${id}`),

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -321,4 +322,43 @@ func (h *WMSHandler) ListAuditTrail(w http.ResponseWriter, r *http.Request) {
 		entries = []domain.AuditTrailEntry{}
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"data": entries})
+}
+
+// GetExpiryReport handles GET /api/v1/wms/expiry-report?days=30&warehouse_id=
+// It lists on-hand batches that are expired or expire within `days` days.
+func (h *WMSHandler) GetExpiryReport(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	var whID *uuid.UUID
+	if s := strings.TrimSpace(r.URL.Query().Get("warehouse_id")); s != "" {
+		id, err := uuid.Parse(s)
+		if err != nil {
+			RespondError(w, r, http.StatusBadRequest, "invalid warehouse_id uuid")
+			return
+		}
+		whID = &id
+	}
+
+	days := 0
+	if s := strings.TrimSpace(r.URL.Query().Get("days")); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n <= 0 {
+			RespondError(w, r, http.StatusBadRequest, "days harus bilangan bulat positif")
+			return
+		}
+		days = n
+	}
+
+	report, err := h.uc.GetExpiryReport(r.Context(), tenantID, userID, role, whID, days)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"data": report})
 }
