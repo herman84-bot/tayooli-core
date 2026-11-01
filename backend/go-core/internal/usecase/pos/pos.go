@@ -122,8 +122,31 @@ func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req 
 
 	var subtotal decimal.Decimal
 	var lineItems []domain.POSOrderItem
+	// Nothing is written while the cart is validated: every write is collected
+	// here and persisted atomically by posRepo.CreateSale at the end.
+	sale := &domain.POSSale{}
 
-	// 1. Validate items and stock
+	// Resolve the WMS warehouse and customer location once (read / idempotent).
+	var whID, custLocID uuid.UUID
+	if u.wmsRepo != nil {
+		if req.WarehouseID != nil && *req.WarehouseID != uuid.Nil {
+			whID = *req.WarehouseID
+		} else {
+			whs, err := u.wmsRepo.ListWarehouses(ctx, tenantID)
+			if err == nil && len(whs) > 0 {
+				whID = whs[0].ID
+			}
+		}
+		if whID != uuid.Nil {
+			custLoc, err := u.wmsRepo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeCustomer)
+			if err != nil {
+				return nil, fmt.Errorf("pos: resolve customer location: %w", err)
+			}
+			custLocID = custLoc.ID
+		}
+	}
+
+	// 1. Validate items and plan stock deductions
 	for _, item := range req.Items {
 		if item.ProductID == uuid.Nil || item.Quantity.LessThanOrEqual(decimal.Zero) {
 			return nil, domain.ErrInvalidInput
@@ -134,36 +157,21 @@ func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req 
 			return nil, fmt.Errorf("produk tidak ditemukan: %w", err)
 		}
 
-		// Check stock in inventory
+		// Fast, read-only pre-check of legacy inventory. CreateSale re-checks
+		// under row locks, so concurrent cashiers cannot oversell.
 		if u.inventoryRepo != nil {
 			invs, err := u.inventoryRepo.GetByProductID(ctx, tenantID, item.ProductID)
 			if err == nil && len(invs) > 0 {
-				var totalStock float64
+				total := decimal.Zero
 				for _, inv := range invs {
-					totalStock += inv.Quantity
+					total = total.Add(decimal.NewFromFloat(inv.Quantity))
 				}
-				stockDec := decimal.NewFromFloat(totalStock)
-				if stockDec.LessThan(item.Quantity) {
-					return nil, fmt.Errorf("%w: SKU %s stok tersedia %.2f, diminta %s",
-						domain.ErrInsufficientStock, p.SKU, totalStock, item.Quantity.String())
+				if total.LessThan(item.Quantity) {
+					return nil, domain.LegacyInsufficientStockError(p.SKU, total, item.Quantity)
 				}
-
-				// Deduct from the first inventory row with available stock
-				reqQtyFloat, _ := item.Quantity.Float64()
-				for _, inv := range invs {
-					if inv.Quantity <= 0 {
-						continue
-					}
-					deduct := reqQtyFloat
-					if inv.Quantity < deduct {
-						deduct = inv.Quantity
-					}
-					_ = u.inventoryRepo.UpdateQuantity(ctx, tenantID, inv.ID, -deduct)
-					reqQtyFloat -= deduct
-					if reqQtyFloat <= 0 {
-						break
-					}
-				}
+				sale.InventoryDeductions = append(sale.InventoryDeductions, domain.POSInventoryDeduction{
+					ProductID: item.ProductID, SKU: p.SKU, Quantity: item.Quantity,
+				})
 			}
 		}
 
@@ -192,30 +200,19 @@ func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req 
 		}
 		lineItems = append(lineItems, lineItem)
 
-		// Record in immutable stock movement ledger if WMS repo is available
-		if u.wmsRepo != nil {
-			var whID uuid.UUID
-			if req.WarehouseID != nil && *req.WarehouseID != uuid.Nil {
-				whID = *req.WarehouseID
-			} else {
-				whs, err := u.wmsRepo.ListWarehouses(ctx, tenantID)
-				if err == nil && len(whs) > 0 {
-					whID = whs[0].ID
-				}
-			}
-
-			if whID != uuid.Nil {
-				custLoc, err := u.wmsRepo.GetOrCreateSystemLocation(ctx, tenantID, domain.LocationTypeCustomer)
-				if err != nil {
-					return nil, fmt.Errorf("pos: resolve customer location: %w", err)
-				}
-
-				mov := &domain.StockMovement{
+		// Plan the immutable stock movement (FEFO per batch) for this line.
+		if whID != uuid.Nil {
+			sale.StockDeductions = append(sale.StockDeductions, domain.POSStockDeduction{
+				WarehouseID: whID,
+				ProductID:   item.ProductID,
+				SKU:         p.SKU,
+				Quantity:    item.Quantity,
+				Movement: domain.StockMovement{
 					ID:             uuid.New(),
 					TenantID:       tenantID,
 					MovementNumber: generatePOSNumber("MV-POS"),
 					ProductID:      item.ProductID,
-					DestLocationID: custLoc.ID,
+					DestLocationID: custLocID,
 					Quantity:       item.Quantity,
 					UnitCost:       itemPrice,
 					Status:         domain.StockMovementStatusDone,
@@ -223,17 +220,8 @@ func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req 
 					ReferenceID:    orderID,
 					ExecutedBy:     &userID,
 					CreatedAt:      time.Now().UTC(),
-				}
-				if err := u.wmsRepo.DeductWarehouseStock(ctx, tenantID, whID, item.ProductID, item.Quantity, mov); err != nil {
-					if errors.Is(err, domain.ErrExpiredStockBlocked) {
-						return nil, fmt.Errorf("%w (SKU %s)", domain.ErrExpiredStockBlocked, p.SKU)
-					}
-					if errors.Is(err, domain.ErrInsufficientStock) {
-						return nil, fmt.Errorf("%w: stok gudang tidak mencukupi untuk SKU %s", domain.ErrInsufficientStock, p.SKU)
-					}
-					return nil, fmt.Errorf("pos: deduct warehouse stock SKU %s: %w", p.SKU, err)
-				}
-			}
+				},
+			})
 		}
 	}
 
@@ -281,8 +269,8 @@ func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req 
 		}
 	}
 
-	// 3. Create Sales Order
-	var salesOrderID *uuid.UUID
+	// 3. Plan Sales Order & Invoice (written in the same transaction as the sale)
+	var salesOrderID, salesInvoiceID *uuid.UUID
 	if u.salesOrderRepo != nil && custID != nil {
 		so := &domain.SalesOrder{
 			ID:          uuid.New(),
@@ -294,26 +282,23 @@ func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req 
 			CreatedAt:   time.Now().UTC(),
 			UpdatedAt:   time.Now().UTC(),
 		}
-		if err := u.salesOrderRepo.Create(ctx, so); err == nil {
-			salesOrderID = &so.ID
-		}
-	}
+		sale.SalesOrder = so
+		salesOrderID = &so.ID
 
-	// 4. Create Sales Invoice
-	var salesInvoiceID *uuid.UUID
-	if u.salesInvRepo != nil && salesOrderID != nil {
-		si := &domain.SalesInvoice{
-			ID:            uuid.New(),
-			TenantID:      tenantID,
-			SalesOrderID:  *salesOrderID,
-			InvoiceNumber: generatePOSNumber("INV-POS"),
-			Amount:        grandTotal,
-			Status:        "PAID",
-			DueDate:       time.Now().UTC(),
-			CreatedAt:     time.Now().UTC(),
-			UpdatedAt:     time.Now().UTC(),
-		}
-		if err := u.salesInvRepo.Create(ctx, si); err == nil {
+		// 4. Sales Invoice
+		if u.salesInvRepo != nil {
+			si := &domain.SalesInvoice{
+				ID:            uuid.New(),
+				TenantID:      tenantID,
+				SalesOrderID:  so.ID,
+				InvoiceNumber: generatePOSNumber("INV-POS"),
+				Amount:        grandTotal,
+				Status:        "PAID",
+				DueDate:       time.Now().UTC(),
+				CreatedAt:     time.Now().UTC(),
+				UpdatedAt:     time.Now().UTC(),
+			}
+			sale.SalesInvoice = si
 			salesInvoiceID = &si.ID
 		}
 	}
@@ -341,7 +326,14 @@ func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req 
 		UpdatedAt:      time.Now().UTC(),
 	}
 
-	if err := u.posRepo.CreateOrder(ctx, posOrder, lineItems); err != nil {
+	// 6. Persist everything atomically: stock deductions, sales order/invoice
+	// and the POS order commit together or not at all.
+	sale.Order = posOrder
+	sale.Items = lineItems
+	if err := u.posRepo.CreateSale(ctx, sale); err != nil {
+		if errors.Is(err, domain.ErrInsufficientStock) || errors.Is(err, domain.ErrExpiredStockBlocked) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("gagal menyimpan pesanan POS: %w", err)
 	}
 

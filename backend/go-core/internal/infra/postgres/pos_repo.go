@@ -8,14 +8,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/domain"
 	"github.com/lib/pq"
+	"github.com/shopspring/decimal"
 )
 
 type POSRepo struct {
-	db *sql.DB
+	db  *sql.DB
+	wms *WMSRepo // shares the pool; used for FEFO stock deduction inside CreateSale
 }
 
 func NewPOSRepo(db *sql.DB) *POSRepo {
-	return &POSRepo{db: db}
+	return &POSRepo{db: db, wms: NewWMSRepo(db)}
 }
 
 const createPOSOrderSQL = `
@@ -39,6 +41,123 @@ INSERT INTO pos_order_items (
     quantity, price, discount, subtotal, created_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
+// CreateSale writes a whole POS checkout in ONE transaction: legacy inventory
+// deductions, WMS ledger deductions (FEFO, expired batches blocked), the
+// optional sales order and invoice, and the POS order with its items. Any
+// failure rolls everything back, so stock never leaves for an unrecorded sale.
+// Locks are taken in POSSale.LockOrder() order to avoid deadlocks between
+// concurrent carts.
+func (r *POSRepo) CreateSale(ctx context.Context, sale *domain.POSSale) error {
+	if sale == nil || sale.Order == nil {
+		return domain.ErrInvalidInput
+	}
+	tenantID := sale.Order.TenantID
+	sale.LockOrder()
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("POSRepo.CreateSale: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return fmt.Errorf("POSRepo.CreateSale: set tenant: %w", err)
+	}
+
+	// 1. Legacy inventory rows (locked FOR UPDATE, checked, then deducted).
+	for _, d := range sale.InventoryDeductions {
+		if err := deductLegacyInventoryTx(ctx, tx, tenantID, d); err != nil {
+			return err
+		}
+	}
+
+	// 2. WMS ledger with FEFO batch allocation.
+	for _, d := range sale.StockDeductions {
+		mov := d.Movement
+		if err := r.wms.deductWarehouseStockTx(ctx, tx, tenantID, d.WarehouseID, d.ProductID, d.Quantity, &mov); err != nil {
+			return domain.WrapPOSStockError(d.SKU, err)
+		}
+	}
+
+	// 3. Sales order and invoice (accounting link of the sale).
+	if so := sale.SalesOrder; so != nil {
+		if _, err := tx.ExecContext(ctx, createSalesOrder, so.ID, so.TenantID, so.CustomerID, so.OrderNumber, so.TotalAmount, so.Status, so.CreatedAt, so.UpdatedAt); err != nil {
+			return fmt.Errorf("POSRepo.CreateSale: sales order: %w", err)
+		}
+		if si := sale.SalesInvoice; si != nil {
+			if _, err := tx.ExecContext(ctx, createSalesInvoice, si.ID, si.TenantID, si.SalesOrderID, si.InvoiceNumber, si.Amount, si.Status, si.DueDate, si.CreatedAt, si.UpdatedAt); err != nil {
+				return fmt.Errorf("POSRepo.CreateSale: sales invoice: %w", err)
+			}
+		}
+	}
+
+	// 4. POS order and items.
+	if err := insertPOSOrderTx(ctx, tx, sale.Order, sale.Items); err != nil {
+		return fmt.Errorf("POSRepo.CreateSale: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("POSRepo.CreateSale: commit: %w", err)
+	}
+	return nil
+}
+
+// deductLegacyInventoryTx removes d.Quantity from the product's legacy
+// inventory rows, oldest first. Products without rows are skipped (as before);
+// if the rows cannot cover the quantity the whole sale is refused.
+func deductLegacyInventoryTx(ctx context.Context, tx *sql.Tx, tenantID uuid.UUID, d domain.POSInventoryDeduction) error {
+	rows, err := tx.QueryContext(ctx, `
+SELECT id, quantity FROM inventory
+WHERE tenant_id = $1 AND product_id = $2
+ORDER BY created_at ASC, id ASC
+FOR UPDATE`, tenantID, d.ProductID)
+	if err != nil {
+		return fmt.Errorf("POSRepo.CreateSale: lock inventory: %w", err)
+	}
+	type invRow struct {
+		id  uuid.UUID
+		qty decimal.Decimal
+	}
+	var list []invRow
+	total := decimal.Zero
+	for rows.Next() {
+		var ir invRow
+		if err := rows.Scan(&ir.id, &ir.qty); err != nil {
+			rows.Close()
+			return fmt.Errorf("POSRepo.CreateSale: scan inventory: %w", err)
+		}
+		list = append(list, ir)
+		total = total.Add(ir.qty)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("POSRepo.CreateSale: inventory rows: %w", err)
+	}
+	rows.Close()
+
+	if len(list) == 0 {
+		return nil
+	}
+	if total.LessThan(d.Quantity) {
+		return domain.LegacyInsufficientStockError(d.SKU, total, d.Quantity)
+	}
+	remaining := d.Quantity
+	for _, ir := range list {
+		if !remaining.IsPositive() {
+			break
+		}
+		if !ir.qty.IsPositive() {
+			continue
+		}
+		take := decimal.Min(ir.qty, remaining)
+		if _, err := tx.ExecContext(ctx, updateInventoryQuantity, take.Neg(), ir.id, tenantID); err != nil {
+			return fmt.Errorf("POSRepo.CreateSale: deduct inventory: %w", err)
+		}
+		remaining = remaining.Sub(take)
+	}
+	return nil
+}
+
 func (r *POSRepo) CreateOrder(ctx context.Context, order *domain.POSOrder, items []domain.POSOrderItem) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -49,8 +168,18 @@ func (r *POSRepo) CreateOrder(ctx context.Context, order *domain.POSOrder, items
 	if err := setTenantLocally(ctx, tx, order.TenantID); err != nil {
 		return fmt.Errorf("POSRepo.CreateOrder: set tenant: %w", err)
 	}
+	if err := insertPOSOrderTx(ctx, tx, order, items); err != nil {
+		return fmt.Errorf("POSRepo.CreateOrder: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("POSRepo.CreateOrder: commit: %w", err)
+	}
+	return nil
+}
 
-	_, err = tx.ExecContext(ctx, createPOSOrderSQL,
+// insertPOSOrderTx inserts a POS order and its items inside the caller's transaction.
+func insertPOSOrderTx(ctx context.Context, tx *sql.Tx, order *domain.POSOrder, items []domain.POSOrderItem) error {
+	_, err := tx.ExecContext(ctx, createPOSOrderSQL,
 		order.ID, order.TenantID, order.OrderNumber,
 		ptrToNullUUID(order.CustomerID), ptrToNullUUID(order.WarehouseID),
 		order.Subtotal, order.TaxAmount, order.DiscountAmount, order.TotalAmount,
@@ -60,7 +189,7 @@ func (r *POSRepo) CreateOrder(ctx context.Context, order *domain.POSOrder, items
 		order.CreatedAt, order.UpdatedAt,
 	)
 	if err != nil {
-		return fmt.Errorf("POSRepo.CreateOrder: exec order: %w", err)
+		return fmt.Errorf("exec order: %w", err)
 	}
 
 	for _, item := range items {
@@ -69,12 +198,8 @@ func (r *POSRepo) CreateOrder(ctx context.Context, order *domain.POSOrder, items
 			item.Quantity, item.Price, item.Discount, item.Subtotal, item.CreatedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("POSRepo.CreateOrder: exec item: %w", err)
+			return fmt.Errorf("exec item: %w", err)
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("POSRepo.CreateOrder: commit: %w", err)
 	}
 	return nil
 }

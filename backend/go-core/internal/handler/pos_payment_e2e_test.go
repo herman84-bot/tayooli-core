@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/domain"
 	"github.com/herman84-bot/Erp-Like-PAPER-ID/backend/go-core/internal/handler"
@@ -174,6 +175,39 @@ func (g *e2eGateway) VerifyTransactionStatus(ctx context.Context, orderID string
 type e2ePOSRepo struct {
 	orders []domain.POSOrder
 	items  map[uuid.UUID][]domain.POSOrderItem
+	inv    *e2eInventoryRepo // CreateSale applies legacy inventory deductions here
+}
+
+// CreateSale mimics the transactional repo: check all lines, then apply all.
+func (m *e2ePOSRepo) CreateSale(ctx context.Context, sale *domain.POSSale) error {
+	if m.inv != nil {
+		for _, d := range sale.InventoryDeductions {
+			total := decimal.Zero
+			for _, inv := range m.inv.stocks {
+				if inv.ProductID == d.ProductID {
+					total = total.Add(decimal.NewFromFloat(inv.Quantity))
+				}
+			}
+			if total.LessThan(d.Quantity) {
+				return domain.LegacyInsufficientStockError(d.SKU, total, d.Quantity)
+			}
+		}
+		for _, d := range sale.InventoryDeductions {
+			remaining, _ := d.Quantity.Float64()
+			for id, inv := range m.inv.stocks {
+				if inv.ProductID != d.ProductID || inv.Quantity <= 0 || remaining <= 0 {
+					continue
+				}
+				take := remaining
+				if inv.Quantity < take {
+					take = inv.Quantity
+				}
+				_ = m.inv.UpdateQuantity(ctx, inv.TenantID, id, -take)
+				remaining -= take
+			}
+		}
+	}
+	return m.CreateOrder(ctx, sale.Order, sale.Items)
 }
 
 func (m *e2ePOSRepo) CreateOrder(ctx context.Context, order *domain.POSOrder, items []domain.POSOrderItem) error {
@@ -337,7 +371,7 @@ func buildE2E(t *testing.T, withCredentials bool) *e2eEnv {
 	inventory := &e2eInventoryRepo{stocks: map[uuid.UUID]*domain.Inventory{
 		invID: {ID: invID, TenantID: e2eTenant, ProductID: productID, Quantity: 100},
 	}}
-	posRepo := &e2ePOSRepo{items: map[uuid.UUID][]domain.POSOrderItem{}}
+	posRepo := &e2ePOSRepo{items: map[uuid.UUID][]domain.POSOrderItem{}, inv: inventory}
 
 	// wmsRepo is nil, exactly like the existing POS usecase test.
 	posUsecase := posUC.New(posRepo, productRepo, inventory, nil, &e2eCustomerRepo{}, &e2eSalesOrderRepo{}, &e2eSalesInvoiceRepo{})

@@ -14,6 +14,56 @@ import (
 type mockPOSRepo struct {
 	orders []domain.POSOrder
 	items  map[uuid.UUID][]domain.POSOrderItem
+	// CreateSale applies the sale to these fakes, all or nothing.
+	inv   *mockInventoryRepo
+	so    *mockSalesOrderRepo
+	si    *mockSalesInvoiceRepo
+	sales []domain.POSSale
+	// failSale makes CreateSale fail (simulates e.g. a DB error at commit).
+	failSale error
+}
+
+// CreateSale mimics the transactional repo: validate everything first, then
+// apply every write; on any error nothing is applied.
+func (m *mockPOSRepo) CreateSale(ctx context.Context, sale *domain.POSSale) error {
+	if m.failSale != nil {
+		return m.failSale
+	}
+	if m.inv != nil {
+		for _, d := range sale.InventoryDeductions {
+			total := decimal.Zero
+			for _, inv := range m.inv.stocks {
+				if inv.ProductID == d.ProductID {
+					total = total.Add(decimal.NewFromFloat(inv.Quantity))
+				}
+			}
+			if total.LessThan(d.Quantity) {
+				return domain.LegacyInsufficientStockError(d.SKU, total, d.Quantity)
+			}
+		}
+		for _, d := range sale.InventoryDeductions {
+			remaining, _ := d.Quantity.Float64()
+			for _, inv := range m.inv.stocks {
+				if inv.ProductID != d.ProductID || inv.Quantity <= 0 || remaining <= 0 {
+					continue
+				}
+				take := remaining
+				if inv.Quantity < take {
+					take = inv.Quantity
+				}
+				inv.Quantity -= take
+				remaining -= take
+			}
+		}
+	}
+	if sale.SalesOrder != nil && m.so != nil {
+		m.so.orders = append(m.so.orders, *sale.SalesOrder)
+	}
+	if sale.SalesInvoice != nil && m.si != nil {
+		m.si.invoices = append(m.si.invoices, *sale.SalesInvoice)
+	}
+	m.sales = append(m.sales, *sale)
+	return m.CreateOrder(ctx, sale.Order, sale.Items)
 }
 
 func (m *mockPOSRepo) CreateOrder(ctx context.Context, order *domain.POSOrder, items []domain.POSOrderItem) error {
@@ -175,9 +225,9 @@ func TestPOSCheckout_SuccessAndStockDeduction(t *testing.T) {
 		},
 	}
 
-	posRepo := &mockPOSRepo{items: make(map[uuid.UUID][]domain.POSOrderItem)}
 	soRepo := &mockSalesOrderRepo{}
 	siRepo := &mockSalesInvoiceRepo{}
+	posRepo := &mockPOSRepo{items: make(map[uuid.UUID][]domain.POSOrderItem), inv: iRepo, so: soRepo, si: siRepo}
 	custRepo := &mockCustomerRepo{}
 
 	uc := pos.New(posRepo, pRepo, iRepo, nil, custRepo, soRepo, siRepo)

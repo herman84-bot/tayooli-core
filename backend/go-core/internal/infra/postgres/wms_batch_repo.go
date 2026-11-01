@@ -405,9 +405,22 @@ func (r *WMSRepo) DeductWarehouseStock(ctx context.Context, tenantID, warehouseI
 	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
 		return fmt.Errorf("WMSRepo.DeductWarehouseStock: set tenant: %w", err)
 	}
+	if err := r.deductWarehouseStockTx(ctx, tx, tenantID, warehouseID, productID, qty, mov); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// deductWarehouseStockTx is DeductWarehouseStock inside a caller-owned
+// transaction (tenant already set), so a POS sale can deduct several products
+// and save its order atomically (POSRepo.CreateSale).
+func (r *WMSRepo) deductWarehouseStockTx(ctx context.Context, tx *sql.Tx, tenantID, warehouseID, productID uuid.UUID, qty decimal.Decimal, mov *domain.StockMovement) error {
+	if !qty.IsPositive() {
+		return domain.ErrInvalidInput
+	}
 
 	// Advisory transaction lock per (tenant, warehouse, product)
-	_, err = tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text || $2::text || $3::text))", tenantID, warehouseID, productID)
+	_, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtext($1::text || $2::text || $3::text))", tenantID, warehouseID, productID)
 	if err != nil {
 		return fmt.Errorf("WMSRepo.DeductWarehouseStock: advisory lock: %w", err)
 	}
@@ -497,7 +510,7 @@ ORDER BY b.expiry_date ASC NULLS LAST, b.created_at ASC, loc.code ASC, b.id ASC`
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 // -----------------------------------------------------------------------------
