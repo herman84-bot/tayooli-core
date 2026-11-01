@@ -2,9 +2,9 @@ package pos
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,9 +85,26 @@ func New(
 	}
 }
 
+// posNumberAlphabet is Crockford base32 (no I, L, O, U) so a number read aloud
+// or copied from a receipt is not mistaken for 1 or 0.
+const posNumberAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+// posNumberRandLen random characters give 50 bits per number. The previous
+// 4-digit suffix allowed only 9,000 numbers per day, so busy tills hit the
+// unique constraints on pos_orders/stock_movements and checkout failed with
+// HTTP 500. At 10,000 sales a day the collision chance is now ~4e-8.
+const posNumberRandLen = 10
+
+// generatePOSNumber returns "<prefix>-YYYYMMDD-<10 random base32 chars>".
 func generatePOSNumber(prefix string) string {
 	now := time.Now().UTC()
-	return fmt.Sprintf("%s-%s-%04d", prefix, now.Format("20060102"), rand.Intn(9000)+1000)
+	var buf [posNumberRandLen]byte
+	_, _ = rand.Read(buf[:]) // crypto/rand.Read never fails (Go 1.24+)
+	out := make([]byte, posNumberRandLen)
+	for i, b := range buf {
+		out[i] = posNumberAlphabet[b&31]
+	}
+	return fmt.Sprintf("%s-%s-%s", prefix, now.Format("20060102"), out)
 }
 
 func (u *Usecase) Checkout(ctx context.Context, tenantID, userID uuid.UUID, req CheckoutRequest) (*CheckoutResponse, error) {

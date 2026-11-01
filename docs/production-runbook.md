@@ -54,6 +54,8 @@ Alur inti: Frontend memproksi `/api/v1/*` server-side ke Go API → Go publish e
 | `BREVO_SENDER_NAME` | Opsional | Nama pengirim tampilan (default `Tayooli ERP`) |
 | `APP_URL` | **WAJIB** (`https://tayooli.my.id`) | Base URL semua tautan email (reset password, verifikasi, undangan) dan return URL pembayaran. Dibaca via `config.ResolveAppURL`: di `APP_ENV=production` nilai kosong/`localhost`/`http` ditolak, dicatat `[CONFIG] ERROR: APP_URL ...` di log, lalu diganti `https://tayooli.my.id`. Dibaca saat runtime (bukan build), cukup redeploy backend |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Alternatif jika tidak pakai Brevo | Fallback SMTP standar bila Brevo tidak dikonfigurasi |
+| `TENANT_RATE_RPS`, `TENANT_RATE_BURST` | Opsional, **naikkan untuk tenant besar** | Batas request per tenant (`cmd/api/main.go`, default `20` rps / burst `100`). Kuota ini dibagi oleh **semua user satu perusahaan**. Load test 2026-11-01 (300 user aktif bersamaan, jeda 3–10 detik per aksi) menghasilkan ±60 request/detik: dengan default, 67% request ditolak HTTP 429. Untuk ±300 user pakai `TENANT_RATE_RPS=150` dan `TENANT_RATE_BURST=300` |
+| `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS` | Opsional | Pool koneksi Postgres (default 25 / 10). Sesuaikan dengan `max_connections` Postgres |
 
 ### 2.3 AI Worker (Python)
 
@@ -189,6 +191,7 @@ curl -sf -b /tmp/cj http://<api>/api/v1/invoices   # hanya data tenant sendiri
 ### Konfigurasi
 - [ ] `NEXT_PUBLIC_API_URL`/`BACKEND_URL` menunjuk backend produksi (atau `AUTH_DEMO=true` untuk demo publik)
 - [ ] `FRONTEND_ORIGIN` diset (CORS)
+- [ ] `TENANT_RATE_RPS` / `TENANT_RATE_BURST` disesuaikan dengan jumlah user per tenant (±300 user: 150 / 300, lihat §2.2)
 - [ ] Migrasi 001–013 applied
 - [ ] Topics Kafka ada
 - [ ] Password seed users diganti jika memakai `012_e2e_test_users.sql` (admin@test.com / password123 — **jangan dibawa ke produksi**)
