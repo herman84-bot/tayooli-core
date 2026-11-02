@@ -432,7 +432,7 @@ export default function TransfersPage() {
     }
 
     return (
-      <div className="flex items-center gap-1 w-full max-w-md">
+      <div className="flex items-center gap-1 w-full">
         {steps.map((step, idx) => {
           const state = getStepState(step.key)
           return (
@@ -450,7 +450,7 @@ export default function TransfersPage() {
                     : "bg-slate-100 text-slate-400 border border-slate-200"
                 }`}
               >
-                <span className="text-[9px] font-medium leading-tight">{step.label}</span>
+                <span className="text-[9px] font-medium leading-tight whitespace-nowrap">{step.label}</span>
               </div>
               {idx < steps.length - 1 && (
                 <div
@@ -634,10 +634,10 @@ export default function TransfersPage() {
               return (
                 <div
                   key={transfer.id}
-                  className="bg-white rounded-xl border border-slate-200 hover:border-blue-200 hover:shadow-md transition-[border-color,box-shadow] p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5"
+                  className="bg-white rounded-xl border border-slate-200 hover:border-blue-200 hover:shadow-md transition-[border-color,box-shadow] p-5 flex flex-col lg:flex-row lg:flex-wrap items-start lg:items-center justify-between gap-5"
                 >
                   {/* Left Column: Number, Route, Logistics info */}
-                  <div className="space-y-3 flex-1">
+                  <div className="space-y-3 flex-1 min-w-0 lg:min-w-[24rem]">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <span className="font-mono text-base font-extrabold text-slate-900">
                         {transfer.transfer_number}
@@ -654,7 +654,7 @@ export default function TransfersPage() {
                     </div>
 
                     {/* Source -> Destination Route */}
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
                       <div className="flex items-center gap-1.5 font-semibold text-slate-800 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
                         <Building className="w-4 h-4 text-slate-500" />
                         <span>{getWarehouseName(transfer.from_warehouse_id)}</span>
@@ -730,7 +730,7 @@ export default function TransfersPage() {
                   </div>
 
                   {/* Middle Column: Visual Stepper Tracker */}
-                  <div className="w-full lg:w-72 flex flex-col items-start lg:items-center">
+                  <div className="w-full lg:w-[22rem] shrink-0 flex flex-col items-start lg:items-center">
                     <span className="text-[11px] font-semibold text-slate-500 mb-1.5">
                       Status Perjalanan
                     </span>
@@ -738,7 +738,7 @@ export default function TransfersPage() {
                   </div>
 
                   {/* Right Column: Actions (min 48px touch target) */}
-                  <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                  <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto lg:ml-auto shrink-0 justify-end pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                     {/* Action: Submit for approval (DRAFT -> PENDING_APPROVAL) */}
                     {isDraft && (
                       <>

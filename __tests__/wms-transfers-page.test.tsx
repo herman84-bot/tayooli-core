@@ -65,4 +65,24 @@ describe('TransfersPage UI and Typography Quality', () => {
     expect(dikirimStep.className).not.toMatch(/uppercase/)
     expect(dikirimStep.className).not.toMatch(/tracking-wider/)
   })
+
+  it('keeps the status tracker and action buttons from overlapping on wide screens', () => {
+    render(<TransfersPage />)
+
+    // Tracker column must not be squeezed below the width its five steps need.
+    const trackerColumn = screen.getByText('Status Perjalanan').parentElement as HTMLElement
+    expect(trackerColumn.className).toMatch(/\bshrink-0\b/)
+    expect(trackerColumn.className).not.toMatch(/lg:w-72\b/)
+
+    // Step labels never wrap or squash into each other.
+    expect(screen.getByText('Dikirim').className).toMatch(/whitespace-nowrap/)
+
+    // Action column keeps its own width instead of being overlapped.
+    const actionColumn = screen.getByRole('button', { name: 'Detail Item' }).parentElement as HTMLElement
+    expect(actionColumn.className).toMatch(/\bshrink-0\b/)
+
+    // Left info column is the one allowed to shrink (and its route chips wrap).
+    const leftColumn = screen.getByText('TR-2026-001').closest('div.space-y-3') as HTMLElement
+    expect(leftColumn.className).toMatch(/\bmin-w-0\b/)
+  })
 })
