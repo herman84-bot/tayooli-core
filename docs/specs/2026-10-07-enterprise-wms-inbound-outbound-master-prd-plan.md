@@ -421,16 +421,23 @@ ALTER TABLE delivery_orders ADD COLUMN IF NOT EXISTS package_box_type VARCHAR(50
 [PICKED] (Seluruh item terkumpul di troli & dibawa ke meja packing)
    │
    ▼
-[PACKING_QC] (100% SKU scan ulang di meja kemas, dimasukkan dus)
+[PACKING] (Scan 100% SKU di meja kemas, packing slip dimasukkan, cetak & tempel resi termal AWB)
    │
    ▼
-[PACKED] (Packing slip dimasukkan, resi termal AWB tertempel)
+[PACKED] (Paket terbungkus rapi, resi AWB tertempel, siap inspeksi QC Outbound)
+   │
+   ├── (Tolak QC / QC_FAILED: kemasan cacat / resi rusak ➔ kembali ke PACKING untuk kemas ulang)
+   ▼
+[QC_PASSED] (Inspeksi fisik, verifikasi koli/berat, scan resi AWB oleh pemeriksa QC independen - Segregation of Duties)
    │
    ▼
-[STAGED] (Paket ditaruh di Outbound Staging Area per ekspedisi)
+[STAGED] (Paket dipindahkan ke Outbound Staging Area & dialokasikan ke Manifes Ekspedisi)
    │
    ▼
-[SHIPPED] (Loading scan ke bak truk, tanda tangan DO/Manifest, mutasi stok final)
+[LOADED] (Loading scan 100% koli ke bak truk / armada ekspedisi di loading dock)
+   │
+   ▼
+[SHIPPED] (Pemberangkatan / Dispatch ekspedisi dengan TTD digital sopir & supervisor, mutasi stok final)
 ```
 
 ---
@@ -449,8 +456,11 @@ Endpoint baru yang disediakan di layer REST API (`backend/go-core/internal/handl
 | `GET` | `/api/v1/wms/outbound/picking/tasks` | Mengambil instruksi picking terurut rute terpendek untuk PDA. |
 | `POST` | `/api/v1/wms/outbound/picking/scan` | Validasi scan barcode rak dan produk saat pengambilan barang. |
 | `POST` | `/api/v1/wms/outbound/pack-station/verify` | Pemindaian verifikasi 100% di meja packing sebelum cetak AWB. |
-| `POST` | `/api/v1/wms/outbound/manifests` | Membuat lembar manifest serah terima ekspedisi menggabungkan Surat Jalan. |
-| `POST` | `/api/v1/wms/outbound/loading/scan` | Pemindaian barcode resi saat paket dimuat ke dalam armada truk. |
+| `POST` | `/api/v1/wms/delivery-orders/{id}/qc/pass` | Loloskan QC Outbound (verifikasi AWB & koli, Segregation of Duties `packed_by != qc_by`). |
+| `POST` | `/api/v1/wms/delivery-orders/{id}/qc/reject` | Tolak QC Outbound (`QC_FAILED`) dengan alasan wajib, kembalikan ke meja kemas. |
+| `GET` | `/api/v1/wms/outbound/qc/inspections` | Riwayat jejak audit inspeksi QC Outbound per gudang/Surat Jalan. |
+| `POST` | `/api/v1/wms/outbound/manifests` | Membuat lembar manifest serah terima ekspedisi (wajib Surat Jalan `QC_PASSED`). |
+| `POST` | `/api/v1/wms/outbound/loading/scan` | Pemindaian barcode resi saat paket dimuat ke dalam armada truk (`LOADED`). |
 
 ---
 

@@ -65,6 +65,19 @@ Historically, `tayooli-core` handled stock receipts and delivery orders as singl
 - Official legal documents (Surat Jalan 3-ply, Manifest Angkutan, and Berita Acara Kerusakan) use client-side browser print rendering on standard A4 paper with isolated `@media print` stylesheets.
 - Logistics labels (Pallet LPN and Carrier AWB) use high-contrast monochrome layouts calibrated for standard $100\text{mm} \times 150\text{mm}$ (4" x 6") direct thermal label printers.
 
+### Invariant 6: Outbound QC Verification & Segregation of Duties
+- Outbound shipping strictly adheres to the sequenced lifecycle:
+  `Order Release (Pick Wave) → Wave Picking → Packing & AWB (PACKED) → Outbound QC (QC_PASSED / QC_FAILED) → Staging Area (STAGED) → Loading Scan (LOADED) → Expedition Dispatch (SHIPPED)`.
+- **Segregation of Duties (Pemisahan Tugas ISO):**
+  The QC inspector (`qc_by`) MUST NOT be the same individual who packed the order (`packed_by`). Attempting self-approval returns `ErrQCSameActorForbidden`.
+- **Outbound QC Verification Scope:**
+  1. Verification of physical packaging integrity, seal, koli quantity, and weight match.
+  2. Mandatory barcode scanning and verification of courier AWB tracking barcode (`tracking_number`) or DO number.
+  3. Rejection transitions order to `QC_FAILED` with mandatory audit reason (`rejection_reason`), routing the package back to the packing station for repackaging.
+- **Manifest & Dock Dispatch Gating:**
+  - Creating a Shipping Manifest requires orders in `QC_PASSED` status. Orders in `PACKED` are rejected with `ErrDeliveryOrderNotQCPassed`.
+  - Dispatching a manifest requires all assigned orders to be physically scanned at the truck loading dock (`status = 'LOADED'`). Dispatches in `STAGED` without complete loading scan are rejected with `ErrManifestNotLoaded`.
+
 ---
 
 ## 3. Database Schema Blueprint

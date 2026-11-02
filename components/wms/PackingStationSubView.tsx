@@ -31,6 +31,8 @@ const DO_STATUS_LABEL: Record<string, string> = {
   CONFIRMED: "Dikonfirmasi",
   PICKED: "Sudah Diambil",
   PACKED: "Sudah Dikemas",
+  QC_PASSED: "Lolos QC",
+  QC_FAILED: "QC Ditolak (Kemasi Ulang)",
 }
 
 const doStatusLabel = (s: string) => DO_STATUS_LABEL[s] ?? s
@@ -94,9 +96,13 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
       setLoadingOrders(true)
       setOrdersError(null)
       const res = await api.wms.deliveryOrders.list(selectedWarehouseId || undefined)
-      // Filter orders ready for packing: CONFIRMED, PICKED, or PACKED
+      // Filter orders ready for packing: CONFIRMED, PICKED, PACKED, or QC_FAILED (repack required)
       const packable = (res.data || []).filter(
-        (o) => o.status === "CONFIRMED" || o.status === "PICKED" || o.status === "PACKED"
+        (o) =>
+          o.status === "CONFIRMED" ||
+          o.status === "PICKED" ||
+          o.status === "PACKED" ||
+          o.status === "QC_FAILED"
       )
       setOrders(packable)
     } catch (err: any) {
@@ -428,6 +434,19 @@ export function PackingStationSubView({ warehouseId }: PackingStationSubViewProp
                   )}
                 </div>
               </div>
+
+              {selectedOrder.status === "QC_FAILED" && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2.5 text-xs text-rose-800">
+                  <AlertCircle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-bold">Ditolak oleh Petugas QC Outbound:</span>
+                    <p className="mt-0.5 text-rose-700">{selectedOrder.qc_notes || "Kemasan atau item tidak sesuai standar, harap periksa kembali dan kemas ulang."}</p>
+                    {selectedOrder.qc_by_name && (
+                      <p className="text-[11px] text-rose-500 mt-0.5">Pemeriksa QC: {selectedOrder.qc_by_name}</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Status Alert Notification */}
               {scanMessage && (

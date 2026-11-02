@@ -261,13 +261,13 @@ export default function WMSDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-16">
+    <div className="min-h-screen bg-slate-50 pb-16">
       {/* ── Top Bar / Header ── */}
-      <div className="bg-white border-b border-[#E2E8F0] px-4 sm:px-6 py-5 sticky top-0 z-20 shadow-xs">
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-5 sticky top-0 z-20 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-[#EFF6FF] border border-[#BFDBFE] text-[#2563EB]">
+              <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-600">
                 <WarehouseIcon className="w-6 h-6" />
               </div>
               <div>
@@ -285,15 +285,15 @@ export default function WMSDashboardPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/wms/scanner"
-              className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-medium text-sm bg-white border border-[#BFDBFE] text-[#2563EB] hover:bg-[#EFF6FF] active:scale-95 transition-all shadow-xs"
+              className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-medium text-sm bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 active:scale-95 transition-colors shadow-xs"
             >
-              <ScanLine className="w-4 h-4 text-[#2563EB]" />
+              <ScanLine className="w-4 h-4 text-blue-600" />
               <span>Pemindai Barcode</span>
             </Link>
 
             <Link
               href="/wms/transfers"
-              className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-medium text-sm bg-white border border-[#E2E8F0] text-slate-700 hover:bg-slate-50 active:scale-95 transition-all shadow-xs"
+              className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-medium text-sm bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-colors shadow-xs"
             >
               <ArrowRightLeft className="w-4 h-4 text-slate-600" />
               <span>Transfer Stok</span>
@@ -304,7 +304,7 @@ export default function WMSDashboardPage() {
             <button
               type="button"
               onClick={() => setShowCreateLocModal(true)}
-              className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-medium text-sm bg-white border border-slate-300 text-slate-800 hover:bg-slate-100 active:scale-95 transition-all shadow-xs"
+              className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-medium text-sm bg-white border border-slate-300 text-slate-800 hover:bg-slate-100 active:scale-95 transition-colors shadow-xs"
             >
               <Plus className="w-4 h-4" />
               <span>+ Tambah Rak/Lokasi</span>
@@ -313,7 +313,7 @@ export default function WMSDashboardPage() {
             <button
               type="button"
               onClick={() => setShowCreateWhModal(true)}
-              className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-semibold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-sm"
+              className="inline-flex items-center justify-center gap-2 px-4 min-h-[48px] rounded-lg font-semibold text-sm bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-colors shadow-sm"
             >
               <Building className="w-4 h-4" />
               <span>+ Gudang Baru</span>
@@ -326,9 +326,9 @@ export default function WMSDashboardPage() {
         {/* ── Active Warehouse Selector & Quick Metrics ── */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Warehouse Selector Card */}
-          <div className="md:col-span-2 bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+          <div className="md:col-span-2 bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-xs font-semibold text-slate-600">
                 Pilih Gudang Aktif
               </span>
               <RefreshButton
@@ -338,7 +338,7 @@ export default function WMSDashboardPage() {
                 onClick={() => void refresh()}
                 showLabel
                 iconClassName="w-3.5 h-3.5"
-                className="text-xs text-[#2563EB] hover:bg-blue-50 rounded-md px-2 border border-transparent flex items-center gap-1 min-h-[36px]"
+                className="text-xs text-blue-600 hover:bg-blue-50 rounded-md px-2 border border-transparent flex items-center gap-1 min-h-[36px]"
               />
             </div>
 
@@ -347,12 +347,12 @@ export default function WMSDashboardPage() {
                 aria-label="Pilih Gudang Aktif"
                 value={selectedWarehouseId}
                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                className="w-full min-h-[48px] px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent transition-all"
+                className="w-full min-h-[48px] px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-colors"
               >
-                <option value="ALL">🌐 Semua Gudang</option>
+                <option value="ALL">Semua Gudang</option>
                 {warehouses.map((wh) => (
                   <option key={wh.id} value={wh.id}>
-                    📦 [{wh.code}] {wh.name} {wh.address ? `— ${wh.address}` : ""}
+                    [{wh.code}] {wh.name} {wh.address ? `— ${wh.address}` : ""}
                   </option>
                 ))}
               </select>
@@ -369,10 +369,10 @@ export default function WMSDashboardPage() {
           </div>
 
           {/* Metric 1: Total Locations / Racks */}
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between text-slate-500">
-              <span className="text-xs font-semibold uppercase tracking-wider">Total Rak</span>
-              <Layers className="w-5 h-5 text-[#2563EB]" />
+              <span className="text-xs font-semibold text-slate-600">Total Rak</span>
+              <Layers className="w-5 h-5 text-blue-600" />
             </div>
             <div className="mt-2">
               <div className="text-3xl font-extrabold text-slate-900">
@@ -385,10 +385,10 @@ export default function WMSDashboardPage() {
           </div>
 
           {/* Metric 2: Active Transfers */}
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between text-slate-500">
-              <span className="text-xs font-semibold uppercase tracking-wider">Transfer Dalam Pengiriman</span>
-              <Truck className="w-5 h-5 text-[#EA580C]" />
+              <span className="text-xs font-semibold text-slate-600">Transfer Dalam Pengiriman</span>
+              <Truck className="w-5 h-5 text-orange-600" />
             </div>
             <div className="mt-2">
               <div className="text-3xl font-extrabold text-slate-900">
@@ -402,14 +402,14 @@ export default function WMSDashboardPage() {
         </div>
 
         {/* ── Main Tabbed View ── */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           {/* Tabs bar */}
-          <div className="flex items-center border-b border-[#E2E8F0] px-4 sm:px-6 bg-slate-50/70">
+          <div className="flex items-center border-b border-slate-200 px-4 sm:px-6 bg-slate-50/70">
             <button
               onClick={() => setActiveTab("locations")}
-              className={`flex items-center gap-2 py-4 px-4 border-b-2 font-semibold text-sm transition-all min-h-[48px] ${
+              className={`flex items-center gap-2 py-4 px-4 border-b-2 font-semibold text-sm transition-colors min-h-[48px] ${
                 activeTab === "locations"
-                  ? "border-[#2563EB] text-[#2563EB] bg-white rounded-t-lg"
+                  ? "border-blue-600 text-blue-600 bg-white rounded-t-lg"
                   : "border-transparent text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -419,9 +419,9 @@ export default function WMSDashboardPage() {
 
             <button
               onClick={() => setActiveTab("movements")}
-              className={`flex items-center gap-2 py-4 px-4 border-b-2 font-semibold text-sm transition-all min-h-[48px] ${
+              className={`flex items-center gap-2 py-4 px-4 border-b-2 font-semibold text-sm transition-colors min-h-[48px] ${
                 activeTab === "movements"
-                  ? "border-[#2563EB] text-[#2563EB] bg-white rounded-t-lg"
+                  ? "border-blue-600 text-blue-600 bg-white rounded-t-lg"
                   : "border-transparent text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -441,8 +441,8 @@ export default function WMSDashboardPage() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Cari kode rak, nama, atau barcode..."
-                    className="w-full pl-10 pr-4 min-h-[48px] text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                    placeholder="Cari kode rak, nama, atau barcode…"
+                    className="w-full pl-10 pr-4 min-h-[48px] text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
 
@@ -458,9 +458,9 @@ export default function WMSDashboardPage() {
                     <button
                       key={filter.value}
                       onClick={() => setTypeFilter(filter.value)}
-                      className={`px-3 py-2 text-xs font-semibold rounded-lg transition-all min-h-[40px] whitespace-nowrap ${
+                      className={`px-3 py-2 text-xs font-semibold rounded-lg transition-colors min-h-[40px] whitespace-nowrap ${
                         typeFilter === filter.value
-                          ? "bg-[#2563EB] text-white"
+                          ? "bg-blue-600 text-white"
                           : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                       }`}
                     >
@@ -474,7 +474,7 @@ export default function WMSDashboardPage() {
               {loadingLocations ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div key={i} className="bg-white rounded-xl border border-[#E2E8F0] p-4.5 space-y-4 shadow-xs">
+                    <div key={i} className="bg-white rounded-xl border border-slate-200 p-4.5 space-y-4 shadow-xs">
                       <div className="flex justify-between items-start">
                         <div className="space-y-1.5 flex-1">
                           <ShimmerSkeleton className="h-5 w-24 rounded" />
@@ -501,7 +501,7 @@ export default function WMSDashboardPage() {
                   </p>
                   <button
                     onClick={() => setShowCreateLocModal(true)}
-                    className="inline-flex items-center gap-2 px-5 min-h-[48px] rounded-lg font-semibold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
+                    className="inline-flex items-center gap-2 px-5 min-h-[48px] rounded-lg font-semibold text-sm bg-blue-600 text-white hover:bg-blue-700"
                   >
                     <Plus className="w-4 h-4" />
                     + Tambah Rak / Lokasi
@@ -517,7 +517,7 @@ export default function WMSDashboardPage() {
                     return (
                       <div
                         key={loc.id}
-                        className="bg-white rounded-xl border border-[#E2E8F0] p-4.5 hover:border-[#BFDBFE] hover:shadow-md transition-all flex flex-col justify-between"
+                        className="bg-white rounded-xl border border-slate-200 p-4.5 hover:border-blue-200 hover:shadow-md transition-[border-color,box-shadow] flex flex-col justify-between"
                       >
                         <div>
                           {/* Card Header: Code & Badges */}
@@ -587,7 +587,7 @@ export default function WMSDashboardPage() {
                           </div>
                           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all ${
+                              className={`h-full rounded-full transition-colors ${
                                 occupancyPercent > 85
                                   ? "bg-rose-500"
                                   : occupancyPercent > 60
@@ -629,7 +629,7 @@ export default function WMSDashboardPage() {
               {/* Table */}
               <div className="overflow-x-auto border border-slate-200 rounded-xl">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-600 border-b border-slate-200">
+                  <thead className="bg-slate-100 text-xs font-semibold text-slate-600 border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3">No. Mutasi / Waktu</th>
                       <th className="px-4 py-3">Produk & SKU</th>
@@ -645,7 +645,7 @@ export default function WMSDashboardPage() {
                     {loadingMovements ? (
                       <tr>
                         <td colSpan={8} className="px-4 py-8 text-center text-slate-500 text-sm">
-                          Memuat riwayat mutasi stok...
+                          Memuat riwayat mutasi stok…
                         </td>
                       </tr>
                     ) : movements.length === 0 ? (
@@ -658,7 +658,7 @@ export default function WMSDashboardPage() {
                       movements.map((mov) => (
                         <tr key={mov.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="px-4 py-3 font-mono text-xs text-slate-900">
-                            <div className="font-bold text-[#2563EB]">{mov.movement_number}</div>
+                            <div className="font-bold text-blue-600">{mov.movement_number}</div>
                             <div className="text-[11px] text-slate-400">
                               {new Date(mov.created_at).toLocaleString("id-ID", {
                                 day: "numeric",
@@ -679,7 +679,7 @@ export default function WMSDashboardPage() {
                           <td className="px-4 py-3">
                             {renderLocationBadge(mov.dest_location_code || mov.dest_location_id || "-")}
                           </td>
-                          <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                          <td className="px-4 py-3 text-right font-bold text-slate-900 tabular-nums">
                             {Number(mov.quantity) > 0 ? `+${Number(mov.quantity)}` : Number(mov.quantity)}{" "}
                             <span className="text-xs font-normal text-slate-500">unit</span>
                           </td>
@@ -751,10 +751,10 @@ export default function WMSDashboardPage() {
       {/* ── MODAL 1: Create Warehouse ── */}
       {showCreateWhModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-[#EFF6FF] text-[#2563EB]">
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
                   <Building className="w-5 h-5" />
                 </div>
                 <div>
@@ -779,7 +779,7 @@ export default function WMSDashboardPage() {
 
             <form onSubmit={handleCreateWarehouse} className="mt-5 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Kode Gudang *
                 </label>
                 <input
@@ -788,12 +788,12 @@ export default function WMSDashboardPage() {
                   placeholder="Misal: GUDANG-CKG-01"
                   value={newWhCode}
                   onChange={(e) => setNewWhCode(e.target.value.toUpperCase())}
-                  className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+                  className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-600 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Nama Gudang *
                 </label>
                 <input
@@ -802,20 +802,20 @@ export default function WMSDashboardPage() {
                   placeholder="Misal: Gudang Distribusi Cakung"
                   value={newWhName}
                   onChange={(e) => setNewWhName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+                  className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Alamat / Wilayah
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Alamat lengkap fasilitas gudang..."
+                  placeholder="Alamat lengkap fasilitas gudang…"
                   value={newWhAddress}
                   onChange={(e) => setNewWhAddress(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none"
                 />
               </div>
 
@@ -830,9 +830,9 @@ export default function WMSDashboardPage() {
                 <button
                   type="submit"
                   disabled={createWarehouseMutation.isPending}
-                  className="px-5 min-h-[48px] rounded-lg text-sm font-semibold bg-[#2563EB] text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+                  className="px-5 min-h-[48px] rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {createWarehouseMutation.isPending ? "Menyimpan..." : "Simpan Gudang"}
+                  {createWarehouseMutation.isPending ? "Menyimpan…" : "Simpan Gudang"}
                 </button>
               </div>
             </form>
@@ -843,10 +843,10 @@ export default function WMSDashboardPage() {
       {/* ── MODAL 2: Create Location / Rack ── */}
       {showCreateLocModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-[#EFF6FF] text-[#2563EB]">
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
                   <Layers className="w-5 h-5" />
                 </div>
                 <div>
@@ -871,13 +871,13 @@ export default function WMSDashboardPage() {
 
             <form onSubmit={handleCreateLocation} className="mt-5 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Pilih Gudang *
                 </label>
                 <select
                   value={newLocWarehouseId || (selectedWarehouseId !== "ALL" ? selectedWarehouseId : "")}
                   onChange={(e) => setNewLocWarehouseId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+                  className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none"
                 >
                   <option value="">-- Pilih Gudang --</option>
                   {warehouses.map((wh) => (
@@ -890,7 +890,7 @@ export default function WMSDashboardPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Kode Lokasi *
                   </label>
                   <input
@@ -899,12 +899,12 @@ export default function WMSDashboardPage() {
                     placeholder="Contoh: RAK-A1-BIN04"
                     value={newLocCode}
                     onChange={(e) => setNewLocCode(e.target.value.toUpperCase())}
-                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-600 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Nama / Deskripsi *
                   </label>
                   <input
@@ -913,14 +913,14 @@ export default function WMSDashboardPage() {
                     placeholder="Contoh: Rak Susun Makanan"
                     value={newLocName}
                     onChange={(e) => setNewLocName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Barcode Lokasi (Opsional)
                   </label>
                   <input
@@ -928,18 +928,18 @@ export default function WMSDashboardPage() {
                     placeholder="LOC-XXXXX"
                     value={newLocBarcode}
                     onChange={(e) => setNewLocBarcode(e.target.value)}
-                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-600 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Tipe Lokasi
                   </label>
                   <select
                     value={newLocType}
                     onChange={(e) => setNewLocType(e.target.value as LocationType)}
-                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+                    className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none"
                   >
                     <option value="INTERNAL">Rak Internal</option>
                     <option value="TRANSIT">Area Transit</option>
@@ -957,7 +957,7 @@ export default function WMSDashboardPage() {
                     type="checkbox"
                     checked={newLocIsPallet}
                     onChange={(e) => setNewLocIsPallet(e.target.checked)}
-                    className="w-5 h-5 rounded text-[#2563EB] focus:ring-[#2563EB]"
+                    className="w-5 h-5 rounded text-blue-600 focus:ring-blue-600"
                   />
                   <span className="text-sm font-semibold text-slate-800">
                     Ini adalah Palet LPN Bergerak
@@ -974,21 +974,21 @@ export default function WMSDashboardPage() {
                       placeholder="Misal: PLT-JKT-0042"
                       value={newLocPalletNumber}
                       onChange={(e) => setNewLocPalletNumber(e.target.value.toUpperCase())}
-                      className="w-full px-3 py-2 min-h-[44px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-[#2563EB]"
+                      className="w-full px-3 py-2 min-h-[44px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-600"
                     />
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Kapasitas Maksimum Unit
                 </label>
                 <input
                   type="number"
                   value={newLocCapacity}
                   onChange={(e) => setNewLocCapacity(e.target.value)}
-                  className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-[#2563EB] focus:outline-none"
+                  className="w-full px-3.5 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-600 focus:outline-none"
                 />
               </div>
 
@@ -1003,9 +1003,9 @@ export default function WMSDashboardPage() {
                 <button
                   type="submit"
                   disabled={createLocationMutation.isPending}
-                  className="px-5 min-h-[48px] rounded-lg text-sm font-semibold bg-[#2563EB] text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+                  className="px-5 min-h-[48px] rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {createLocationMutation.isPending ? "Menyimpan..." : "Simpan Lokasi"}
+                  {createLocationMutation.isPending ? "Menyimpan…" : "Simpan Lokasi"}
                 </button>
               </div>
             </form>

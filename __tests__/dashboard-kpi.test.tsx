@@ -112,4 +112,13 @@ describe('DashboardPage 8 Enterprise WMS SOP KPIs', () => {
     expect(screen.queryByText('Memenuhi')).not.toBeInTheDocument()
     expect(screen.queryByText('Perhatian')).not.toBeInTheDocument()
   })
+
+  it('renders section headers in human sentence case without screaming uppercase tracking', () => {
+    mockKPIResult = { data: mockKPIs }
+    render(<DashboardPage />)
+
+    const kpiHeader = screen.getByRole('heading', { name: /Indikator Kinerja Pergudangan/i })
+    expect(kpiHeader.className).not.toMatch(/uppercase/)
+    expect(kpiHeader.className).not.toMatch(/tracking-wider/)
+  })
 })

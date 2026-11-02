@@ -99,9 +99,9 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
   const effectiveWhForDO = selectedModalWhId || warehouseId || (warehouses[0]?.id ?? null)
   const { data: allDOs = [], isLoading: isDOsLoading } = useDeliveryOrders(effectiveWhForDO)
 
-  // Filter DOs ready for staging/manifest (only PACKED DOs ready for dispatch manifest)
+  // Filter DOs ready for staging/manifest (only QC_PASSED DOs ready for dispatch manifest)
   const availableDOs = useMemo(() => {
-    return allDOs.filter((d) => d.status === "PACKED")
+    return allDOs.filter((d) => d.status === "QC_PASSED")
   }, [allDOs])
 
   // ── Detail / Loading Scan Drawer State ──
@@ -793,7 +793,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                       ) : availableDOs.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="py-6 text-center text-slate-400">
-                            Tidak ada Surat Jalan siap muat (status PACKED) di gudang ini.
+                            Tidak ada Surat Jalan siap muat (status Lolos QC / QC_PASSED) di gudang ini.
                           </td>
                         </tr>
                       ) : (

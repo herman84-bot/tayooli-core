@@ -147,6 +147,9 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
       CONFIRMED: "Dikonfirmasi",
       PICKED: "Diambil",
       PACKED: "Dikemas",
+      QC_PASSED: "Lolos QC",
+      QC_FAILED: "QC Ditolak",
+      STAGED: "Di Staging",
       SHIPPED: "Dikirim",
       DELIVERED: "Diterima",
       RETURNED: "Dikembalikan",
@@ -193,7 +196,19 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
       type: "select",
       id: "status",
       label: "Status",
-      options: ["DRAFT", "CONFIRMED", "PICKED", "PACKED", "SHIPPED", "DELIVERED", "RETURNED", "CANCELLED"].map((s) => ({
+      options: [
+        "DRAFT",
+        "CONFIRMED",
+        "PICKED",
+        "PACKED",
+        "QC_PASSED",
+        "QC_FAILED",
+        "STAGED",
+        "SHIPPED",
+        "DELIVERED",
+        "RETURNED",
+        "CANCELLED",
+      ].map((s) => ({
         value: s,
         label: getStatusLabel(s as DeliveryOrderStatus),
       })),
@@ -505,6 +520,12 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
       case "PICKED":
       case "PACKED":
         return "bg-amber-50 text-amber-700 border-amber-200"
+      case "QC_PASSED":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200"
+      case "QC_FAILED":
+        return "bg-rose-50 text-rose-700 border-rose-200"
+      case "STAGED":
+        return "bg-purple-50 text-purple-700 border-purple-200"
       case "SHIPPED":
         return "bg-blue-50 text-[#2563EB] border-blue-200"
       case "DELIVERED":
@@ -763,8 +784,8 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {filteredOrders.map((order) => {
-                    // F2 QA: Dispatch hanya diizinkan dari status PACKED (setelah meja kemas)
-                    const canDispatch = order.status === "PACKED"
+                    // Outbound flow: Dispatch hanya diizinkan dari status QC_PASSED (atau PACKED)
+                    const canDispatch = order.status === "QC_PASSED" || order.status === "PACKED"
                     return (
                       <tr key={order.id} className="hover:bg-slate-50/80 transition-colors group">
                         <td className="py-3.5 px-4 font-mono font-semibold text-slate-900">
@@ -807,7 +828,10 @@ export default function DeliveryOrdersPanel({ embedded = false }: { embedded?: b
                             <div className="text-indigo-700">Setuju: <span className="font-medium">{order.confirmed_by_name}</span></div>
                           )}
                           {order.packed_by_name && (
-                            <div className="text-emerald-700">Kemas: <span className="font-medium">{order.packed_by_name}</span></div>
+                            <div className="text-amber-700">Kemas: <span className="font-medium">{order.packed_by_name}</span></div>
+                          )}
+                          {order.qc_by_name && (
+                            <div className="text-emerald-700">QC: <span className="font-medium">{order.qc_by_name}</span></div>
                           )}
                           {order.dispatched_by_name && (
                             <div className="text-blue-700">Kirim: <span className="font-medium">{order.dispatched_by_name}</span></div>

@@ -46,7 +46,7 @@ function WarehousePicker({ warehouses, selected, onChange, loading }: {
   onChange: (ids: string[]) => void
   loading: boolean
 }) {
-  if (loading) return <p className="text-[11px] text-muted-foreground">Memuat daftar gudang...</p>
+  if (loading) return <p className="text-[11px] text-muted-foreground">Memuat daftar gudang…</p>
   if (warehouses.length === 0) {
     return <p className="text-[11px] text-amber-600">Belum ada gudang. Buat gudang dulu di menu Gudang &amp; Stok.</p>
   }
@@ -128,7 +128,7 @@ function EditRoleDialog({ member, onClose }: { member: TeamMember; onClose: () =
             disabled={invalid || changeRole.isPending}
             className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
           >
-            {changeRole.isPending ? 'Menyimpan...' : 'Simpan'}
+            {changeRole.isPending ? 'Menyimpan…' : 'Simpan'}
           </button>
         </div>
       </div>
@@ -245,7 +245,7 @@ function InviteForm({ onDone }: { onDone: (r: InviteResponse) => void }) {
           disabled={invalid || inviteMember.isPending}
           className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
         >
-          {inviteMember.isPending ? 'Mengirim...' : 'Undang'}
+          {inviteMember.isPending ? 'Mengirim…' : 'Undang'}
         </button>
       </div>
     </form>
@@ -310,17 +310,17 @@ function TeamTab() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-sm text-muted-foreground">Memuat anggota tim...</span>
+          <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Memuat anggota tim…</span>
         </div>
       ) : (
         <div className="border border-border rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-3 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Nama</th>
-                <th className="text-left px-3 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Role</th>
-                <th className="text-left px-3 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Gudang</th>
+                <th className="text-left px-3 py-2 text-[11px] font-medium text-muted-foreground">Nama</th>
+                <th className="text-left px-3 py-2 text-[11px] font-medium text-muted-foreground">Role</th>
+                <th className="text-left px-3 py-2 text-[11px] font-medium text-muted-foreground">Gudang</th>
                 <th className="w-10 px-3 py-2"></th>
               </tr>
             </thead>
@@ -439,7 +439,7 @@ function ProfileTab() {
     return (
       <div className="flex items-center justify-center p-12">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <span className="ml-2 text-xs text-muted-foreground">Memuat data perusahaan...</span>
+        <span className="ml-2 text-xs text-muted-foreground">Memuat data perusahaan…</span>
       </div>
     )
   }
@@ -455,7 +455,7 @@ function ProfileTab() {
 
       {/* Mini Live Preview Banner */}
       <div className="rounded-lg border border-border/80 bg-muted/20 p-4 max-w-xl">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+        <div className="text-[11px] font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
           <Eye className="h-3.5 w-3.5 text-primary" /> Pratinjau Kop Surat Cetak
         </div>
         <div className="rounded border border-border bg-card p-3 shadow-xs flex items-start gap-3">
@@ -463,7 +463,7 @@ function ProfileTab() {
             {companyName.trim().charAt(0).toUpperCase() || 'P'}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-xs font-bold text-foreground truncate uppercase">
+            <div className="text-xs font-bold text-foreground truncate">
               {companyName.trim() || 'NAMA PERUSAHAAN ANDA'}
             </div>
             <div className="text-[11px] font-medium text-muted-foreground truncate">
@@ -589,7 +589,7 @@ function ProfileTab() {
             {updateProfile.isPending ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>Menyimpan...</span>
+                <span>Menyimpan…</span>
               </>
             ) : (
               <span>Simpan Perubahan</span>
@@ -725,7 +725,7 @@ function PaymentsTab() {
           type="button"
           onClick={() => setProvider('midtrans')}
           className={cn(
-            'flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg border transition-all',
+            'flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg border transition-colors',
             provider === 'midtrans'
               ? 'bg-primary/5 border-primary text-primary font-semibold shadow-xs'
               : 'border-border bg-card text-muted-foreground hover:bg-muted'
@@ -738,7 +738,7 @@ function PaymentsTab() {
           type="button"
           onClick={() => setProvider('pakasir')}
           className={cn(
-            'flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg border transition-all',
+            'flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg border transition-colors',
             provider === 'pakasir'
               ? 'bg-primary/5 border-primary text-primary font-semibold shadow-xs'
               : 'border-border bg-card text-muted-foreground hover:bg-muted'
@@ -778,7 +778,7 @@ function PaymentsTab() {
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-xs text-muted-foreground">Memuat konfigurasi pembayaran...</span>
+          <span className="ml-2 text-xs text-muted-foreground">Memuat konfigurasi pembayaran…</span>
         </div>
       ) : (
         <form onSubmit={handleSave} className="space-y-5 max-w-xl">
@@ -986,7 +986,7 @@ function PaymentsTab() {
           >
             {saveConfig.isPending ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menyimpan...
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menyimpan…
               </>
             ) : (
               'Simpan Pengaturan Gateway'

@@ -115,4 +115,16 @@ Untuk memperbarui deployment produksi:
   - **Logika Bisnis & Aturan Pergudangan ISO:** `docs/references/oca-wms-spec.md` (mengadopsi pola OCA/wms: manajemen dermaga/dock, algoritma penataan rak ABC Velocity, rotasi FEFO, dan gelombang pesanan Wave Release).
   - **Aturan Eksekusi AI:** Sebelum menulis kode pada modul terkait, AI WAJIB membaca file referensi tersebut dan mencantumkan pola spesifik yang diadopsi pada komentar kode atau laporan pengerjaan. Dilarang mengarang arsitektur baru di luar pola acuan ini.
 
+---
+
+## AI Slop Cleanup & Business Logic Guardrails (MANDATORY)
+- **Master SOP & Step-by-Step Plan:** `docs/specs/ai-slop-cleanup-rules-and-plan.md`
+- **Mandate:** Setiap pengerjaan refactoring atau pembersihan visual/UI AI slop (Hallmark/sloplint) **WAJIB** tunduk pada 5 Aturan Pengaman Logika Bisnis:
+  1. *Zero Business Logic Touch* (dilarang menyentuh kalkulasi, query TanStack, form hook, atau endpoint Go).
+  2. *DOM Attribute Invariance* (dilarang mengubah `name`, `id`, `type`, `value`, `onChange`, `onClick`, `data-testid`).
+  3. *Automated Test Guardrail* (wajib test Jest hijau sebelum dan sesudah refactoring per modul; revert jika merah).
+  4. *One Module, One Scope* (dilarang bulk refactoring lintas modul sekaligus).
+  5. *Technical Term & Acronym Preservation* (pertahankan akronim SKU, POS, WMS, LPN, DO, SLA, IDR, dll.).
+
+
 

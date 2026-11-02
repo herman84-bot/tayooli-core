@@ -63,10 +63,10 @@ function SectionHeader({
     <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between">
       <div className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+        <h2 className="text-xs font-semibold text-muted-foreground">{title}</h2>
       </div>
       {href && linkLabel && (
-        <Link href={href} className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1">
+        <Link href={href} className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
           {linkLabel} <ExternalLink className="h-3 w-3" />
         </Link>
       )}
@@ -101,7 +101,7 @@ function StatCard({ label, value, icon: Icon, iconClass, bg, subtext }: StatCard
 function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="bg-muted/40 rounded-lg p-2.5 text-center border border-border/30 hover:border-slate-300 transition-colors duration-150 cursor-default">
-      <div className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</div>
+      <div className="text-[10px] text-muted-foreground font-medium">{label}</div>
       <div className="font-mono font-bold text-sm text-foreground mt-0.5 tabular-nums">{value}</div>
     </div>
   )
@@ -167,7 +167,6 @@ function SOPKPICard({
           </div>
         ) : (
           <div className="flex items-baseline gap-1.5">
-            <span aria-hidden className="text-lg font-bold font-mono text-muted-foreground">—</span>
             <span className="text-[11px] text-muted-foreground">Belum ada data</span>
           </div>
         )}
@@ -316,7 +315,7 @@ export default function DashboardPage() {
               <MiniStat label="Pelanggan" value={s.customers.active} />
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1.5">
+              <div className="text-[10px] font-semibold text-muted-foreground/70 mb-1.5">
                 Transaksi Terakhir
               </div>
               {s.pos.recent_orders.length > 0 ? (
@@ -333,7 +332,7 @@ export default function DashboardPage() {
                           <div className="text-[10px] text-muted-foreground truncate">{order.customer_name}</div>
                         </div>
                         <div className="text-right shrink-0 flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-muted text-muted-foreground border border-border/50">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground border border-border/50">
                             {order.payment_method}
                           </span>
                           <span className="font-mono font-semibold text-foreground tabular-nums">{formatCurrency(order.total_amount)}</span>
@@ -369,11 +368,11 @@ export default function DashboardPage() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" /> Stok Menipis (≤ 5 unit)
                 </span>
                 <Link href="/products" className="text-[10px] font-medium text-muted-foreground hover:text-primary">
-                  Master Produk →
+                  Master Produk
                 </Link>
               </div>
               {s.wms.low_stock_items.length > 0 ? (
@@ -385,8 +384,8 @@ export default function DashboardPage() {
                     >
                       <div className="min-w-0">
                         <div className="font-medium text-foreground truncate">{item.name}</div>
-                        <div className="font-mono text-[10px] text-muted-foreground">
-                          {item.sku} • Min: {item.min_threshold}
+                        <div className="text-[10px] text-muted-foreground">
+                          <span className="font-mono">{item.sku}</span> • Min: <span className="font-mono tabular-nums">{item.min_threshold}</span>
                         </div>
                       </div>
                       <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 tabular-nums shrink-0">
@@ -413,12 +412,12 @@ export default function DashboardPage() {
         <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Gauge className="h-4 w-4 text-primary" />
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="text-xs font-semibold text-muted-foreground">
               Indikator Kinerja Pergudangan
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground bg-muted/40 px-2 py-0.5 rounded border border-border/40 font-mono">
+            <span className="text-[11px] text-muted-foreground bg-muted/40 px-2 py-0.5 rounded border border-border/40">
               {kpiWindowDays} hari terakhir
             </span>
             <Link
@@ -435,7 +434,7 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center gap-2 mb-2.5">
               <ArrowDownToLine className="h-3.5 w-3.5 text-blue-600" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <h3 className="text-xs font-semibold text-muted-foreground">
                 Operasi Barang Masuk (Penerimaan &amp; Penataan Rak)
               </h3>
             </div>
@@ -494,7 +493,7 @@ export default function DashboardPage() {
           <div>
             <div className="flex items-center gap-2 mb-2.5">
               <ArrowUpFromLine className="h-3.5 w-3.5 text-indigo-600" />
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <h3 className="text-xs font-semibold text-muted-foreground">
                 Operasi Barang Keluar (Pengambilan &amp; Pengiriman)
               </h3>
             </div>
@@ -555,7 +554,7 @@ export default function DashboardPage() {
         <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Truck className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="text-xs font-semibold text-muted-foreground">
               Aktivitas Barang Keluar &amp; Pemenuhan
             </h2>
           </div>
@@ -580,7 +579,7 @@ export default function DashboardPage() {
               href="/wms/arus-barang"
               className="text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
             >
-              Buka Arus Barang →
+              Buka Arus Barang
             </Link>
           </div>
         </div>
@@ -598,7 +597,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
             {/* Top 10 Produk Keluar */}
             <div className="space-y-1.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
+              <div className="text-[10px] font-semibold text-muted-foreground/70 flex items-center justify-between">
                 <span>10 Produk Keluar Teratas ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
                 <span>Jumlah Fisik</span>
               </div>
@@ -610,8 +609,8 @@ export default function DashboardPage() {
                         <div className="font-medium text-foreground truncate">{p.product_name || 'Produk Tanpa Nama'}</div>
                         <div className="text-[10px] text-muted-foreground font-mono">{p.product_sku || '-'}</div>
                       </div>
-                      <span className="font-mono font-bold text-indigo-600 tabular-nums shrink-0">
-                        {p.quantity} unit
+                      <span className="font-bold text-indigo-600 shrink-0">
+                        <span className="font-mono tabular-nums">{p.quantity}</span> unit
                       </span>
                     </li>
                   ))}
@@ -625,7 +624,7 @@ export default function DashboardPage() {
 
             {/* Top 10 Toko / Pelanggan Teraktif */}
             <div className="space-y-1.5">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
+              <div className="text-[10px] font-semibold text-muted-foreground/70 flex items-center justify-between">
                 <span>10 Toko / Pelanggan Teraktif ({period === '7d' ? '7 Hari' : period === '30d' ? '30 Hari' : '90 Hari'})</span>
                 <span>Nilai Transaksi</span>
               </div>

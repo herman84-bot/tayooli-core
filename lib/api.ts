@@ -432,6 +432,9 @@ export type DeliveryOrderStatus =
   | "CONFIRMED"
   | "PICKED"
   | "PACKED"
+  | "QC_PASSED"
+  | "QC_FAILED"
+  | "STAGED"
   | "SHIPPED"
   | "DELIVERED"
   | "RETURNED"
@@ -450,6 +453,10 @@ export interface DeliveryOrder {
   confirmed_by_name?: string | null
   packed_by?: string | null
   packed_by_name?: string | null
+  qc_by?: string | null
+  qc_by_name?: string | null
+  qc_at?: string | null
+  qc_notes?: string | null
   dispatched_by?: string | null
   dispatched_by_name?: string | null
   package_weight_kg?: string | number | null
@@ -622,6 +629,23 @@ export interface PackScanResult {
 export interface DeliveryOrderDetailResponse {
   delivery_order: DeliveryOrder
   items: DeliveryOrderItem[]
+}
+
+export interface OutboundQCInspection {
+  id: string
+  tenant_id: string
+  delivery_order_id: string
+  warehouse_id: string
+  do_number?: string
+  inspector_id: string
+  inspector_name?: string
+  status: "QC_PASSED" | "QC_FAILED"
+  scanned_awb?: string | null
+  awb_matched: boolean
+  package_qty_matched: boolean
+  rejection_reason?: string | null
+  notes?: string | null
+  created_at: string
 }
 
 export type ShippingManifestStatus = "STAGED" | "LOADED" | "DISPATCHED" | "CANCELLED"
@@ -1808,6 +1832,35 @@ export const api = {
           method: "POST",
           body: JSON.stringify(payload),
         }),
+      passQC: (
+        id: string,
+        payload: {
+          scanned_awb?: string
+          notes?: string
+        } = {}
+      ) =>
+        request<{ data: DeliveryOrder }>(`/wms/delivery-orders/${id}/qc/pass`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      rejectQC: (
+        id: string,
+        payload: {
+          reason: string
+          notes?: string
+        }
+      ) =>
+        request<{ data: DeliveryOrder }>(`/wms/delivery-orders/${id}/qc/reject`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+      listQCInspections: (params?: { warehouse_id?: string; delivery_order_id?: string }) => {
+        const q = new URLSearchParams()
+        if (params?.warehouse_id) q.set("warehouse_id", params.warehouse_id)
+        if (params?.delivery_order_id) q.set("delivery_order_id", params.delivery_order_id)
+        const qs = q.toString() ? `?${q.toString()}` : ""
+        return request<{ data: OutboundQCInspection[] }>(`/wms/outbound/qc/inspections${qs}`)
+      },
     },
     pickWaves: {
       list: (params?: { warehouse_id?: string; order_type?: string; expedition_name?: string; status?: string }) => {

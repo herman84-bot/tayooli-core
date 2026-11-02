@@ -411,7 +411,7 @@ export default function StockOpnamePage() {
         )
       case "IN_PROGRESS":
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300 animate-pulse">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300 animate-pulse motion-reduce:animate-none">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Sedang Dihitung
           </span>
@@ -467,10 +467,10 @@ export default function StockOpnamePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-16">
+    <div className="min-h-screen bg-slate-50 pb-16">
       {/* ── Toast Notification Banner ── */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 max-w-md w-full p-4 rounded-xl shadow-lg border transition-all duration-300 flex items-start gap-3 bg-white border-slate-200">
+        <div className="fixed top-4 right-4 z-50 max-w-md w-full p-4 rounded-xl shadow-lg border transition-opacity duration-300 flex items-start gap-3 bg-white border-slate-200">
           {toast.type === "success" && (
             <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
               <CheckCircle2 className="w-5 h-5" />
@@ -482,7 +482,7 @@ export default function StockOpnamePage() {
             </div>
           )}
           {toast.type === "info" && (
-            <div className="p-2 rounded-lg bg-blue-100 text-[#2563EB] shrink-0">
+            <div className="p-2 rounded-lg bg-blue-100 text-blue-600 shrink-0">
               <Sparkles className="w-5 h-5" />
             </div>
           )}
@@ -500,7 +500,7 @@ export default function StockOpnamePage() {
       )}
 
       {/* ── Top Header Bar ── */}
-      <div className="bg-white border-b border-[#E2E8F0] px-4 sm:px-6 py-5 sticky top-0 z-20 shadow-xs">
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-5 sticky top-0 z-20 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -512,7 +512,7 @@ export default function StockOpnamePage() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <ClipboardCheck className="w-6 h-6 text-[#2563EB]" />
+                <ClipboardCheck className="w-6 h-6 text-blue-600" />
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                   Stok Opname & Penyesuaian Fisik
                 </h1>
@@ -538,7 +538,7 @@ export default function StockOpnamePage() {
                 setNewOpnameNumber(`OPN-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(opnames.length + 1).padStart(3, "0")}`)
                 setShowCreateModal(true)
               }}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-all min-h-[48px]"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-xs transition-colors min-h-[48px]"
             >
               <Plus className="w-5 h-5" />
               <span>Audit Baru</span>
@@ -605,10 +605,10 @@ export default function StockOpnamePage() {
               <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Cari nomor opname, catatan, atau petugas..."
+                placeholder="Cari nomor opname, catatan, atau petugas…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent min-h-[48px]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent min-h-[48px]"
               />
               {searchQuery && (
                 <button
@@ -625,7 +625,7 @@ export default function StockOpnamePage() {
               <select
                 value={selectedWarehouseId}
                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-h-[48px]"
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white min-h-[48px]"
               >
                 <option value="ALL">Semua Gudang</option>
                 {warehouses.map((w) => (
@@ -645,7 +645,7 @@ export default function StockOpnamePage() {
                 onClick={() => setStatusFilter(st)}
                 className={`px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors min-h-[48px] flex items-center ${
                   statusFilter === st
-                    ? "bg-[#2563EB] text-white"
+                    ? "bg-blue-600 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
@@ -674,7 +674,7 @@ export default function StockOpnamePage() {
               </p>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-[#2563EB] text-white text-sm font-medium rounded-lg hover:bg-blue-700 min-h-[48px]"
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 min-h-[48px]"
               >
                 <Plus className="w-4 h-4" />
                 <span>Buat Sesi Opname Baru</span>
@@ -685,7 +685,7 @@ export default function StockOpnamePage() {
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-600 tracking-wider">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
                     <tr>
                       <th className="px-6 py-3.5">Nomor Audit</th>
                       <th className="px-6 py-3.5">Gudang</th>
@@ -740,9 +740,9 @@ export default function StockOpnamePage() {
                           <td className="px-6 py-4 text-right">
                             <button
                               onClick={() => setActiveOpnameId(o.id)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all min-h-[48px] ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors min-h-[48px] ${
                                 isOpened
-                                  ? "bg-[#2563EB] text-white shadow-xs"
+                                  ? "bg-blue-600 text-white shadow-xs"
                                   : "border border-slate-300 text-slate-700 hover:bg-slate-100"
                               }`}
                             >
@@ -779,7 +779,7 @@ export default function StockOpnamePage() {
                       </span>
                       <button
                         onClick={() => setActiveOpnameId(o.id)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold bg-[#2563EB] text-white shadow-xs min-h-[48px]"
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold bg-blue-600 text-white shadow-xs min-h-[48px]"
                       >
                         <span>{o.status === "COMPLETED" ? "Lihat Hasil" : "Mulai Hitung"}</span>
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -795,14 +795,14 @@ export default function StockOpnamePage() {
 
       {/* ── ACTIVE COUNTING DRAWER / VIEW ── */}
       {activeOpnameId && activeOpname && (
-        <div className="fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
-          <div className="w-full max-w-3xl bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
+        <div className="fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200 motion-reduce:animate-none">
+          <div className="w-full max-w-3xl bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300 motion-reduce:animate-none">
             {/* Drawer Header */}
             <div className="bg-slate-900 text-white p-4 sm:p-6 border-b border-slate-800 shrink-0">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-blue-400">
+                    <span className="text-xs font-semibold text-blue-400">
                       Sesi Penghitungan Fisik
                     </span>
                     {renderStatusBadge(activeOpname.status)}
@@ -844,19 +844,19 @@ export default function StockOpnamePage() {
               {/* Counting Stats Bar */}
               <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-slate-800 text-center">
                 <div className="bg-slate-800/80 p-2 rounded-lg">
-                  <span className="text-[10px] text-slate-400 uppercase font-medium">Total Dihitung</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Total Dihitung</span>
                   <div className="text-lg font-bold text-white mt-0.5">{activeStats.totalItems}</div>
                 </div>
                 <div className="bg-emerald-950/40 border border-emerald-800/50 p-2 rounded-lg">
-                  <span className="text-[10px] text-emerald-400 uppercase font-medium">Sesuai (0)</span>
+                  <span className="text-[10px] text-emerald-400 font-medium">Sesuai (0)</span>
                   <div className="text-lg font-bold text-emerald-400 mt-0.5">{activeStats.matchCount}</div>
                 </div>
                 <div className="bg-blue-950/40 border border-blue-800/50 p-2 rounded-lg">
-                  <span className="text-[10px] text-blue-400 uppercase font-medium">Surplus (+)</span>
+                  <span className="text-[10px] text-blue-400 font-medium">Surplus (+)</span>
                   <div className="text-lg font-bold text-blue-400 mt-0.5">+{activeStats.surplusCount}</div>
                 </div>
                 <div className="bg-rose-950/40 border border-rose-800/50 p-2 rounded-lg">
-                  <span className="text-[10px] text-rose-400 uppercase font-medium">Defisit (-)</span>
+                  <span className="text-[10px] text-rose-400 font-medium">Defisit (-)</span>
                   <div className="text-lg font-bold text-rose-400 mt-0.5">-{activeStats.deficitCount}</div>
                 </div>
               </div>
@@ -869,7 +869,7 @@ export default function StockOpnamePage() {
                 <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 sm:p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Barcode className="w-5 h-5 text-[#2563EB]" />
+                      <Barcode className="w-5 h-5 text-blue-600" />
                       <h3 className="text-sm font-bold text-slate-900">
                         Scan Barcode Fisik
                       </h3>
@@ -886,15 +886,15 @@ export default function StockOpnamePage() {
                       <input
                         ref={scanInputRef}
                         type="text"
-                        placeholder="Pindai barcode SKU / nomor rak atau ketik..."
+                        placeholder="Pindai barcode SKU / nomor rak atau ketik…"
                         value={scanInput}
                         onChange={(e) => setScanInput(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-h-[48px]"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white min-h-[48px]"
                       />
                     </div>
                     <button
                       type="submit"
-                      className="px-5 py-2.5 bg-[#EA580C] hover:bg-orange-700 text-white font-semibold text-sm rounded-lg shadow-xs transition-colors min-h-[48px] shrink-0"
+                      className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm rounded-lg shadow-xs transition-colors min-h-[48px] shrink-0"
                     >
                       Pindai / Cari
                     </button>
@@ -934,7 +934,7 @@ export default function StockOpnamePage() {
                         <select
                           value={effectiveLocationId}
                           onChange={(e) => setSelectedLocationId(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-h-[48px]"
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white min-h-[48px]"
                         >
                           <option value="">-- Pilih lokasi penyimpanan --</option>
                           {opnameLocations.map((l) => (
@@ -954,7 +954,7 @@ export default function StockOpnamePage() {
                       </div>
 
                       <div>
-                        <span className="block text-[11px] font-semibold text-[#2563EB]">Jumlah Fisik</span>
+                        <span className="block text-[11px] font-semibold text-blue-600">Jumlah Fisik</span>
                         <div className="flex items-center gap-1 mt-1">
                           <input
                             type="number"
@@ -962,7 +962,7 @@ export default function StockOpnamePage() {
                             step="any"
                             value={physicalCountInput}
                             onChange={(e) => setPhysicalCountInput(e.target.value)}
-                            className="w-full px-2 py-1 text-base font-bold text-slate-900 border border-slate-300 rounded focus:ring-2 focus:ring-[#2563EB] min-h-[40px]"
+                            className="w-full px-2 py-1 text-base font-bold text-slate-900 border border-slate-300 rounded focus:ring-2 focus:ring-blue-600 min-h-[40px]"
                           />
                         </div>
                       </div>
@@ -1012,10 +1012,10 @@ export default function StockOpnamePage() {
                     <div>
                       <input
                         type="text"
-                        placeholder="Catatan kondisi (opsional, misal: kemasan sobek, hilang, tercecer)..."
+                        placeholder="Catatan kondisi (opsional, misal: kemasan sobek, hilang, tercecer)…"
                         value={countNotes}
                         onChange={(e) => setCountNotes(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-600"
                       />
                     </div>
 
@@ -1023,12 +1023,12 @@ export default function StockOpnamePage() {
                     <button
                       type="submit"
                       disabled={addItemMutation.isPending || !selectedProduct}
-                      className="w-full flex items-center justify-center gap-2 py-3 bg-[#2563EB] hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg shadow-sm transition-all min-h-[48px]"
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg shadow-xs transition-colors min-h-[48px]"
                     >
                       {addItemMutation.isPending ? (
                         <>
                           <RefreshCw className="w-5 h-5 animate-spin" />
-                          <span>Menyimpan ke Daftar...</span>
+                          <span>Menyimpan ke Daftar…</span>
                         </>
                       ) : (
                         <>
@@ -1071,16 +1071,16 @@ export default function StockOpnamePage() {
                     <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Cari item di sesi ini..."
+                      placeholder="Cari item di sesi ini…"
                       value={drawerSearch}
                       onChange={(e) => setDrawerSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#2563EB] min-h-[36px]"
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-600 min-h-[36px]"
                     />
                   </div>
                 </div>
 
                 {loadingActiveOpname ? (
-                  <div className="p-8 text-center text-slate-500 text-xs">Memuat detail barang...</div>
+                  <div className="p-8 text-center text-slate-500 text-xs">Memuat detail barang…</div>
                 ) : filteredCountedItems.length === 0 ? (
                   <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs">
                     Belum ada barang yang dicatat pada sesi audit ini. Pindai barcode atau pilih produk di atas.
@@ -1197,7 +1197,7 @@ export default function StockOpnamePage() {
                       type="button"
                       onClick={() => setShowPostingConfirmModal(true)}
                       disabled={countedItems.length === 0}
-                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#EA580C] hover:bg-orange-700 disabled:opacity-50 text-white font-bold text-sm rounded-lg shadow-md transition-all min-h-[48px]"
+                      className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-bold text-sm rounded-lg shadow-sm transition-colors min-h-[48px]"
                     >
                       <Lock className="w-5 h-5" />
                       <span>{buttonLabel}</span>
@@ -1213,9 +1213,9 @@ export default function StockOpnamePage() {
       {/* ── MODAL: Posting Confirmation (@LOSS) ── */}
       {showPostingConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-200 motion-reduce:animate-none">
             <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-orange-100 text-[#EA580C]">
+              <div className="p-3 rounded-xl bg-orange-100 text-orange-600">
                 <AlertCircle className="w-6 h-6" />
               </div>
               <div>
@@ -1255,12 +1255,12 @@ export default function StockOpnamePage() {
                 type="button"
                 onClick={handleConfirmPosting}
                 disabled={completeOpnameMutation.isPending}
-                className="flex-1 py-2.5 px-4 rounded-lg bg-[#EA580C] hover:bg-orange-700 text-white font-bold text-sm shadow-sm transition-all min-h-[48px] flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 px-4 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-xs transition-colors min-h-[48px] flex items-center justify-center gap-2"
               >
                 {completeOpnameMutation.isPending ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Memposting...</span>
+                    <span>Memposting…</span>
                   </>
                 ) : (
                   <>
@@ -1277,10 +1277,10 @@ export default function StockOpnamePage() {
       {/* ── MODAL: Create New Stock Opname ── */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-200 motion-reduce:animate-none">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <ClipboardCheck className="w-5 h-5 text-[#2563EB]" />
+                <ClipboardCheck className="w-5 h-5 text-blue-600" />
                 <h3 className="text-base font-bold text-slate-900">Audit Baru</h3>
               </div>
               <button
@@ -1307,7 +1307,7 @@ export default function StockOpnamePage() {
                 <select
                   value={newWarehouseId}
                   onChange={(e) => setNewWarehouseId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-h-[48px]"
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white min-h-[48px]"
                   required
                 >
                   <option value="">-- Pilih Gudang Audit --</option>
@@ -1329,7 +1329,7 @@ export default function StockOpnamePage() {
                   placeholder="Contoh: OPN-20260408-001"
                   value={newOpnameNumber}
                   onChange={(e) => setNewOpnameNumber(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] min-h-[48px]"
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 min-h-[48px]"
                 />
                 <span className="text-[11px] text-slate-400 mt-1 block">
                   Kosongkan untuk membuat nomor otomatis secara berurutan.
@@ -1343,10 +1343,10 @@ export default function StockOpnamePage() {
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Misal: Audit Siklus Bulanan Rak Depan & Sembako..."
+                  placeholder="Misal: Audit Siklus Bulanan Rak Depan & Sembako…"
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600"
                 />
               </div>
 
@@ -1361,12 +1361,12 @@ export default function StockOpnamePage() {
                 <button
                   type="submit"
                   disabled={createOpnameMutation.isPending}
-                  className="flex-1 py-2.5 px-4 rounded-lg bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-sm shadow-sm transition-all min-h-[48px] flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-xs transition-colors min-h-[48px] flex items-center justify-center gap-2"
                 >
                   {createOpnameMutation.isPending ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Membuat Sesi...</span>
+                      <span>Membuat Sesi…</span>
                     </>
                   ) : (
                     <>

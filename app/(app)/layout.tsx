@@ -55,11 +55,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full min-h-96 gap-3">
             <BinanceArcSpinner size={34} strokeColor="#2563EB" strokeWidth={3.5} />
-            <span className="text-xs font-semibold text-muted-foreground tracking-wide">Menyiapkan sesi...</span>
+            <span className="text-xs font-semibold text-muted-foreground tracking-wide">Menyiapkan sesi…</span>
           </div>
         ) : !isAuthenticated ? null : !allowed ? (
           <div role="alert" className="flex items-center justify-center min-h-96 p-6 text-sm text-muted-foreground">
-            Akses terbatas untuk peran Anda. Mengalihkan...
+            Akses terbatas untuk peran Anda. Mengalihkan…
           </div>
         ) : (
           children

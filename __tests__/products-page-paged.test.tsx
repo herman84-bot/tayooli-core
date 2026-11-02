@@ -72,7 +72,7 @@ describe('ProductsPage server pagination & search', () => {
     expect(screen.queryByText('Produk Alpha 21')).not.toBeInTheDocument()
 
     // Footer shows range & total
-    expect(screen.getByText(/Menampilkan 1–20 dari 45 produk/)).toBeInTheDocument()
+    expect(screen.getByText(/Menampilkan 1 sampai 20 dari 45 produk/)).toBeInTheDocument()
   })
 
   it('navigates to page 2 via pagination button', async () => {
@@ -109,5 +109,16 @@ describe('ProductsPage server pagination & search', () => {
       },
       { timeout: 1000 },
     )
+  })
+
+  it('renders table headers in human sentence case without screaming uppercase tracking', async () => {
+    renderWithClient()
+    await waitFor(() => {
+      expect(screen.getByText('Produk Alpha 1')).toBeInTheDocument()
+    })
+
+    const nameHeader = screen.getByRole('columnheader', { name: /Nama Produk/i })
+    expect(nameHeader.className).not.toMatch(/uppercase/)
+    expect(nameHeader.className).not.toMatch(/tracking-wider/)
   })
 })

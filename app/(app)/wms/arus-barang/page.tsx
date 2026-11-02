@@ -50,6 +50,7 @@ import { DockBoardSubView } from "@/components/wms/DockBoardSubView"
 import DeliveryOrdersPanel from "@/components/wms/DeliveryOrdersPanel"
 import { WavePickingSubView } from "@/components/wms/WavePickingSubView"
 import { PackingStationSubView } from "@/components/wms/PackingStationSubView"
+import { OutboundQCSubView } from "@/components/wms/OutboundQCSubView"
 import { ShippingManifestsPanel } from "@/components/wms/ShippingManifestsPanel"
 import { LPNManagementModal } from "@/components/wms/LPNManagementModal"
 
@@ -145,7 +146,7 @@ function TypeBadge({ type }: { type?: StockReceiptType }) {
 
 type Mode = "masuk" | "keluar"
 type MasukTab = "penerimaan" | "putaway" | "trace" | "qc" | "dock"
-type KeluarTab = "surat_jalan" | "picking" | "packing" | "manifest"
+type KeluarTab = "surat_jalan" | "picking" | "packing" | "qc" | "manifest"
 
 export default function ArusBarangPage() {
   const searchParams = useSearchParams()
@@ -219,25 +220,25 @@ export default function ArusBarangPage() {
           <div className="inline-flex rounded-lg bg-slate-100 p-1 border border-slate-200 shadow-inner">
             <button
               onClick={() => switchMode("masuk")}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold transition-all ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold transition-colors ${
                 mode === "masuk"
-                  ? "bg-emerald-600 text-white shadow-sm"
+                  ? "bg-emerald-600 text-white shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <ArrowDownToLine className="h-4 w-4" />
-              BARANG MASUK
+              Barang Masuk
             </button>
             <button
               onClick={() => switchMode("keluar")}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold transition-all ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-xs font-semibold transition-colors ${
                 mode === "keluar"
-                  ? "bg-blue-600 text-white shadow-sm"
+                  ? "bg-blue-600 text-white shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <ArrowUpFromLine className="h-4 w-4" />
-              BARANG KELUAR
+              Barang Keluar
             </button>
           </div>
 
@@ -356,6 +357,16 @@ export default function ArusBarangPage() {
               Stasiun Pengemasan
             </button>
             <button
+              onClick={() => setKeluarTab("qc")}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                keluarTab === "qc"
+                  ? "bg-blue-50 text-blue-800 font-semibold"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              QC Pengiriman
+            </button>
+            <button
               onClick={() => setKeluarTab("manifest")}
               className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
                 keluarTab === "manifest"
@@ -396,6 +407,9 @@ export default function ArusBarangPage() {
         )}
         {keluarTab === "packing" && (
           <PackingStationSubView warehouseId={selectedWarehouseId} />
+        )}
+        {keluarTab === "qc" && (
+          <OutboundQCSubView warehouseId={selectedWarehouseId} />
         )}
         {keluarTab === "manifest" && (
           <ShippingManifestsPanel warehouseId={selectedWarehouseId} />
@@ -551,7 +565,7 @@ function InboundReceivingSubView({
 
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50/80 text-xs uppercase text-slate-600 font-semibold tracking-wider">
+              <thead className="border-b border-slate-200 bg-slate-50/80 text-xs text-slate-600 font-semibold">
                 <tr>
                   <th className="px-4 py-3">No. Penerimaan</th>
                   <th className="px-4 py-3">Tipe Sumber</th>
@@ -881,7 +895,7 @@ function InboundReceiptForm({
             type="text"
             value={form.from_name}
             onChange={(e) => setForm({ ...form, from_name: e.target.value })}
-            placeholder="Contoh: Dapur Pusat, PT Sumber Makmur..."
+            placeholder="Contoh: Dapur Pusat, PT Sumber Makmur…"
             className="w-full px-3 py-2 border border-slate-300 rounded-lg"
           />
         </div>
@@ -963,7 +977,7 @@ function InboundReceiptForm({
             type="text"
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            placeholder="Catatan kondisi kiriman..."
+            placeholder="Catatan kondisi kiriman…"
             className="w-full px-3 py-2 border border-slate-300 rounded-lg"
           />
         </div>
@@ -971,14 +985,14 @@ function InboundReceiptForm({
 
       {/* Product Search & Line Items */}
       <div className="space-y-3 pt-3 border-t border-slate-100">
-        <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider">
+        <label className="block text-xs font-semibold text-slate-800">
           Tambah Produk & Alokasi Batch
         </label>
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Ketik nama produk atau pindai Barcode/SKU..."
+            placeholder="Ketik nama produk atau pindai Barcode/SKU…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-xs"
@@ -1051,7 +1065,7 @@ function InboundReceiptForm({
                         }`}
                       />
                       {isPastDate(line.expiry_date) && (
-                        <div className="mt-0.5 text-[10px] text-rose-600">Sudah kedaluwarsa — catat sebagai ditolak</div>
+                        <div className="mt-0.5 text-[10px] text-rose-600">Sudah kedaluwarsa, catat sebagai ditolak</div>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -1087,7 +1101,7 @@ function InboundReceiptForm({
                           onChange={(e) => updateLine(idx, { reject_reason: e.target.value })}
                           className="w-full px-2 py-1 border border-rose-300 rounded bg-rose-50/40 text-xs"
                         >
-                          <option value="">Pilih alasan...</option>
+                          <option value="">Pilih alasan…</option>
                           {REJECT_REASONS.map((r) => (
                             <option key={r} value={r}>
                               {r}
@@ -1130,7 +1144,7 @@ function InboundReceiptForm({
           title={validateReceiptLines(form.lines) ?? undefined}
           className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm"
         >
-          {saving ? "Menyimpan Draf..." : "Simpan Draf Penerimaan"}
+          {saving ? "Menyimpan Draf…" : "Simpan Draf Penerimaan"}
         </button>
       </div>
     </div>
@@ -1163,7 +1177,7 @@ function InboundReceiptDetail({
   const [cancelReason, setCancelReason] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
 
-  if (isLoading) return <p className="text-xs text-slate-400">Memuat detail penerimaan...</p>
+  if (isLoading) return <p className="text-xs text-slate-400">Memuat detail penerimaan…</p>
   if (isError || !data) {
     return (
       <div className="space-y-3">
@@ -1255,7 +1269,7 @@ function InboundReceiptDetail({
               disabled={isProcessing}
               className="px-4 py-2 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 rounded-lg shadow-sm"
             >
-              {isProcessing ? "Memproses..." : "Konfirmasi Masuk Area Transit"}
+              {isProcessing ? "Memproses…" : "Konfirmasi Masuk Area Transit"}
             </button>
           )}
 
@@ -1265,7 +1279,7 @@ function InboundReceiptDetail({
               disabled={isProcessing}
               className="px-4 py-2 text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 rounded-lg shadow-sm"
             >
-              {isProcessing ? "Merilis..." : "Setujui Rilis Lot"}
+              {isProcessing ? "Merilis…" : "Setujui Rilis Lot"}
             </button>
           ) : null}
 
@@ -1318,7 +1332,7 @@ function InboundReceiptDetail({
 
       {/* Items Table */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-semibold text-xs text-slate-700 uppercase tracking-wider">
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-semibold text-xs text-slate-700">
           Rincian Barang & Lot
         </div>
         <table className="w-full text-left text-xs">
@@ -1374,7 +1388,7 @@ function InboundReceiptDetail({
               </label>
               <input
                 type="text"
-                placeholder="Contoh: Salah kirim, supplier membatalkan PO..."
+                placeholder="Contoh: Salah kirim, supplier membatalkan PO…"
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
@@ -1392,7 +1406,7 @@ function InboundReceiptDetail({
                 disabled={!cancelReason.trim() || isProcessing}
                 className="px-3 py-1.5 text-xs font-medium bg-rose-600 text-white rounded-md disabled:opacity-50"
               >
-                {isProcessing ? "Membatalkan..." : "Ya, Batalkan"}
+                {isProcessing ? "Membatalkan…" : "Ya, Batalkan"}
               </button>
             </div>
           </div>

@@ -274,3 +274,11 @@
   padding-right: max(env(safe-area-inset-right, 0px), 0.5rem);
 }
 
+
+/* ----------------------------------------------------------------------------
+ * Scanner camera vignette — dark mask around the clear scan window.
+ * Extracted from an inline arbitrary shadow so the value lives in CSS.
+ * -------------------------------------------------------------------------- */
+.scanner-scrim {
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.45);
+}

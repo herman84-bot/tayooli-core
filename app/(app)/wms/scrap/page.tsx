@@ -304,10 +304,10 @@ export default function StockScrapPage() {
   }, [scraps])
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-16">
+    <div className="min-h-screen bg-slate-50 pb-16">
       {/* ── Toast Notification Banner ── */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 max-w-md w-full p-4 rounded-xl shadow-lg border transition-all duration-300 flex items-start gap-3 bg-white border-slate-200">
+        <div className="fixed top-4 right-4 z-50 max-w-md w-full p-4 rounded-xl shadow-lg border transition-opacity duration-300 flex items-start gap-3 bg-white border-slate-200">
           {toast.type === "success" && (
             <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
               <CheckCircle2 className="w-5 h-5" />
@@ -319,7 +319,7 @@ export default function StockScrapPage() {
             </div>
           )}
           {toast.type === "info" && (
-            <div className="p-2 rounded-lg bg-blue-100 text-[#2563EB] shrink-0">
+            <div className="p-2 rounded-lg bg-blue-100 text-blue-600 shrink-0">
               <Info className="w-5 h-5" />
             </div>
           )}
@@ -337,7 +337,7 @@ export default function StockScrapPage() {
       )}
 
       {/* ── Top Header Bar ── */}
-      <div className="bg-white border-b border-[#E2E8F0] px-4 sm:px-6 py-5 sticky top-0 z-20 shadow-xs">
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-5 sticky top-0 z-20 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -349,7 +349,7 @@ export default function StockScrapPage() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-6 h-6 text-[#EA580C]" />
+                <AlertTriangle className="w-6 h-6 text-orange-600" />
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                   Barang Rusak & Karantina
                 </h1>
@@ -374,7 +374,7 @@ export default function StockScrapPage() {
                 setModalWarehouseId(warehouses[0]?.id || "")
                 setShowQuarantineModal(true)
               }}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-[#EA580C] hover:bg-orange-700 text-white font-medium rounded-lg shadow-sm transition-all min-h-[48px]"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg shadow-xs transition-colors min-h-[48px]"
             >
               <Plus className="w-5 h-5" />
               <span>Karantina Barang Rusak</span>
@@ -417,9 +417,9 @@ export default function StockScrapPage() {
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-blue-200 bg-blue-50/20 shadow-xs hover:border-blue-300 transition-colors duration-150 cursor-default">
-            <span className="text-xs font-medium text-[#2563EB]">Karantina Fisik</span>
+            <span className="text-xs font-medium text-blue-600">Karantina Fisik</span>
             <div className="flex items-baseline justify-between mt-2">
-              <span className="text-2xl font-bold text-[#2563EB]">{metrics.physicalCount}</span>
+              <span className="text-2xl font-bold text-blue-600">{metrics.physicalCount}</span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
                 Isolasi
               </span>
@@ -435,10 +435,10 @@ export default function StockScrapPage() {
               <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Cari nomor barang rusak, produk, SKU, alasan, atau pelapor..."
+                placeholder="Cari nomor barang rusak, produk, SKU, alasan, atau pelapor…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent min-h-[48px]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent min-h-[48px]"
               />
               {searchQuery && (
                 <button
@@ -455,7 +455,7 @@ export default function StockScrapPage() {
               <select
                 value={selectedWarehouseId}
                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] bg-white min-h-[48px]"
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 bg-white min-h-[48px]"
               >
                 <option value="ALL">Semua Gudang</option>
                 {warehouses.map((w) => (
@@ -475,7 +475,7 @@ export default function StockScrapPage() {
                 onClick={() => setDestinationFilter(dest)}
                 className={`px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors min-h-[48px] flex items-center ${
                   destinationFilter === dest
-                    ? "bg-[#EA580C] text-white"
+                    ? "bg-orange-600 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
@@ -505,7 +505,7 @@ export default function StockScrapPage() {
                   setModalWarehouseId(warehouses[0]?.id || "")
                   setShowQuarantineModal(true)
                 }}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-[#EA580C] text-white text-sm font-medium rounded-lg hover:bg-orange-700 min-h-[48px]"
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 min-h-[48px]"
               >
                 <Plus className="w-4 h-4" />
                 <span>Karantina Barang Rusak Sekarang</span>
@@ -516,7 +516,7 @@ export default function StockScrapPage() {
               {/* Desktop View */}
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-600 tracking-wider">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600">
                     <tr>
                       <th className="px-6 py-3.5">Nomor Barang Rusak</th>
                       <th className="px-6 py-3.5">Tanggal</th>
@@ -556,7 +556,7 @@ export default function StockScrapPage() {
                           </td>
                           <td className="px-6 py-4 text-xs">
                             <span className="font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                              {s.source_location_id.slice(0, 8)}
+                              {s.source_location_id ? s.source_location_id.slice(0, 8) : "-"}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-xs">
@@ -655,11 +655,11 @@ export default function StockScrapPage() {
       {/* ── MODAL: Quarantine Damaged Goods (Karantina Barang Rusak) ── */}
       {showQuarantineModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-200 motion-reduce:animate-none max-h-[92vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-orange-100 text-[#EA580C]">
+                <div className="p-2 rounded-lg bg-orange-100 text-orange-600">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
@@ -691,7 +691,7 @@ export default function StockScrapPage() {
             <form onSubmit={handleManualScanSubmit} className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-                  <ScanLine className="w-4 h-4 text-[#EA580C]" />
+                  <ScanLine className="w-4 h-4 text-orange-600" />
                   Pindai Barcode Produk / Rak Asal
                 </span>
                 <span className="text-[10px] text-emerald-600 font-medium">Pemindai Perangkat Aktif</span>
@@ -700,14 +700,14 @@ export default function StockScrapPage() {
                 <input
                   ref={barcodeInputRef}
                   type="text"
-                  placeholder="Pindai barcode SKU atau kode rak..."
+                  placeholder="Pindai barcode SKU atau kode rak…"
                   value={barcodeSearchInput}
                   onChange={(e) => setBarcodeSearchInput(e.target.value)}
-                  className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#EA580C] min-h-[44px]"
+                  className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-600 min-h-[44px]"
                 />
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#EA580C] hover:bg-orange-700 text-white font-semibold text-xs rounded-lg min-h-[44px]"
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs rounded-lg min-h-[44px]"
                 >
                   Pindai
                 </button>
@@ -726,7 +726,7 @@ export default function StockScrapPage() {
                     setModalWarehouseId(e.target.value)
                     setSourceLocationId("")
                   }}
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] bg-white min-h-[48px]"
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 bg-white min-h-[48px]"
                   required
                 >
                   <option value="">-- Pilih Gudang --</option>
@@ -759,7 +759,7 @@ export default function StockScrapPage() {
                 <select
                   value={sourceLocationId}
                   onChange={(e) => setSourceLocationId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] bg-white min-h-[48px]"
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 bg-white min-h-[48px]"
                   required
                 >
                   <option value="">-- Pilih Rak Asal --</option>
@@ -782,7 +782,7 @@ export default function StockScrapPage() {
                   <button
                     type="button"
                     onClick={() => setScrapDestinationType("VIRTUAL")}
-                    className={`p-3 rounded-xl border text-left transition-all min-h-[48px] ${
+                    className={`p-3 rounded-xl border text-left transition-colors min-h-[48px] ${
                       scrapDestinationType === "VIRTUAL"
                         ? "border-rose-400 bg-rose-50/60 ring-2 ring-rose-300"
                         : "border-slate-200 bg-white hover:bg-slate-50"
@@ -800,13 +800,13 @@ export default function StockScrapPage() {
                   <button
                     type="button"
                     onClick={() => setScrapDestinationType("PHYSICAL")}
-                    className={`p-3 rounded-xl border text-left transition-all min-h-[48px] ${
+                    className={`p-3 rounded-xl border text-left transition-colors min-h-[48px] ${
                       scrapDestinationType === "PHYSICAL"
                         ? "border-blue-400 bg-blue-50/60 ring-2 ring-blue-300"
                         : "border-slate-200 bg-white hover:bg-slate-50"
                     }`}
                   >
-                    <div className="flex items-center gap-1.5 font-bold text-xs text-[#2563EB]">
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-blue-600">
                       <ShieldAlert className="w-4 h-4 text-blue-500" />
                       <span>Rak Karantina Fisik</span>
                     </div>
@@ -826,7 +826,7 @@ export default function StockScrapPage() {
                   <select
                     value={targetQuarantineLocationId}
                     onChange={(e) => setTargetQuarantineLocationId(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB] bg-white min-h-[48px]"
+                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white min-h-[48px]"
                     required
                   >
                     <option value="">-- Pilih Rak Karantina --</option>
@@ -851,7 +851,7 @@ export default function StockScrapPage() {
                     step="any"
                     value={quantityInput}
                     onChange={(e) => setQuantityInput(e.target.value)}
-                    className="flex-1 px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] min-h-[48px]"
+                    className="flex-1 px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 min-h-[48px]"
                     required
                   />
                   <div className="flex gap-1">
@@ -880,9 +880,9 @@ export default function StockScrapPage() {
                       key={p}
                       type="button"
                       onClick={() => setReasonPreset(p)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                         reasonPreset === p
-                          ? "bg-[#EA580C] text-white"
+                          ? "bg-orange-600 text-white"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
@@ -892,10 +892,10 @@ export default function StockScrapPage() {
                 </div>
                 <textarea
                   rows={2}
-                  placeholder="Detail kronologi kerusakan (misal: palet miring saat pemuatan truk)..."
+                  placeholder="Detail kronologi kerusakan (misal: palet miring saat pemuatan truk)…"
                   value={reasonDetail}
                   onChange={(e) => setReasonDetail(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#EA580C]"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-600"
                 />
               </div>
 
@@ -909,7 +909,7 @@ export default function StockScrapPage() {
                   placeholder="Otomatis: SCRAP-YYYYMMDD-XXX"
                   value={scrapNumberInput}
                   onChange={(e) => setScrapNumberInput(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#EA580C]"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-600"
                 />
               </div>
 
@@ -934,12 +934,12 @@ export default function StockScrapPage() {
                 <button
                   type="submit"
                   disabled={createScrapMutation.isPending}
-                  className="flex-1 py-2.5 px-4 rounded-lg bg-[#EA580C] hover:bg-orange-700 text-white font-bold text-sm shadow-sm transition-all min-h-[48px] flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 px-4 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-xs transition-colors min-h-[48px] flex items-center justify-center gap-2"
                 >
                   {createScrapMutation.isPending ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Memproses Karantina...</span>
+                      <span>Memproses Karantina…</span>
                     </>
                   ) : (
                     <>

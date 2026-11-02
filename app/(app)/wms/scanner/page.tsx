@@ -20,7 +20,6 @@ import {
   Volume2,
   VolumeX,
   Keyboard,
-  Barcode as BarcodeIcon,
   Store,
   Box,
   Truck,
@@ -498,9 +497,9 @@ export default function BarcodeScannerPage() {
   const displayProduct: ResolvedProduct | null = resolvedProduct ?? null
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-16">
+    <div className="min-h-screen bg-slate-50 pb-16">
       {/* ── Top Header ── */}
-      <div className="bg-white border-b border-[#E2E8F0] px-4 sm:px-6 py-4 sticky top-0 z-30 shadow-xs">
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 sticky top-0 z-30 shadow-xs">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Link
@@ -512,7 +511,7 @@ export default function BarcodeScannerPage() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <ScanLine className="w-5 h-5 text-[#2563EB]" />
+                <ScanLine className="w-5 h-5 text-blue-600" />
                 <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
                   Pemindai Barcode Mobile
                 </h1>
@@ -529,7 +528,7 @@ export default function BarcodeScannerPage() {
               onClick={() => setSoundEnabled((prev) => !prev)}
               className={`p-2.5 rounded-lg border min-h-[48px] min-w-[48px] flex items-center justify-center transition-colors ${
                 soundEnabled
-                  ? "border-blue-200 bg-blue-50 text-[#2563EB]"
+                  ? "border-blue-200 bg-blue-50 text-blue-600"
                   : "border-slate-200 bg-slate-50 text-slate-400"
               }`}
               title={soundEnabled ? "Audio beep aktif" : "Audio bisu"}
@@ -543,7 +542,7 @@ export default function BarcodeScannerPage() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-5 space-y-5">
         {/* ── Mode Switcher Pills (min 48px touch target) ── */}
-        <div className="bg-white p-1.5 rounded-xl border border-[#E2E8F0] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 shadow-xs">
+        <div className="bg-white p-1.5 rounded-xl border border-slate-200 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 shadow-xs">
           <button
             type="button"
             onClick={() => {
@@ -553,9 +552,9 @@ export default function BarcodeScannerPage() {
               setPutawayError(null)
               setPutawaySuccessMessage(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-colors ${
               mode === "PUTAWAY"
-                ? "bg-[#2563EB] text-white shadow-xs"
+                ? "bg-blue-600 text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
@@ -569,9 +568,9 @@ export default function BarcodeScannerPage() {
               setMode("OUTBOUND")
               setOutboundResult(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-colors ${
               mode === "OUTBOUND"
-                ? "bg-[#2563EB] text-white shadow-xs"
+                ? "bg-blue-600 text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
@@ -585,9 +584,9 @@ export default function BarcodeScannerPage() {
               setMode("LOADING_TRUCK")
               setLoadingScanResult(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-colors ${
               mode === "LOADING_TRUCK"
-                ? "bg-[#2563EB] text-white shadow-xs"
+                ? "bg-blue-600 text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
@@ -602,9 +601,9 @@ export default function BarcodeScannerPage() {
               setLpnPutawaySuccessMessage(null)
               setLpnPutawayErrorMessage(null)
             }}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-colors ${
               mode === "PALLET_LPN"
-                ? "bg-[#2563EB] text-white shadow-xs"
+                ? "bg-blue-600 text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
@@ -615,9 +614,9 @@ export default function BarcodeScannerPage() {
           <button
             type="button"
             onClick={() => setMode("PRICE_CHECK")}
-            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-all col-span-2 sm:col-span-1 ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 py-3 px-2 rounded-lg font-bold text-[11px] sm:text-xs min-h-[48px] text-center transition-colors col-span-2 sm:col-span-1 ${
               mode === "PRICE_CHECK"
-                ? "bg-[#2563EB] text-white shadow-xs"
+                ? "bg-blue-600 text-white shadow-xs"
                 : "text-slate-700 hover:bg-slate-100"
             }`}
           >
@@ -627,9 +626,9 @@ export default function BarcodeScannerPage() {
         </div>
 
         {/* ── Mode Instruction Banner ── */}
-        <div className="p-3.5 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] text-slate-800 text-xs sm:text-sm flex items-start sm:items-center justify-between gap-3">
+        <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-slate-800 text-xs sm:text-sm flex items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-[#2563EB] animate-ping" />
+            <span className="flex h-2.5 w-2.5 rounded-full bg-blue-600 animate-ping motion-reduce:animate-none" />
             <div>
               {mode === "PUTAWAY" && (
                 <span>
@@ -680,38 +679,38 @@ export default function BarcodeScannerPage() {
 
         {/* ── Putaway 2-Step Progress Indicator ── */}
         {mode === "PUTAWAY" && (
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
             <div className="grid grid-cols-2 gap-3 text-center">
               <div
-                className={`p-3.5 rounded-xl border-2 transition-all ${
+                className={`p-3.5 rounded-xl border-2 transition-colors ${
                   putawayRack
                     ? "bg-emerald-50 border-emerald-500 text-emerald-950 font-bold"
-                    : "bg-blue-50 border-[#2563EB] text-blue-950 font-bold ring-2 ring-blue-100"
+                    : "bg-blue-50 border-blue-600 text-blue-950 font-bold ring-2 ring-blue-100"
                 }`}
               >
-                <div className="text-xs uppercase tracking-wider font-bold text-slate-700">Langkah 1: Rak Lokasi</div>
+                <div className="text-xs font-bold text-slate-700">Langkah 1: Rak Lokasi</div>
                 <div className="text-sm font-mono font-extrabold mt-1 text-slate-900">
-                  {putawayRack ? `✓ Rak: ${putawayRack}` : "Arahkan & Scan Barcode Rak..."}
+                  {putawayRack ? `✓ Rak: ${putawayRack}` : "Arahkan & Scan Barcode Rak…"}
                 </div>
               </div>
 
               <div
-                className={`p-3.5 rounded-xl border-2 transition-all ${
+                className={`p-3.5 rounded-xl border-2 transition-colors ${
                   !putawayRack
                     ? "bg-slate-100 border-slate-300 text-slate-700"
                     : putawaySuccessMessage?.includes("BERHASIL")
                     ? "bg-emerald-50 border-emerald-500 text-emerald-950 font-bold"
-                    : "bg-blue-50 border-[#2563EB] text-blue-950 font-bold ring-2 ring-blue-100"
+                    : "bg-blue-50 border-blue-600 text-blue-950 font-bold ring-2 ring-blue-100"
                 }`}
               >
-                <div className="text-xs uppercase tracking-wider font-bold text-slate-700">Langkah 2: Produk / Barang</div>
+                <div className="text-xs font-bold text-slate-700">Langkah 2: Produk / Barang</div>
                 <div className="text-sm font-mono font-extrabold mt-1 text-slate-900">
                   {putawaySubmitting
-                    ? "Memproses..."
+                    ? "Memproses…"
                     : putawaySuccessMessage?.includes("BERHASIL")
                     ? `✓ ${lastScannedCode}`
                     : putawayRack
-                    ? "Siap Scan Barcode Produk..."
+                    ? "Siap Scan Barcode Produk…"
                     : "Menunggu Scan Rak (Langkah 1)"}
                 </div>
               </div>
@@ -735,11 +734,11 @@ export default function BarcodeScannerPage() {
 
         {/* ── Outbound Verification Status Banner (Match / Mismatch) ── */}
         {mode === "OUTBOUND" && (
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs space-y-3">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
             <div>
               <label
                 htmlFor="outbound-do-select"
-                className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-bold text-slate-800 mb-1.5"
               >
                 Pilih Surat Jalan (Dikonfirmasi / Sudah Diambil)
               </label>
@@ -750,7 +749,7 @@ export default function BarcodeScannerPage() {
                   setOutboundDoId(e.target.value || null)
                   setOutboundResult(null)
                 }}
-                className="w-full min-h-[48px] px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-medium text-slate-900"
+                className="w-full min-h-[48px] px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 font-medium text-slate-900"
               >
                 <option value="">-- Pilih Surat Jalan untuk Verifikasi Pengambilan --</option>
                 {outboundOrders.map((o) => (
@@ -796,11 +795,11 @@ export default function BarcodeScannerPage() {
 
         {/* ── Truck Loading Mode: Manifest Selector & Status Banner ── */}
         {mode === "LOADING_TRUCK" && (
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">
             <div>
               <label
                 htmlFor="manifest-select"
-                className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-bold text-slate-700 mb-1.5"
               >
                 Pilih Manifes Pengiriman (Armada / Truk)
               </label>
@@ -811,7 +810,7 @@ export default function BarcodeScannerPage() {
                   setSelectedManifestId(e.target.value || null)
                   setLoadingScanResult(null)
                 }}
-                className="w-full min-h-[48px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-medium"
+                className="w-full min-h-[48px] px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 font-medium"
               >
                 <option value="">-- Pilih Manifes Aktif (Di Area Transit / Dimuat) --</option>
                 {activeManifests.map((m) => (
@@ -825,7 +824,7 @@ export default function BarcodeScannerPage() {
             {/* Recent scan feedback banner */}
             {loadingScanResult && (
               <div
-                className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-all ${
+                className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-colors ${
                   loadingScanResult.success
                     ? "bg-emerald-50 border-emerald-500 text-emerald-900"
                     : "bg-rose-50 border-rose-500 text-rose-900"
@@ -901,7 +900,7 @@ export default function BarcodeScannerPage() {
                       </div>
                       <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                         <div
-                          className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                          className="bg-blue-600 h-3 rounded-full transition-colors duration-300 ease-out"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -911,7 +910,7 @@ export default function BarcodeScannerPage() {
 
                 {/* List of DOs in manifest with badges */}
                 <div className="space-y-2">
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <div className="text-xs font-bold text-slate-700">
                     Daftar Surat Jalan (DO) Dalam Manifes:
                   </div>
                   <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
@@ -960,12 +959,12 @@ export default function BarcodeScannerPage() {
 
         {/* ── Pallet LPN Putaway Mode Section ── */}
         {mode === "PALLET_LPN" && (
-          <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">
             {/* Step Indicators */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Step 1 Indicator */}
               <div
-                className={`p-3.5 rounded-xl border-2 transition-all ${
+                className={`p-3.5 rounded-xl border-2 transition-colors ${
                   scannedLPNCode
                     ? "bg-emerald-50 border-emerald-500 text-emerald-900"
                     : "bg-blue-50 border-blue-500 text-blue-900"
@@ -982,7 +981,7 @@ export default function BarcodeScannerPage() {
                     >
                       1
                     </span>
-                    <span className="font-bold text-xs uppercase tracking-wider">
+                    <span className="font-bold text-xs">
                       Langkah 1: Scan Barcode Palet LPN
                     </span>
                   </div>
@@ -1021,7 +1020,7 @@ export default function BarcodeScannerPage() {
 
               {/* Step 2 Indicator */}
               <div
-                className={`p-3.5 rounded-xl border-2 transition-all ${
+                className={`p-3.5 rounded-xl border-2 transition-colors ${
                   !scannedLPNCode
                     ? "bg-slate-50 border-slate-200 text-slate-400 opacity-70"
                     : targetRackLocation
@@ -1042,7 +1041,7 @@ export default function BarcodeScannerPage() {
                     >
                       2
                     </span>
-                    <span className="font-bold text-xs uppercase tracking-wider">
+                    <span className="font-bold text-xs">
                       Langkah 2: Scan Barcode Rak Lokasi Tujuan
                     </span>
                   </div>
@@ -1074,7 +1073,7 @@ export default function BarcodeScannerPage() {
 
             {/* Banners for feedback */}
             {lpnPutawaySuccessMessage && (
-              <div className="p-4 rounded-xl border-2 bg-emerald-50 border-emerald-500 text-emerald-900 flex items-center gap-3 transition-all">
+              <div className="p-4 rounded-xl border-2 bg-emerald-50 border-emerald-500 text-emerald-900 flex items-center gap-3 transition-colors">
                 <div className="p-2 rounded-full bg-emerald-200 text-emerald-800 shrink-0">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
@@ -1086,7 +1085,7 @@ export default function BarcodeScannerPage() {
             )}
 
             {lpnPutawayErrorMessage && (
-              <div className="p-4 rounded-xl border-2 bg-rose-50 border-rose-500 text-rose-900 flex items-center gap-3 transition-all">
+              <div className="p-4 rounded-xl border-2 bg-rose-50 border-rose-500 text-rose-900 flex items-center gap-3 transition-colors">
                 <div className="p-2 rounded-full bg-rose-200 text-rose-800 shrink-0">
                   <AlertCircle className="w-6 h-6" />
                 </div>
@@ -1153,12 +1152,12 @@ export default function BarcodeScannerPage() {
 
                 {/* Table/List ringkas isi koli di dalam palet */}
                 <div>
-                  <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  <div className="text-xs font-bold text-slate-700 mb-2">
                     Daftar Koli Di Dalam Palet:
                   </div>
                   {lpnDetailLoading ? (
                     <div className="text-xs text-slate-500 py-3 text-center">
-                      Memuat detail koli palet...
+                      Memuat detail koli palet…
                     </div>
                   ) : !lpnDetail?.items || lpnDetail.items.length === 0 ? (
                     <div className="text-xs text-slate-400 py-3 text-center italic bg-white rounded-lg border border-slate-200">
@@ -1211,6 +1210,7 @@ export default function BarcodeScannerPage() {
               ref={videoRef}
               playsInline
               muted
+              poster="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%274%27%20height%3D%273%27%3E%3Crect%20width%3D%274%27%20height%3D%273%27%20fill%3D%27%23000%27%2F%3E%3C%2Fsvg%3E"
               className={`w-full h-full object-cover ${cameraActive ? "block" : "hidden"}`}
             />
 
@@ -1231,7 +1231,7 @@ export default function BarcodeScannerPage() {
                 <button
                   type="button"
                   onClick={startCamera}
-                  className="inline-flex items-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] transition-all shadow-md"
+                  className="inline-flex items-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-sm"
                 >
                   <Camera className="w-4 h-4" />
                   <span>Nyalakan Kamera Web</span>
@@ -1243,15 +1243,15 @@ export default function BarcodeScannerPage() {
             {cameraActive && (
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                 {/* Dark Mask Around Scan Window */}
-                <div className="relative w-64 sm:w-80 h-44 sm:h-52 border-2 border-white/70 rounded-xl overflow-hidden shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]">
+                <div className="relative w-64 sm:w-80 h-44 sm:h-52 border-2 border-white/70 rounded-xl overflow-hidden scanner-scrim">
                   {/* Targeting Corners */}
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-[#2563EB] rounded-tl-sm" />
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-[#2563EB] rounded-tr-sm" />
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-[#2563EB] rounded-bl-sm" />
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-[#2563EB] rounded-br-sm" />
+                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-blue-600 rounded-tl-sm" />
+                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-blue-600 rounded-tr-sm" />
+                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-blue-600 rounded-bl-sm" />
+                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-blue-600 rounded-br-sm" />
 
                   {/* Red Laser Sweeping Line Animation */}
-                  <div className="absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-[#EA580C] to-transparent shadow-[0_0_8px_#EA580C] animate-pulse top-1/2 -translate-y-1/2" />
+                  <div className="absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-orange-600 to-transparent animate-pulse motion-reduce:animate-none top-1/2 -translate-y-1/2" />
                 </div>
               </div>
             )}
@@ -1270,7 +1270,7 @@ export default function BarcodeScannerPage() {
                   <button
                     type="button"
                     onClick={toggleTorch}
-                    className={`p-3 rounded-full min-h-[48px] min-w-[48px] flex items-center justify-center text-white backdrop-blur-md transition-all ${
+                    className={`p-3 rounded-full min-h-[48px] min-w-[48px] flex items-center justify-center text-white backdrop-blur-md transition-colors ${
                       torchOn ? "bg-amber-500 shadow-lg" : "bg-black/40 hover:bg-black/60"
                     }`}
                     aria-label="Senter"
@@ -1281,7 +1281,7 @@ export default function BarcodeScannerPage() {
                 <button
                   type="button"
                   onClick={stopCamera}
-                  className="p-3 rounded-full min-h-[48px] min-w-[48px] flex items-center justify-center bg-black/40 hover:bg-black/60 text-white backdrop-blur-md transition-all"
+                  className="p-3 rounded-full min-h-[48px] min-w-[48px] flex items-center justify-center bg-black/40 hover:bg-black/60 text-white backdrop-blur-md transition-colors"
                   aria-label="Matikan Kamera"
                 >
                   <CameraOff className="w-5 h-5" />
@@ -1292,7 +1292,7 @@ export default function BarcodeScannerPage() {
         </div>
 
         {/* ── Manual Barcode Entry & Simulation Triggers ── */}
-        <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
           <form onSubmit={handleManualSubmit} className="flex gap-2">
             <div className="relative flex-1">
               <Keyboard className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1300,13 +1300,13 @@ export default function BarcodeScannerPage() {
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder="Ketik barcode / SKU lalu Enter..."
-                className="w-full pl-10 pr-4 min-h-[48px] text-base sm:text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] font-mono"
+                placeholder="Ketik barcode / SKU lalu Enter…"
+                className="w-full pl-10 pr-4 min-h-[48px] text-base sm:text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono"
               />
             </div>
             <button
               type="submit"
-              className="px-5 min-h-[48px] rounded-lg font-bold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-xs"
+              className="px-5 min-h-[48px] rounded-lg font-bold text-sm bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-colors shadow-xs"
             >
               Scan
             </button>
@@ -1325,14 +1325,10 @@ export default function BarcodeScannerPage() {
 
         {/* ── Immediate Product Resolution Card ── */}
         {displayProduct && (
-          <div className="bg-white rounded-xl border-2 border-[#BFDBFE] p-5 shadow-sm space-y-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl border-2 border-blue-200 p-5 shadow-sm space-y-4 animate-in fade-in duration-150 motion-reduce:animate-none">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-blue-100 text-[#2563EB]">
-                  <BarcodeIcon className="w-3.5 h-3.5" />
-                  Master SKU Ditemukan
-                </span>
-                <h3 className="text-lg font-extrabold text-slate-900 mt-1">
+                <h3 className="text-lg font-extrabold text-slate-900">
                   {displayProduct.name}
                 </h3>
               </div>
@@ -1356,7 +1352,7 @@ export default function BarcodeScannerPage() {
               </div>
               <div>
                 <div className="text-slate-500">Sumber Pemetaan:</div>
-                <div className="font-semibold text-[#2563EB] mt-0.5">
+                <div className="font-semibold text-blue-600 mt-0.5">
                   {displayProduct.source}
                 </div>
               </div>

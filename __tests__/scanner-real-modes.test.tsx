@@ -247,4 +247,17 @@ describe('useManualRefresh', () => {
     render(<RefreshButton status="idle" onClick={() => {}} updatedAt={ms} />)
     expect(screen.getByText('Data: 14:32:05')).toBeInTheDocument()
   })
+
+  test('Putaway 2-step indicator renders step headers in sentence case without screaming uppercase tracking', () => {
+    render(<BarcodeScannerPage />)
+
+    // Putaway mode is the default mode
+    const step1 = screen.getByText(/Langkah 1: Rak Lokasi/i)
+    expect(step1.className).not.toMatch(/uppercase/)
+    expect(step1.className).not.toMatch(/tracking-wider/)
+
+    const step2 = screen.getByText(/Langkah 2: Produk \/ Barang/i)
+    expect(step2.className).not.toMatch(/uppercase/)
+    expect(step2.className).not.toMatch(/tracking-wider/)
+  })
 })

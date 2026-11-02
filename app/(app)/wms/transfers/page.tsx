@@ -396,7 +396,7 @@ export default function TransfersPage() {
       return (
         <div className="flex items-center gap-1.5 w-full max-w-md px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">
           <XCircle className="w-3.5 h-3.5 shrink-0" />
-          <span className="text-[11px] font-bold uppercase tracking-wider">Ditolak</span>
+          <span className="text-[11px] font-bold">Ditolak</span>
         </div>
       )
     }
@@ -407,7 +407,7 @@ export default function TransfersPage() {
       return (
         <div className="flex items-center gap-1.5 w-full max-w-md px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-600">
           <Ban className="w-3.5 h-3.5 shrink-0" />
-          <span className="text-[11px] font-bold uppercase tracking-wider">Dibatalkan</span>
+          <span className="text-[11px] font-bold">Dibatalkan</span>
         </div>
       )
     }
@@ -438,19 +438,19 @@ export default function TransfersPage() {
           return (
             <React.Fragment key={step.key}>
               <div
-                className={`flex-1 flex flex-col items-center py-1 px-1 rounded text-center transition-all ${
+                className={`flex-1 flex flex-col items-center py-1 px-1 rounded text-center transition-colors ${
                   state === "completed"
                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                     : state === "active"
                     ? step.key === "IN_TRANSIT"
-                      ? "bg-amber-100 text-amber-900 border border-amber-300 font-bold animate-pulse"
+                      ? "bg-amber-100 text-amber-900 border border-amber-300 font-bold animate-pulse motion-reduce:animate-none"
                       : step.key === "PENDING_APPROVAL"
                       ? "bg-yellow-100 text-yellow-900 border border-yellow-300 font-bold"
                       : "bg-blue-100 text-blue-900 border border-blue-300 font-bold"
                     : "bg-slate-100 text-slate-400 border border-slate-200"
                 }`}
               >
-                <span className="text-[9px] tracking-wider uppercase leading-tight">{step.label}</span>
+                <span className="text-[9px] font-medium leading-tight">{step.label}</span>
               </div>
               {idx < steps.length - 1 && (
                 <div
@@ -467,11 +467,11 @@ export default function TransfersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-16">
+    <div className="min-h-screen bg-slate-50 pb-16">
       {/* ── Toast Notification ── */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm transition-all ${
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg border text-sm transition-opacity ${
             toast.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-800"
               : "bg-rose-50 border-rose-200 text-rose-800"
@@ -493,7 +493,7 @@ export default function TransfersPage() {
       )}
 
       {/* ── Top Header ── */}
-      <div className="bg-white border-b border-[#E2E8F0] px-4 sm:px-6 py-5 sticky top-0 z-20 shadow-xs">
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-5 sticky top-0 z-20 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -504,7 +504,7 @@ export default function TransfersPage() {
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <Truck className="w-6 h-6 text-[#2563EB]" />
+                <Truck className="w-6 h-6 text-blue-600" />
                 <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                   Transfer Stok Antar Gudang
                 </h1>
@@ -531,7 +531,7 @@ export default function TransfersPage() {
                 // No auto-added row: racks are unknown until a source warehouse is chosen.
                 setShowCreateModal(true)
               }}
-              className="inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-sm"
+              className="inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-colors shadow-xs"
             >
               <Plus className="w-4 h-4" />
               <span>+ Buat Transfer Baru</span>
@@ -542,7 +542,7 @@ export default function TransfersPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
         {/* ── Filters & Search Bar ── */}
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xs">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xs">
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -550,7 +550,7 @@ export default function TransfersPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari nomor transfer, plat nomor, atau nama supir..."
-              className="w-full pl-10 pr-4 min-h-[48px] text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+              className="w-full pl-10 pr-4 min-h-[48px] text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
             />
           </div>
 
@@ -568,9 +568,9 @@ export default function TransfersPage() {
               <button
                 key={tab.value}
                 onClick={() => setStatusFilter(tab.value)}
-                className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-all min-h-[42px] whitespace-nowrap ${
+                className={`px-3.5 py-2 text-xs font-semibold rounded-lg transition-colors min-h-[42px] whitespace-nowrap ${
                   statusFilter === tab.value
-                    ? "bg-[#2563EB] text-white"
+                    ? "bg-blue-600 text-white"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
@@ -584,7 +584,7 @@ export default function TransfersPage() {
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-xl border border-[#E2E8F0] p-5 space-y-4 shadow-xs">
+              <div key={i} className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
                 <div className="flex justify-between items-center">
                   <div className="space-y-2">
                     <ShimmerSkeleton className="h-5 w-40 rounded" />
@@ -600,7 +600,7 @@ export default function TransfersPage() {
             ))}
           </div>
         ) : filteredTransfers.length === 0 ? (
-          <div className="text-center py-16 px-4 bg-white rounded-xl border border-[#E2E8F0]">
+          <div className="text-center py-16 px-4 bg-white rounded-xl border border-slate-200">
             <Truck className="w-12 h-12 text-slate-400 mx-auto mb-3" />
             <h3 className="text-base font-bold text-slate-900">Belum ada data transfer</h3>
             <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-5">
@@ -608,7 +608,7 @@ export default function TransfersPage() {
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 px-5 min-h-[48px] rounded-lg font-semibold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
+              className="inline-flex items-center gap-2 px-5 min-h-[48px] rounded-lg font-semibold text-sm bg-blue-600 text-white hover:bg-blue-700"
             >
               <Plus className="w-4 h-4" />
               Buat Transfer Baru
@@ -634,7 +634,7 @@ export default function TransfersPage() {
               return (
                 <div
                   key={transfer.id}
-                  className="bg-white rounded-xl border border-[#E2E8F0] hover:border-[#BFDBFE] hover:shadow-md transition-all p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5"
+                  className="bg-white rounded-xl border border-slate-200 hover:border-blue-200 hover:shadow-md transition-[border-color,box-shadow] p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5"
                 >
                   {/* Left Column: Number, Route, Logistics info */}
                   <div className="space-y-3 flex-1">
@@ -659,9 +659,9 @@ export default function TransfersPage() {
                         <Building className="w-4 h-4 text-slate-500" />
                         <span>{getWarehouseName(transfer.from_warehouse_id)}</span>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-[#2563EB] shrink-0" />
-                      <div className="flex items-center gap-1.5 font-semibold text-slate-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 text-[#2563EB]">
-                        <Building className="w-4 h-4 text-[#2563EB]" />
+                      <ArrowRight className="w-4 h-4 text-blue-600 shrink-0" />
+                      <div className="flex items-center gap-1.5 font-semibold text-slate-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 text-blue-600">
+                        <Building className="w-4 h-4 text-blue-600" />
                         <span>{getWarehouseName(transfer.to_warehouse_id)}</span>
                       </div>
                     </div>
@@ -731,7 +731,7 @@ export default function TransfersPage() {
 
                   {/* Middle Column: Visual Stepper Tracker */}
                   <div className="w-full lg:w-72 flex flex-col items-start lg:items-center">
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                    <span className="text-[11px] font-semibold text-slate-500 mb-1.5">
                       Status Perjalanan
                     </span>
                     {renderStatusTracker(transfer.status)}
@@ -746,7 +746,7 @@ export default function TransfersPage() {
                           type="button"
                           onClick={() => requestSubmit(transfer.id)}
                           disabled={isActionPending}
-                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-[#2563EB] text-white hover:bg-[#1D4ED8] active:scale-95 transition-all shadow-xs"
+                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-colors shadow-xs"
                         >
                           <ClipboardCheck className="w-4 h-4" />
                           <span>Ajukan Persetujuan</span>
@@ -756,7 +756,7 @@ export default function TransfersPage() {
                           type="button"
                           onClick={() => requestCancel(transfer.id)}
                           disabled={isActionPending}
-                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 active:scale-95 transition-all"
+                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 active:scale-95 transition-colors"
                         >
                           <Ban className="w-4 h-4" />
                           <span>Batalkan Draf</span>
@@ -772,7 +772,7 @@ export default function TransfersPage() {
                           type="button"
                           onClick={() => requestReject(transfer.id, transfer.transfer_number)}
                           disabled={isActionPending}
-                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-xs"
+                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-colors shadow-xs"
                         >
                           <XCircle className="w-4 h-4" />
                           <span>Tolak</span>
@@ -781,7 +781,7 @@ export default function TransfersPage() {
                           type="button"
                           onClick={() => requestApprove(transfer.id)}
                           disabled={isActionPending}
-                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-xs"
+                          className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-colors shadow-xs"
                         >
                           <ShieldCheck className="w-4 h-4" />
                           <span>Setujui Transfer</span>
@@ -795,7 +795,7 @@ export default function TransfersPage() {
                         type="button"
                         onClick={() => requestDispatch(transfer.id)}
                         disabled={isActionPending}
-                        className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-[#EA580C] text-white hover:bg-[#C2410C] active:scale-95 transition-all shadow-xs"
+                        className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-orange-600 text-white hover:bg-orange-700 active:scale-95 transition-colors shadow-xs"
                       >
                         <Send className="w-4 h-4" />
                         <span>Kirim Armada</span>
@@ -808,7 +808,7 @@ export default function TransfersPage() {
                         type="button"
                         onClick={() => requestReceive(transfer.id)}
                         disabled={isActionPending}
-                        className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-xs"
+                        className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 px-5 min-h-[48px] rounded-lg font-bold text-sm bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-colors shadow-xs"
                       >
                         <PackageCheck className="w-4 h-4" />
                         <span>Konfirmasi Terima</span>
@@ -837,7 +837,7 @@ export default function TransfersPage() {
           <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-[#EFF6FF] text-[#2563EB]">
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
@@ -864,14 +864,14 @@ export default function TransfersPage() {
               {/* Warehouse Selection */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Dari Gudang (Asal) *
                   </label>
                   <select
                     required
                     value={fromWhId}
                     onChange={(e) => setFromWhId(e.target.value)}
-                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB] bg-white"
+                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600 bg-white"
                   >
                     <option value="">-- Pilih Gudang Asal --</option>
                     {warehouses.map((wh) => (
@@ -889,14 +889,14 @@ export default function TransfersPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Ke Gudang (Tujuan) *
                   </label>
                   <select
                     required
                     value={toWhId}
                     onChange={(e) => setToWhId(e.target.value)}
-                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB] bg-white"
+                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600 bg-white"
                   >
                     <option value="">-- Pilih Gudang Tujuan --</option>
                     {warehouses
@@ -919,7 +919,7 @@ export default function TransfersPage() {
               {/* Vehicle & Driver */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     No. Transfer (Opsional)
                   </label>
                   <input
@@ -927,11 +927,11 @@ export default function TransfersPage() {
                     placeholder="TR-Otomatis"
                     value={transferNumber}
                     onChange={(e) => setTransferNumber(e.target.value)}
-                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-[#2563EB]"
+                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Plat Nomor Kendaraan
                   </label>
                   <input
@@ -939,11 +939,11 @@ export default function TransfersPage() {
                     placeholder="Contoh: B 1234 XYZ"
                     value={vehiclePlate}
                     onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-[#2563EB]"
+                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Nama Pengemudi / Kurir
                   </label>
                   <input
@@ -951,14 +951,14 @@ export default function TransfersPage() {
                     placeholder="Contoh: Pak Joko"
                     value={driverName}
                     onChange={(e) => setDriverName(e.target.value)}
-                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB]"
+                    className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Catatan / Instruksi
                 </label>
                 <input
@@ -966,14 +966,14 @@ export default function TransfersPage() {
                   placeholder="Keterangan pengiriman..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-[#2563EB]"
+                  className="w-full px-3 py-2.5 min-h-[48px] rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-600"
                 />
               </div>
 
               {/* Line Item Builder */}
               <div className="pt-2">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  <label className="text-xs font-bold text-slate-800">
                     Daftar Barang Transfer ({lineItems.length})
                   </label>
                   <button
@@ -981,7 +981,7 @@ export default function TransfersPage() {
                     onClick={handleAddLineItem}
                     disabled={!fromWhId}
                     title={!fromWhId ? "Pilih Gudang Asal terlebih dahulu" : undefined}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 min-h-[36px] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     + Tambah Baris
@@ -1070,7 +1070,7 @@ export default function TransfersPage() {
                 <button
                   type="submit"
                   disabled={createTransferMutation.isPending}
-                  className="px-6 min-h-[48px] rounded-lg text-sm font-bold bg-[#2563EB] text-white hover:bg-[#1D4ED8] disabled:opacity-50"
+                  className="px-6 min-h-[48px] rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   {createTransferMutation.isPending ? "Memproses..." : "Buat Dokumen Transfer"}
                 </button>
@@ -1086,7 +1086,7 @@ export default function TransfersPage() {
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <span className="font-mono text-xs text-slate-500">Detail Surat Transfer</span>
+                <span className="text-xs text-slate-500 font-medium">Detail Surat Transfer</span>
                 <h3 className="text-lg font-extrabold text-slate-900">
                   {selectedTransferForDetail.transfer_number}
                 </h3>
@@ -1117,7 +1117,7 @@ export default function TransfersPage() {
                   <span className="text-slate-500">Status:</span>
                   <span
                     className={`font-bold ${
-                      selectedTransferForDetail.status === "REJECTED" ? "text-rose-600" : "text-[#2563EB]"
+                      selectedTransferForDetail.status === "REJECTED" ? "text-rose-600" : "text-blue-600"
                     }`}
                   >
                     {TRANSFER_STATUS_LABEL[selectedTransferForDetail.status] ?? selectedTransferForDetail.status}
@@ -1148,7 +1148,7 @@ export default function TransfersPage() {
               </div>
 
               <div className="pt-2">
-                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                <div className="text-xs font-bold text-slate-700 mb-2">
                   Daftar Kuantitas
                 </div>
                 <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 text-xs text-slate-600 flex items-center justify-between">
@@ -1220,9 +1220,9 @@ export default function TransfersPage() {
                 onClick={handleConfirmAction}
                 className={`px-4 py-2 rounded-lg text-white text-sm font-semibold shadow-sm transition disabled:opacity-50 ${
                   confirmModal.type === "dispatch"
-                    ? "bg-[#EA580C] hover:bg-[#C2410C]"
+                    ? "bg-orange-600 hover:bg-orange-700"
                     : confirmModal.type === "submit"
-                    ? "bg-[#2563EB] hover:bg-[#1D4ED8]"
+                    ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-emerald-600 hover:bg-emerald-700"
                 }`}
               >
@@ -1252,7 +1252,7 @@ export default function TransfersPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Alasan Penolakan *
               </label>
               <textarea

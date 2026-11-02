@@ -8,6 +8,7 @@ import {
   type ShippingManifest,
   type ShippingManifestDetail,
   type WMSOutboundKPISummary,
+  type OutboundQCInspection,
 } from "@/lib/api"
 
 /**
@@ -121,3 +122,65 @@ export function useWMSOutboundKPI(warehouseId?: string) {
 }
 
 export const useOutboundKPI = useWMSOutboundKPI
+
+/**
+ * Fetch Outbound QC inspection history records.
+ */
+export function useOutboundQCInspections(params?: {
+  warehouse_id?: string
+  delivery_order_id?: string
+}) {
+  return useQuery<OutboundQCInspection[]>({
+    queryKey: ["outbound-qc-inspections", params],
+    queryFn: async () => {
+      const res = await api.wms.deliveryOrders.listQCInspections(params)
+      return res.data ?? []
+    },
+  })
+}
+
+/**
+ * Mutation to pass Outbound QC inspection on a PACKED delivery order.
+ * Transitions DO status from PACKED -> QC_PASSED.
+ */
+export function usePassOutboundQC() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (variables: {
+      id: string
+      payload?: { scanned_awb?: string; notes?: string }
+    }) => {
+      return api.wms.deliveryOrders.passQC(variables.id, variables.payload ?? {})
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["delivery-orders"] })
+      qc.invalidateQueries({ queryKey: ["delivery-order", variables.id] })
+      qc.invalidateQueries({ queryKey: ["outbound-qc-inspections"] })
+      qc.invalidateQueries({ queryKey: ["shipping-manifests"] })
+      qc.invalidateQueries({ queryKey: ["wms-outbound-kpi"] })
+    },
+  })
+}
+
+/**
+ * Mutation to reject Outbound QC inspection on a PACKED delivery order.
+ * Transitions DO status to QC_FAILED for repack.
+ */
+export function useRejectOutboundQC() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (variables: {
+      id: string
+      payload: { reason: string; notes?: string }
+    }) => {
+      return api.wms.deliveryOrders.rejectQC(variables.id, variables.payload)
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["delivery-orders"] })
+      qc.invalidateQueries({ queryKey: ["delivery-order", variables.id] })
+      qc.invalidateQueries({ queryKey: ["outbound-qc-inspections"] })
+      qc.invalidateQueries({ queryKey: ["shipping-manifests"] })
+      qc.invalidateQueries({ queryKey: ["wms-outbound-kpi"] })
+    },
+  })
+}

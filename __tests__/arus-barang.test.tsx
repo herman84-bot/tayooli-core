@@ -197,6 +197,7 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
     expect(screen.getAllByRole('button', { name: /^Surat Jalan$/i })[0]).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Pengambilan Gelombang/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Stasiun Pengemasan/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /QC Pengiriman/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Manifes & Muat/i })).toBeInTheDocument()
   })
 
@@ -236,5 +237,14 @@ describe('Unified Arus Barang Page (KO-2a & Sprint 1)', () => {
     expect(screen.getByText('BATCH-20261007-001')).toBeInTheDocument()
     expect(screen.getByText('A-01-01')).toBeInTheDocument()
     expect(screen.getByText('Rak Default')).toBeInTheDocument()
+  })
+
+  it('renders inbound receipt table header in sentence case without screaming uppercase tracking', () => {
+    currentMode = 'masuk'
+    render(<ArusBarangPage />)
+
+    const header = screen.getByRole('columnheader', { name: /No\. Penerimaan/i })
+    expect(header.closest('thead')?.className).not.toMatch(/uppercase/)
+    expect(header.closest('thead')?.className).not.toMatch(/tracking-wider/)
   })
 })
