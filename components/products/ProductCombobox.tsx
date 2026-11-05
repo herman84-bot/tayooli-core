@@ -149,7 +149,7 @@ export function ProductCombobox({
         aria-expanded={open}
         aria-label={value ? `${ariaLabel ?? placeholder}: ${value.name}` : (ariaLabel ?? placeholder)}
         className={cn(
-          "w-full flex items-center justify-between gap-2 px-3 py-2 text-sm rounded-lg border bg-white text-zinc-900 transition-colors",
+          "w-full min-h-[44px] flex items-center justify-between gap-2 px-3 py-2 text-base sm:text-sm rounded-lg border bg-white text-zinc-900 transition-colors",
           "border-zinc-300 hover:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600",
           disabled && "opacity-50 cursor-not-allowed bg-zinc-50 text-zinc-500",
           open && "border-indigo-600 ring-2 ring-indigo-500/20"
@@ -197,7 +197,7 @@ export function ProductCombobox({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Ketik nama atau SKU produk..."
               aria-label="Cari produk"
-              className="w-full px-2.5 py-1.5 text-xs rounded border border-zinc-200 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-2.5 py-2 text-base sm:text-xs rounded border border-zinc-200 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
@@ -217,7 +217,7 @@ export function ProductCombobox({
                   onMouseEnter={() => setHighlightIdx(idx)}
                   onClick={() => handleSelect(p)}
                   className={cn(
-                    "px-3 py-2 cursor-pointer flex items-center justify-between gap-2 transition-colors",
+                    "px-3 py-2.5 min-h-[44px] cursor-pointer flex items-center justify-between gap-2 transition-colors",
                     idx === highlightIdx ? "bg-indigo-50 text-indigo-900" : "hover:bg-zinc-50 text-zinc-800",
                     value?.id === p.id && "font-semibold"
                   )}

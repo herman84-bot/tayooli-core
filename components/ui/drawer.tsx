@@ -54,26 +54,30 @@ export function Drawer({ children }: { children: React.ReactNode }) {
 export function DrawerHeader({ title, icon }: { title: string; icon?: React.ReactNode }) {
   const { onOpenChange } = useDrawer()
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+    <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 bg-gray-50 safe-top">
       <div className="flex items-center gap-3">
         {icon && <span className="text-gray-500">{icon}</span>}
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900">{title}</h2>
       </div>
       <button
         onClick={() => onOpenChange(false)}
         aria-label="Tutup"
-        className="p-2 rounded-md hover:bg-gray-200 transition-colors"
+        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-gray-200 text-gray-500 hover:text-gray-900 transition-colors active:scale-95"
       >
-        <X className="w-5 h-5 text-gray-500" />
+        <X className="w-5 h-5" />
       </button>
     </div>
   )
 }
 
 export function DrawerContent({ children }: { children: React.ReactNode }) {
-  return <div className="flex-1 overflow-y-auto p-6 bg-white">{children}</div>
+  return <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-white">{children}</div>
 }
 
 export function DrawerFooter({ children }: { children: React.ReactNode }) {
-  return <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">{children}</div>
+  return (
+    <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-t border-gray-200 bg-gray-50 flex flex-col-reverse sm:flex-row justify-end gap-2.5 sm:gap-3 safe-bottom">
+      {children}
+    </div>
+  )
 }

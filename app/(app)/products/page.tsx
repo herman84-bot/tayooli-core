@@ -568,7 +568,7 @@ export default function ProductsPage() {
                           <button
                             type="button"
                             onClick={() => setSelectedProduct(p)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-medium transition-colors shadow-2xs"
+                            className="inline-flex items-center gap-1 px-3 py-2 min-h-[44px] rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-medium transition-colors shadow-2xs active:scale-95"
                             title="Detail & Stok"
                           >
                             <span>Detail</span>
@@ -577,18 +577,20 @@ export default function ProductsPage() {
                           <button
                             type="button"
                             onClick={(e) => handleOpenEdit(p, e)}
-                            className="p-1.5 rounded-lg border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors shadow-2xs"
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors shadow-2xs active:scale-95"
                             title="Ubah Produk"
+                            aria-label="Ubah Produk"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
                             onClick={(e) => handleOpenDelete(p, e)}
-                            className="p-1.5 rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition-colors shadow-2xs"
+                            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition-colors shadow-2xs active:scale-95"
                             title="Hapus Produk"
+                            aria-label="Hapus Produk"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>

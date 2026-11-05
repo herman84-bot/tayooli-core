@@ -34,8 +34,8 @@ export function DataTable<TData, TValue>({
   }
 
   return (
-    <div className="rounded-md border">
-      <table className="w-full caption-bottom text-sm">
+    <div className="rounded-md border overflow-x-auto">
+      <table className="w-full caption-bottom text-sm min-w-full">
         <thead className="[&_tr]:border-b">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id} className="border-b transition-colors hover:bg-muted/50">

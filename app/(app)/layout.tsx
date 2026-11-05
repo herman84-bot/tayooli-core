@@ -39,18 +39,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* ── Main content ── */}
       <main className="flex-1 min-w-0 overflow-y-auto">
         {/* Mobile header with hamburger */}
-        {isMobile && (
-          <div className="sticky top-0 z-30 flex items-center h-14 px-3 border-b border-border bg-background/95 backdrop-blur safe-top">
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              aria-label="Buka menu"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
-            <span className="ml-2 text-sm font-semibold text-foreground">Tayooli</span>
-          </div>
-        )}
+        <div className="md:hidden sticky top-0 z-30 flex items-center h-14 px-3 border-b border-border bg-background/95 backdrop-blur safe-top">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-95"
+            aria-label="Buka menu"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <span className="ml-2 text-sm font-semibold text-foreground tracking-tight">Tayooli</span>
+        </div>
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full min-h-96 gap-3">

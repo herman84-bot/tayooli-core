@@ -154,6 +154,7 @@
     color-scheme: light;
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    overflow-x: clip;
   }
 
   .dark {
@@ -167,6 +168,16 @@
     border-color: var(--color-border);
   }
 
+  /* Tap highlight suppression on interactive elements for mobile browsers */
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     font-family: var(--font-sans);
     background-color: var(--color-background);
@@ -174,6 +185,7 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overflow-x: clip;
   }
 
   ::selection {
@@ -274,6 +286,18 @@
   padding-right: max(env(safe-area-inset-right, 0px), 0.5rem);
 }
 
+
+/* ----------------------------------------------------------------------------
+ * Mobile Touch & Input Ergonomics (Android & Mobile Browsers)
+ * -------------------------------------------------------------------------- */
+/* Prevent browser auto-zoom on input focus on small screens */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
 
 /* ----------------------------------------------------------------------------
  * Scanner camera vignette — dark mask around the clear scan window.

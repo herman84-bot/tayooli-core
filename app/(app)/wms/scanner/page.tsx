@@ -1205,7 +1205,7 @@ export default function BarcodeScannerPage() {
 
         {/* ── Camera Viewfinder Card with Animated Reticle ── */}
         <div className="bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg border border-slate-800">
-          <div className="aspect-4/3 sm:aspect-16/9 w-full relative flex items-center justify-center bg-black">
+          <div className="aspect-square sm:aspect-16/9 w-full relative flex items-center justify-center bg-black">
             <video
               ref={videoRef}
               playsInline

@@ -129,13 +129,13 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   )
 
   /* ── Mobile drawer ────────────────────────────────────────────────── */
-  if (isMobile) {
+  if (isMobile || mobileOpen) {
     return (
       <>
         {/* Backdrop */}
         {mobileOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/30 transition-opacity"
+            className="fixed inset-0 z-40 bg-black/40 transition-opacity"
             onClick={onMobileClose}
             aria-hidden="true"
           />
@@ -144,13 +144,13 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
         {/* Drawer */}
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-50 w-60 bg-background border-r border-border flex flex-col',
-            'transition-transform duration-200 ease-in-out',
+            'fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border flex flex-col',
+            'transition-transform duration-200 ease-in-out shadow-xl',
             mobileOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >
           {/* Brand + close */}
-          <div className="px-4 py-4 border-b border-border flex items-center gap-2.5">
+          <div className="px-4 py-4 border-b border-border flex items-center gap-2.5 safe-top">
             <Logo size={32} />
             <div className="min-w-0 flex-1">
               <span className="block font-semibold text-foreground text-sm tracking-tight leading-tight">
@@ -162,7 +162,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
             </div>
             <button
               onClick={onMobileClose}
-              className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-95"
               aria-label="Tutup menu"
             >
               <X className="h-5 w-5" />
@@ -173,10 +173,10 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           <nav className="flex-1 px-2.5 py-3 overflow-y-auto">
             {visibleGroups.map((group, gi) => (
               <div key={group.label} className={gi > 0 ? 'mt-4' : undefined}>
-                <p className="px-2.5 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+                <p className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
                   {group.label}
                 </p>
-                <div className="space-y-px">
+                <div className="space-y-1">
                   {group.items.map(({ href, label, icon: Icon, exact }) => {
                     const active = exact
                       ? pathname === href
@@ -187,13 +187,13 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                         href={href}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                          'flex items-center gap-2.5 px-3 min-h-[40px] rounded-lg text-sm transition-colors',
+                          'flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm transition-colors active:scale-98',
                           active
-                            ? 'bg-primary/8 text-primary font-medium'
+                            ? 'bg-primary/10 text-primary font-medium'
                             : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
                         )}
                       >
-                        <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-primary' : 'text-muted-foreground/70')} />
+                        <Icon className={cn('h-4.5 w-4.5 shrink-0', active ? 'text-primary' : 'text-muted-foreground/70')} />
                         {label}
                       </Link>
                     )
@@ -218,10 +218,10 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                       window.location.replace('/login')
                     })()
                   }}
-                  className="ml-2 shrink-0 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  className="ml-2 shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-95"
                   aria-label="Keluar"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
+                  <LogOut className="h-4 w-4" />
                 </button>
               </div>
             )}
@@ -235,7 +235,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   return (
     <aside
       className={cn(
-        'shrink-0 border-r border-border bg-background flex flex-col transition-all duration-200 ease-in-out',
+        'hidden md:flex shrink-0 border-r border-border bg-background flex-col transition-all duration-200 ease-in-out',
         collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_EXPANDED_W,
       )}
     >

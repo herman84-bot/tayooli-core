@@ -71,14 +71,14 @@ export function Pagination({
   ) : null
 
   return (
-    <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
       {pageSizeSelect}
       {totalPages > 1 && (
-        <nav className="flex items-center justify-center gap-1" aria-label="Paginasi">
+        <nav className="flex items-center justify-center gap-1 flex-wrap" aria-label="Paginasi">
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="px-3 py-1 rounded-lg text-sm bg-zinc-100 text-zinc-700 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        className="min-h-[44px] px-3.5 py-2 rounded-lg text-sm bg-zinc-100 text-zinc-700 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors active:scale-95"
       >
         Sebelumnya
       </button>
@@ -93,9 +93,9 @@ export function Pagination({
             key={p}
             onClick={() => onPageChange(p)}
             className={cn(
-              'px-3 py-1 rounded-lg text-sm transition-colors',
+              'min-h-[44px] min-w-[44px] px-3.5 py-2 rounded-lg text-sm transition-colors active:scale-95',
               p === page
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-indigo-600 text-white font-medium'
                 : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200',
             )}
             aria-current={p === page ? 'page' : undefined}
@@ -108,7 +108,7 @@ export function Pagination({
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="px-3 py-1 rounded-lg text-sm bg-zinc-100 text-zinc-700 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        className="min-h-[44px] px-3.5 py-2 rounded-lg text-sm bg-zinc-100 text-zinc-700 hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors active:scale-95"
       >
         Berikutnya
       </button>

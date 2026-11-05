@@ -148,7 +148,7 @@ export function CategoryCombobox({
               : (ariaLabel ?? placeholder)
           }
           className={cn(
-            "w-full flex items-center justify-between gap-2 px-3 py-2 pr-12 text-sm rounded-lg border bg-white text-zinc-900 transition-colors text-left",
+            "w-full min-h-[44px] flex items-center justify-between gap-2 px-3 py-2 pr-12 text-base sm:text-sm rounded-lg border bg-white text-zinc-900 transition-colors text-left",
             "border-zinc-300 hover:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600",
             disabled && "opacity-50 cursor-not-allowed bg-zinc-50 text-zinc-500",
             open && "border-indigo-600 ring-2 ring-indigo-500/20"
@@ -197,7 +197,7 @@ export function CategoryCombobox({
               onKeyDown={handleKeyDown}
               placeholder="Cari atau buat kategori..."
               aria-label="Cari kategori"
-              className="w-full px-2.5 py-1.5 text-xs rounded border border-zinc-300 bg-white focus:outline-none focus:border-indigo-600"
+              className="w-full px-2.5 py-2 text-base sm:text-xs rounded border border-zinc-300 bg-white focus:outline-none focus:border-indigo-600"
             />
           </div>
 
@@ -209,7 +209,7 @@ export function CategoryCombobox({
                 aria-selected={!value}
                 onClick={() => handleSelect(null)}
                 className={cn(
-                  "px-3 py-2 cursor-pointer text-xs text-zinc-500 hover:bg-zinc-50 flex items-center justify-between",
+                  "px-3 py-2.5 min-h-[44px] cursor-pointer text-sm sm:text-xs text-zinc-500 hover:bg-zinc-50 flex items-center justify-between",
                   !value && "font-semibold text-indigo-600 bg-indigo-50/50",
                   highlightedIndex === 0 && "bg-zinc-100"
                 )}
@@ -233,7 +233,7 @@ export function CategoryCombobox({
                     aria-selected={cat.id === value}
                     onClick={() => handleSelect(cat)}
                     className={cn(
-                      "px-3 py-2 cursor-pointer flex items-center justify-between gap-2 transition-colors",
+                      "px-3 py-2.5 min-h-[44px] cursor-pointer flex items-center justify-between gap-2 transition-colors",
                       cat.id === value
                         ? "bg-indigo-50 text-indigo-900 font-semibold"
                         : isHighlighted
@@ -266,7 +266,7 @@ export function CategoryCombobox({
                   ) : (
                     <>
                       <span>+ Buat Kategori:</span>
-                      <strong className="truncate max-w-[140px]">"{query.trim()}"</strong>
+                      <strong className="truncate max-w-[140px]">&quot;{query.trim()}&quot;</strong>
                     </>
                   )}
                 </button>

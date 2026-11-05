@@ -547,7 +547,7 @@ function InboundReceivingSubView({
               <ExportButton onClick={() => setExporting(true)} disabled={receipts.length === 0} />
               <button
                 onClick={() => setShowLPNModal(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg shadow-sm transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg shadow-sm transition-colors min-h-[44px] active:scale-95"
                 title="Kelola wadah palet LPN di gudang"
               >
                 <Boxes className="h-4 w-4 text-emerald-600" />
@@ -555,7 +555,7 @@ function InboundReceivingSubView({
               </button>
               <button
                 onClick={() => openNew("PRODUCTION")}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg shadow-sm transition-colors min-h-[44px] active:scale-95"
               >
                 <Plus className="h-4 w-4" />
                 Terima Barang
