@@ -90,7 +90,10 @@ func (r *WMSRepo) CreateShippingManifest(ctx context.Context, tenantID, userID u
 		if d.manifestID.Valid && d.manifestID.String != "" {
 			return nil, domain.ErrInvalidManifestStatus
 		}
-		if d.status != string(domain.DeliveryOrderStatusPacked) && d.status != string(domain.DeliveryOrderStatusStaged) {
+		if d.status != string(domain.DeliveryOrderStatusQCPassed) && d.status != string(domain.DeliveryOrderStatusStaged) {
+			if d.status == string(domain.DeliveryOrderStatusPacked) {
+				return nil, domain.ErrDeliveryOrderNotQCPassed
+			}
 			return nil, domain.ErrInvalidManifestStatus
 		}
 		if d.expeditionName.Valid && strings.TrimSpace(d.expeditionName.String) != "" && strings.TrimSpace(req.ExpeditionName) != "" {
@@ -539,7 +542,10 @@ func (r *WMSRepo) DispatchShippingManifest(ctx context.Context, tenantID, manife
 	}
 
 	curStatus := domain.ShippingManifestStatus(mStatus)
-	if curStatus != domain.ShippingManifestStatusLoaded && curStatus != domain.ShippingManifestStatusStaged {
+	if curStatus == domain.ShippingManifestStatusStaged {
+		return nil, domain.ErrManifestNotLoaded
+	}
+	if curStatus != domain.ShippingManifestStatusLoaded {
 		return nil, domain.ErrInvalidManifestStatus
 	}
 

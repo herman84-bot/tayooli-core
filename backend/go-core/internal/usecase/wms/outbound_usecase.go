@@ -287,6 +287,51 @@ func (u *Usecase) CompletePackStation(ctx context.Context, tenantID, userID uuid
 	return packedDO, nil
 }
 
+// PassDeliveryOrderQC inspects and approves an outbound packed delivery order.
+// User requirement: Segregation of duties (QC inspector != packer) and AWB / package verification.
+func (u *Usecase) PassDeliveryOrderQC(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PassOutboundQCRequest) (*domain.DeliveryOrder, error) {
+	do, _, err := u.repo.GetDeliveryOrderByID(ctx, tenantID, doID)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, do.WarehouseID); err != nil {
+		return nil, err
+	}
+	// Segregation of duties check at usecase layer
+	if do.PackedBy != nil && *do.PackedBy == userID {
+		return nil, fmt.Errorf("%w: petugas QC harus orang yang berbeda dari petugas packing", domain.ErrSelfApprovalForbidden)
+	}
+	return u.repo.PassDeliveryOrderQC(ctx, tenantID, doID, userID, req)
+}
+
+// RejectDeliveryOrderQC rejects a packed DO during outbound QC, marking it QC_FAILED and requiring re-packing.
+func (u *Usecase) RejectDeliveryOrderQC(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.RejectOutboundQCRequest) (*domain.DeliveryOrder, error) {
+	if strings.TrimSpace(req.Reason) == "" {
+		return nil, domain.ErrQCRejectionReasonRequired
+	}
+	do, _, err := u.repo.GetDeliveryOrderByID(ctx, tenantID, doID)
+	if err != nil {
+		return nil, err
+	}
+	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, do.WarehouseID); err != nil {
+		return nil, err
+	}
+	if do.PackedBy != nil && *do.PackedBy == userID {
+		return nil, fmt.Errorf("%w: petugas QC harus orang yang berbeda dari petugas packing", domain.ErrSelfApprovalForbidden)
+	}
+	return u.repo.RejectDeliveryOrderQC(ctx, tenantID, doID, userID, req)
+}
+
+// ListOutboundQCInspections returns audit records of outbound QC inspections.
+func (u *Usecase) ListOutboundQCInspections(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, doID *uuid.UUID) ([]domain.OutboundQCInspection, error) {
+	if warehouseID != nil {
+		if err := u.ValidateWarehouseReadAccess(ctx, tenantID, userID, role, *warehouseID); err != nil {
+			return nil, err
+		}
+	}
+	return u.repo.ListOutboundQCInspections(ctx, tenantID, warehouseID, doID)
+}
+
 // CreatePickWave groups multiple DOs into a single pick wave by order type and route/courier (PDF-05, OCA §1.3).
 func (u *Usecase) CreatePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreatePickWaveRequest) (*domain.PickWave, error) {
 	if err := u.ValidateWarehouseWriteAccess(ctx, tenantID, userID, role, req.WarehouseID); err != nil {

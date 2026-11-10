@@ -2,16 +2,20 @@ import { Metadata } from "next"
 import { LoginForm } from "@/components/auth/LoginForm"
 import { RedirectIfAuthenticated } from "@/components/auth/RedirectIfAuthenticated"
 import { Logo } from "@/components/brand/Logo"
+import { TayooliAntigravityBackground } from "@/components/auth/TayooliAntigravityBackground"
 
 export const metadata: Metadata = { title: "Masuk | Tayooli ERP" }
 
 export default function LoginPage() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-4 py-8 overflow-hidden">
+      {/* Google Antigravity-inspired particle dynamics background */}
+      <TayooliAntigravityBackground />
+
       {/* Jika sudah login, arahkan ke dashboard (dan setelah login sukses). */}
       <RedirectIfAuthenticated />
 
-      <div className="w-full max-w-sm">
+      <div className="relative z-10 w-full max-w-sm">
         {/* Brand */}
         <div className="flex items-center justify-center gap-2.5 mb-6">
           <Logo size={36} />

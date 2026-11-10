@@ -433,6 +433,286 @@ func (r *WMSRepo) CompleteDOPacking(ctx context.Context, tenantID, doID, userID 
 	return do, err
 }
 
+// PassDeliveryOrderQC validates packed status, verifies AWB match and segregation of duties,
+// transitions DO status to QC_PASSED, and records the inspection audit.
+func (r *WMSRepo) PassDeliveryOrderQC(ctx context.Context, tenantID, doID, userID uuid.UUID, req domain.PassOutboundQCRequest) (*domain.DeliveryOrder, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.PassDeliveryOrderQC: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.PassDeliveryOrderQC: set tenant: %w", err)
+	}
+
+	// 1. Lock and fetch DO
+	var status string
+	var warehouseID uuid.UUID
+	var doNumber string
+	var trackingNumber sql.NullString
+	var packedBy sql.NullString
+	err = tx.QueryRowContext(ctx, `
+		SELECT status, warehouse_id, do_number, tracking_number, packed_by
+		FROM delivery_orders
+		WHERE id = $1 AND tenant_id = $2
+		FOR UPDATE`, doID, tenantID).Scan(&status, &warehouseID, &doNumber, &trackingNumber, &packedBy)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrDeliveryOrderNotFound
+		}
+		return nil, fmt.Errorf("WMSRepo.PassDeliveryOrderQC: select DO: %w", err)
+	}
+
+	if domain.DeliveryOrderStatus(status) != domain.DeliveryOrderStatusPacked {
+		if domain.DeliveryOrderStatus(status) == domain.DeliveryOrderStatusQCPassed {
+			return nil, domain.ErrDeliveryOrderQCAlreadyPassed
+		}
+		return nil, domain.ErrDeliveryOrderNotPacked
+	}
+
+	// Segregation of duties: Petugas QC harus orang yang berbeda dari petugas packing
+	if packedBy.Valid && packedBy.String != "" {
+		if packedByUUID, parseErr := uuid.Parse(packedBy.String); parseErr == nil && packedByUUID == userID {
+			return nil, domain.ErrQCSameActorForbidden
+		}
+	}
+
+	// AWB Verification: cocokkan barcode AWB yang discan
+	scannedAWB := strings.TrimSpace(req.ScannedAWB)
+	awbMatched := true
+	if scannedAWB != "" {
+		match := false
+		if strings.EqualFold(scannedAWB, doNumber) {
+			match = true
+		} else if trackingNumber.Valid && strings.EqualFold(scannedAWB, strings.TrimSpace(trackingNumber.String)) {
+			match = true
+		}
+		if !match {
+			return nil, domain.ErrQCAWBMismatch
+		}
+	}
+
+	now := time.Now().UTC()
+	var notesPtr *string
+	if req.Notes != nil {
+		trimmed := strings.TrimSpace(*req.Notes)
+		if trimmed != "" {
+			notesPtr = &trimmed
+		}
+	}
+
+	var awbPtr *string
+	if scannedAWB != "" {
+		awbPtr = &scannedAWB
+	}
+
+	// 2. Update DO to QC_PASSED
+	_, err = tx.ExecContext(ctx, `
+		UPDATE delivery_orders
+		SET status = 'QC_PASSED',
+		    qc_by = $3,
+		    qc_at = $4,
+		    qc_notes = $5,
+		    updated_at = $4
+		WHERE id = $1 AND tenant_id = $2`,
+		doID, tenantID, userID, now, ptrToNullString(notesPtr))
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.PassDeliveryOrderQC: update DO: %w", err)
+	}
+
+	// 3. Insert into outbound_qc_inspections
+	inspectionID := uuid.New()
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO outbound_qc_inspections (
+			id, tenant_id, delivery_order_id, warehouse_id, inspector_id,
+			status, scanned_awb, awb_matched, package_qty_matched, notes, created_at
+		) VALUES (
+			$1, $2, $3, $4, $5,
+			'QC_PASSED', $6, $7, true, $8, $9
+		)`,
+		inspectionID, tenantID, doID, warehouseID, userID,
+		ptrToNullString(awbPtr), awbMatched, ptrToNullString(notesPtr), now)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.PassDeliveryOrderQC: insert inspection: %w", err)
+	}
+
+	// 4. Audit log
+	auditDetails, _ := json.Marshal(map[string]any{
+		"inspection_id": inspectionID,
+		"scanned_awb":   scannedAWB,
+		"notes":         req.Notes,
+	})
+	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "delivery_order", doID, "qc_passed", auditDetails); err != nil {
+		return nil, fmt.Errorf("WMSRepo.PassDeliveryOrderQC: audit log: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	do, _, err := r.GetDeliveryOrderByID(ctx, tenantID, doID)
+	return do, err
+}
+
+// RejectDeliveryOrderQC marks an outbound DO as QC_FAILED with a mandatory reason,
+// returning it for re-packing.
+func (r *WMSRepo) RejectDeliveryOrderQC(ctx context.Context, tenantID, doID, userID uuid.UUID, req domain.RejectOutboundQCRequest) (*domain.DeliveryOrder, error) {
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, domain.ErrQCRejectionReasonRequired
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.RejectDeliveryOrderQC: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.RejectDeliveryOrderQC: set tenant: %w", err)
+	}
+
+	// 1. Lock and fetch DO
+	var status string
+	var warehouseID uuid.UUID
+	var doNumber string
+	var packedBy sql.NullString
+	err = tx.QueryRowContext(ctx, `
+		SELECT status, warehouse_id, do_number, packed_by
+		FROM delivery_orders
+		WHERE id = $1 AND tenant_id = $2
+		FOR UPDATE`, doID, tenantID).Scan(&status, &warehouseID, &doNumber, &packedBy)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrDeliveryOrderNotFound
+		}
+		return nil, fmt.Errorf("WMSRepo.RejectDeliveryOrderQC: select DO: %w", err)
+	}
+
+	if domain.DeliveryOrderStatus(status) != domain.DeliveryOrderStatusPacked &&
+		domain.DeliveryOrderStatus(status) != domain.DeliveryOrderStatusQCPassed {
+		return nil, domain.ErrDeliveryOrderNotPacked
+	}
+
+	// Segregation of duties: Petugas QC harus orang yang berbeda dari petugas packing
+	if packedBy.Valid && packedBy.String != "" {
+		if packedByUUID, parseErr := uuid.Parse(packedBy.String); parseErr == nil && packedByUUID == userID {
+			return nil, domain.ErrQCSameActorForbidden
+		}
+	}
+
+	now := time.Now().UTC()
+	var notesPtr *string
+	if req.Notes != nil {
+		trimmed := strings.TrimSpace(*req.Notes)
+		if trimmed != "" {
+			notesPtr = &trimmed
+		}
+	}
+
+	// 2. Update DO to QC_FAILED
+	_, err = tx.ExecContext(ctx, `
+		UPDATE delivery_orders
+		SET status = 'QC_FAILED',
+		    qc_by = $3,
+		    qc_at = $4,
+		    qc_notes = $5,
+		    updated_at = $4
+		WHERE id = $1 AND tenant_id = $2`,
+		doID, tenantID, userID, now, reason)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.RejectDeliveryOrderQC: update DO: %w", err)
+	}
+
+	// 3. Insert into outbound_qc_inspections
+	inspectionID := uuid.New()
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO outbound_qc_inspections (
+			id, tenant_id, delivery_order_id, warehouse_id, inspector_id,
+			status, scanned_awb, awb_matched, package_qty_matched, rejection_reason, notes, created_at
+		) VALUES (
+			$1, $2, $3, $4, $5,
+			'QC_FAILED', NULL, false, false, $6, $7, $8
+		)`,
+		inspectionID, tenantID, doID, warehouseID, userID,
+		reason, ptrToNullString(notesPtr), now)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.RejectDeliveryOrderQC: insert inspection: %w", err)
+	}
+
+	// 4. Audit log
+	auditDetails, _ := json.Marshal(map[string]any{
+		"inspection_id":    inspectionID,
+		"rejection_reason": reason,
+		"notes":            req.Notes,
+	})
+	if err := r.WriteAuditTx(ctx, tx, tenantID, &userID, "delivery_order", doID, "qc_rejected", auditDetails); err != nil {
+		return nil, fmt.Errorf("WMSRepo.RejectDeliveryOrderQC: audit log: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	do, _, err := r.GetDeliveryOrderByID(ctx, tenantID, doID)
+	return do, err
+}
+
+// ListOutboundQCInspections retrieves inspection records for warehouse or specific DO.
+func (r *WMSRepo) ListOutboundQCInspections(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, doID *uuid.UUID) ([]domain.OutboundQCInspection, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListOutboundQCInspections: begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if err := setTenantLocally(ctx, tx, tenantID); err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListOutboundQCInspections: set tenant: %w", err)
+	}
+
+	query := `
+		SELECT oqc.id, oqc.tenant_id, oqc.delivery_order_id, oqc.warehouse_id,
+		       COALESCE(d.do_number, ''),
+		       oqc.inspector_id, COALESCE(u.full_name, u.email, ''),
+		       oqc.status, oqc.scanned_awb, oqc.awb_matched, oqc.package_qty_matched,
+		       oqc.rejection_reason, oqc.notes, oqc.created_at
+		FROM outbound_qc_inspections oqc
+		JOIN delivery_orders d ON d.id = oqc.delivery_order_id AND d.tenant_id = oqc.tenant_id
+		LEFT JOIN users u ON u.id = oqc.inspector_id AND u.tenant_id = oqc.tenant_id
+		WHERE oqc.tenant_id = $1
+		  AND ($2::uuid IS NULL OR oqc.warehouse_id = $2)
+		  AND ($3::uuid IS NULL OR oqc.delivery_order_id = $3)
+		ORDER BY oqc.created_at DESC`
+
+	rows, err := tx.QueryContext(ctx, query, tenantID, ptrToNullUUID(warehouseID), ptrToNullUUID(doID))
+	if err != nil {
+		return nil, fmt.Errorf("WMSRepo.ListOutboundQCInspections: query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []domain.OutboundQCInspection
+	for rows.Next() {
+		var it domain.OutboundQCInspection
+		var awb, rej, notes sql.NullString
+		if err := rows.Scan(
+			&it.ID, &it.TenantID, &it.DeliveryOrderID, &it.WarehouseID,
+			&it.DONumber,
+			&it.InspectorID, &it.InspectorName,
+			&it.Status, &awb, &it.AWBMatched, &it.PackageQtyMatched,
+			&rej, &notes, &it.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("WMSRepo.ListOutboundQCInspections: scan: %w", err)
+		}
+		it.ScannedAWB = nullStringToPtr(awb)
+		it.RejectionReason = nullStringToPtr(rej)
+		it.Notes = nullStringToPtr(notes)
+		result = append(result, it)
+	}
+
+	return result, tx.Commit()
+}
+
 func (r *WMSRepo) CreatePickWave(ctx context.Context, tenantID uuid.UUID, createdBy *uuid.UUID, req domain.CreatePickWaveRequest) (*domain.PickWave, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

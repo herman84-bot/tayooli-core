@@ -1131,15 +1131,20 @@ func (u *Usecase) DispatchDeliveryOrder(ctx context.Context, tenantID, userID uu
 		requirePickPack = settings.RequirePickPack
 	}
 	if requirePickPack {
-		if do.Status != domain.DeliveryOrderStatusPacked || do.PackedBy == nil {
+		if do.Status == domain.DeliveryOrderStatusPacked {
+			return nil, domain.ErrDeliveryOrderNotQCPassed
+		}
+		if do.Status != domain.DeliveryOrderStatusQCPassed || do.PackedBy == nil {
 			return nil, domain.ErrDeliveryOrderNotPacked
 		}
 	} else {
-		// jika picking/packing optional, izinkan CONFIRMED atau PACKED, TAPI BLOCK DRAFT
+		// jika picking/packing optional, izinkan CONFIRMED, PACKED, atau QC_PASSED, TAPI BLOCK DRAFT
 		if do.Status == domain.DeliveryOrderStatusDraft {
 			return nil, domain.ErrDeliveryOrderNotPacked
 		}
-		if do.Status != domain.DeliveryOrderStatusPacked && do.Status != domain.DeliveryOrderStatusConfirmed {
+		if do.Status != domain.DeliveryOrderStatusPacked &&
+			do.Status != domain.DeliveryOrderStatusConfirmed &&
+			do.Status != domain.DeliveryOrderStatusQCPassed {
 			return nil, domain.ErrDeliveryOrderNotPacked
 		}
 	}

@@ -106,6 +106,9 @@ type WMSUsecase interface {
 	ReportPickingShortage(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.ShortageReportRequest) (*domain.ShortageTicket, error)
 	ScanPackStationItem(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackScanRequest) (*domain.PackScanResult, error)
 	CompletePackStation(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackCompleteRequest) (*domain.DeliveryOrder, error)
+	PassDeliveryOrderQC(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PassOutboundQCRequest) (*domain.DeliveryOrder, error)
+	RejectDeliveryOrderQC(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.RejectOutboundQCRequest) (*domain.DeliveryOrder, error)
+	ListOutboundQCInspections(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, doID *uuid.UUID) ([]domain.OutboundQCInspection, error)
 	CreatePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreatePickWaveRequest) (*domain.PickWave, error)
 	ListPickWaves(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, orderType, expeditionName *string, status *domain.PickWaveStatus) ([]domain.PickWave, error)
 	GetPickWaveByID(ctx context.Context, tenantID, userID uuid.UUID, role string, waveID uuid.UUID) (*domain.PickWaveDetail, error)
@@ -195,6 +198,11 @@ func (h *WMSHandler) RegisterRoutes(r chi.Router) {
 		r.Post("/delivery-orders/{id}/picking/shortage", h.ReportPickingShortage)
 		r.Post("/delivery-orders/{id}/pack/scan", h.ScanPackStationItem)
 		r.Post("/delivery-orders/{id}/pack/complete", h.CompletePackStation)
+		// Sprint Outbound QC Inspection (Packing & AWB -> QC -> Staging)
+		r.With(idem).Post("/delivery-orders/{id}/qc/pass", h.PassOutboundQC)
+		r.With(idem).Post("/delivery-orders/{id}/qc/reject", h.RejectOutboundQC)
+		r.Get("/outbound/qc/inspections", h.ListOutboundQCInspections)
+		r.Get("/delivery-orders/{id}/qc/inspections", h.ListOutboundQCInspections)
 
 		// Pick Waves (PDF-05, OCA §1.3)
 		r.Get("/pick-waves", h.ListPickWaves)
@@ -339,6 +347,18 @@ func handleWMSError(w http.ResponseWriter, r *http.Request, err error) {
 		RespondError(w, r, http.StatusBadRequest, "data pengiriman (nama sopir, plat nomor, ekspedisi) wajib dilengkapi sebelum dispatch")
 	case errors.Is(err, domain.ErrDeliveryOrderNotPacked):
 		RespondError(w, r, http.StatusBadRequest, "Surat Jalan harus dalam status PACKED sebelum dispatch")
+	case errors.Is(err, domain.ErrDeliveryOrderNotQCPassed):
+		RespondError(w, r, http.StatusUnprocessableEntity, "Surat Jalan harus lolos QC Outbound (QC_PASSED) terlebih dahulu sebelum masuk ke area staging atau manifes")
+	case errors.Is(err, domain.ErrQCAWBMismatch):
+		RespondError(w, r, http.StatusUnprocessableEntity, "No. Resi AWB yang dipindai tidak cocok dengan Surat Jalan ini")
+	case errors.Is(err, domain.ErrDeliveryOrderQCAlreadyPassed):
+		RespondError(w, r, http.StatusConflict, "Surat Jalan ini sudah lolos QC")
+	case errors.Is(err, domain.ErrQCRejectionReasonRequired):
+		RespondError(w, r, http.StatusBadRequest, "Alasan penolakan QC wajib diisi")
+	case errors.Is(err, domain.ErrQCSameActorForbidden):
+		RespondError(w, r, http.StatusForbidden, "Petugas QC harus orang yang berbeda dari petugas packing (Segregation of Duties)")
+	case errors.Is(err, domain.ErrManifestNotLoaded):
+		RespondError(w, r, http.StatusConflict, "Seluruh paket dalam manifes harus dipindai muat (LOADED) sebelum dispatch pengiriman")
 	case errors.Is(err, domain.ErrScrapApprovalRequired):
 		RespondError(w, r, http.StatusForbidden, "pemusnahan stok melebihi batas (10 unit) wajib disetujui oleh admin atau owner")
 	case errors.Is(err, domain.ErrQCAlreadyInspected):

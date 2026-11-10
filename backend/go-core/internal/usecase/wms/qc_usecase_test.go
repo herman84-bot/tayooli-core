@@ -76,6 +76,18 @@ func (m *mockWMSRepo) CompleteDOPacking(ctx context.Context, tenantID, doID, use
 	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusPacked}, nil
 }
 
+func (m *mockWMSRepo) PassDeliveryOrderQC(ctx context.Context, tenantID, doID, userID uuid.UUID, req domain.PassOutboundQCRequest) (*domain.DeliveryOrder, error) {
+	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusQCPassed}, nil
+}
+
+func (m *mockWMSRepo) RejectDeliveryOrderQC(ctx context.Context, tenantID, doID, userID uuid.UUID, req domain.RejectOutboundQCRequest) (*domain.DeliveryOrder, error) {
+	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusQCFailed}, nil
+}
+
+func (m *mockWMSRepo) ListOutboundQCInspections(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, doID *uuid.UUID) ([]domain.OutboundQCInspection, error) {
+	return []domain.OutboundQCInspection{}, nil
+}
+
 func (m *mockWMSRepo) CreatePickWave(ctx context.Context, tenantID uuid.UUID, createdBy *uuid.UUID, req domain.CreatePickWaveRequest) (*domain.PickWave, error) {
 	return &domain.PickWave{ID: uuid.New(), WarehouseID: req.WarehouseID, OrderType: req.OrderType, Status: domain.PickWaveStatusOpen}, nil
 }

@@ -24,7 +24,7 @@ const (
 )
 
 // DeliveryOrderStatusStaged marks a delivery order that is consolidated and staged into a shipping manifest.
-const DeliveryOrderStatusStaged DeliveryOrderStatus = "STAGED"
+// Defined in wms.go as part of DeliveryOrderStatus enum.
 
 // ShippingManifest represents courier multi-DO shipping manifest header.
 type ShippingManifest struct {
@@ -144,6 +144,7 @@ var (
 	ErrManifestSignatureRequired = errors.New("tanda tangan sopir ekspedisi wajib diisi")
 	ErrDOMisload                 = errors.New("nomor Surat Jalan tidak terdaftar dalam manifest ini atau ekspedisi berbeda")
 	ErrManifestEmpty             = errors.New("manifest minimal harus memuat 1 Surat Jalan")
+	ErrManifestNotLoaded         = errors.New("seluruh paket dalam manifes harus dipindai muat (LOADED) sebelum dispatch pengiriman")
 )
 
 // WMSManifestRepository defines persistence operations for shipping manifests.

@@ -405,6 +405,15 @@ func (m *mockWMSUsecase) ScanPackStationItem(ctx context.Context, tenantID, user
 func (m *mockWMSUsecase) CompletePackStation(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PackCompleteRequest) (*domain.DeliveryOrder, error) {
 	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusPacked}, nil
 }
+func (m *mockWMSUsecase) PassDeliveryOrderQC(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.PassOutboundQCRequest) (*domain.DeliveryOrder, error) {
+	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusQCPassed}, nil
+}
+func (m *mockWMSUsecase) RejectDeliveryOrderQC(ctx context.Context, tenantID, userID uuid.UUID, role string, doID uuid.UUID, req domain.RejectOutboundQCRequest) (*domain.DeliveryOrder, error) {
+	return &domain.DeliveryOrder{ID: doID, Status: domain.DeliveryOrderStatusQCFailed}, nil
+}
+func (m *mockWMSUsecase) ListOutboundQCInspections(ctx context.Context, tenantID, userID uuid.UUID, role string, warehouseID *uuid.UUID, doID *uuid.UUID) ([]domain.OutboundQCInspection, error) {
+	return []domain.OutboundQCInspection{}, nil
+}
 func (m *mockWMSUsecase) CreatePickWave(ctx context.Context, tenantID, userID uuid.UUID, role string, req domain.CreatePickWaveRequest) (*domain.PickWave, error) {
 	return &domain.PickWave{ID: uuid.New(), WarehouseID: req.WarehouseID, OrderType: req.OrderType, Status: domain.PickWaveStatusOpen}, nil
 }

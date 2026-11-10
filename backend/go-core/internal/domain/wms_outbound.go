@@ -200,6 +200,36 @@ type PickWaveDetail struct {
 	PickingTasks []PickingTaskDetail `json:"picking_tasks"`
 }
 
+// OutboundQCInspection represents an outbound quality check on a packed delivery order.
+type OutboundQCInspection struct {
+	ID                uuid.UUID `json:"id"`
+	TenantID          uuid.UUID `json:"tenant_id"`
+	DeliveryOrderID   uuid.UUID `json:"delivery_order_id"`
+	WarehouseID       uuid.UUID `json:"warehouse_id"`
+	DONumber          string    `json:"do_number,omitempty"`
+	InspectorID       uuid.UUID `json:"inspector_id"`
+	InspectorName     string    `json:"inspector_name,omitempty"`
+	Status            string    `json:"status"` // QC_PASSED, QC_FAILED
+	ScannedAWB        *string   `json:"scanned_awb,omitempty"`
+	AWBMatched        bool      `json:"awb_matched"`
+	PackageQtyMatched bool      `json:"package_qty_matched"`
+	RejectionReason   *string   `json:"rejection_reason,omitempty"`
+	Notes             *string   `json:"notes,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+}
+
+// PassOutboundQCRequest contains payload to pass a delivery order through outbound QC.
+type PassOutboundQCRequest struct {
+	ScannedAWB string  `json:"scanned_awb"`
+	Notes      *string `json:"notes,omitempty"`
+}
+
+// RejectOutboundQCRequest contains payload to reject a delivery order at outbound QC.
+type RejectOutboundQCRequest struct {
+	Reason string  `json:"reason"`
+	Notes  *string `json:"notes,omitempty"`
+}
+
 // WMSOutboundRepository defines the persistence port for Sprint 3 outbound operations.
 type WMSOutboundRepository interface {
 	GetOrCreatePickingTask(ctx context.Context, tenantID uuid.UUID, doID uuid.UUID) (*PickingTaskDetail, error)
@@ -208,6 +238,9 @@ type WMSOutboundRepository interface {
 	RecordPickingItemProgress(ctx context.Context, tenantID, taskItemID uuid.UUID, pickedQty decimal.Decimal) error
 	UpdateDOPackScan(ctx context.Context, tenantID, doID, itemID uuid.UUID, addPackedQty decimal.Decimal) (*DeliveryOrderItem, error)
 	CompleteDOPacking(ctx context.Context, tenantID, doID, userID uuid.UUID, req PackCompleteRequest) (*DeliveryOrder, error)
+	PassDeliveryOrderQC(ctx context.Context, tenantID, doID, userID uuid.UUID, req PassOutboundQCRequest) (*DeliveryOrder, error)
+	RejectDeliveryOrderQC(ctx context.Context, tenantID, doID, userID uuid.UUID, req RejectOutboundQCRequest) (*DeliveryOrder, error)
+	ListOutboundQCInspections(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, doID *uuid.UUID) ([]OutboundQCInspection, error)
 	CreatePickWave(ctx context.Context, tenantID uuid.UUID, createdBy *uuid.UUID, req CreatePickWaveRequest) (*PickWave, error)
 	ListPickWaves(ctx context.Context, tenantID uuid.UUID, warehouseID *uuid.UUID, orderType, expeditionName *string, status *PickWaveStatus) ([]PickWave, error)
 	GetPickWaveByID(ctx context.Context, tenantID, waveID uuid.UUID) (*PickWaveDetail, error)

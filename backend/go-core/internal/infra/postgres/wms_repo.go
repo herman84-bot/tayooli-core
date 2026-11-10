@@ -2195,6 +2195,8 @@ SELECT d.id, d.tenant_id, d.sales_order_id, d.warehouse_id, d.do_number, d.statu
        d.created_by, COALESCE(u_cr.full_name, u_cr.email, ''),
        d.confirmed_by, COALESCE(u_cf.full_name, u_cf.email, ''),
        d.packed_by, COALESCE(u_pk.full_name, u_pk.email, ''),
+       d.qc_by, COALESCE(u_qc.full_name, u_qc.email, ''),
+       d.qc_at, d.qc_notes,
        d.dispatched_by, COALESCE(u_ds.full_name, u_ds.email, ''),
        d.package_weight_kg, d.package_length_cm, d.package_width_cm, d.package_height_cm,
        d.packaging_type, COALESCE(d.order_type, 'DIRECT_DO'),
@@ -2204,6 +2206,7 @@ LEFT JOIN customers c ON c.id = d.customer_id AND c.tenant_id = d.tenant_id
 LEFT JOIN users u_cr ON u_cr.id = d.created_by AND u_cr.tenant_id = d.tenant_id
 LEFT JOIN users u_cf ON u_cf.id = d.confirmed_by AND u_cf.tenant_id = d.tenant_id
 LEFT JOIN users u_pk ON u_pk.id = d.packed_by AND u_pk.tenant_id = d.tenant_id
+LEFT JOIN users u_qc ON u_qc.id = d.qc_by AND u_qc.tenant_id = d.tenant_id
 LEFT JOIN users u_ds ON u_ds.id = d.dispatched_by AND u_ds.tenant_id = d.tenant_id
 WHERE d.id = $1 AND d.tenant_id = $2`
 
@@ -2233,16 +2236,18 @@ func (r *WMSRepo) GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UU
 	row := tx.QueryRowContext(ctx, getDeliveryOrderByIDSQL, id, tenantID)
 	var do domain.DeliveryOrder
 	var soID, exp, trk, drv, veh, rec, cID, cName sql.NullString
-	var uCr, uCrName, uCf, uCfName, uPk, uPkName, uDs, uDsName sql.NullString
-	var pkgType sql.NullString
-	var recDate sql.NullTime
+	var uCr, uCrName, uCf, uCfName, uPk, uPkName, uQc, uQcName, uDs, uDsName sql.NullString
+	var pkgType, qcNotes sql.NullString
+	var recDate, qcAt sql.NullTime
 	var pWeight, pLength, pWidth, pHeight decimal.NullDecimal
 
 	err = row.Scan(
 		&do.ID, &do.TenantID, &soID, &do.WarehouseID, &do.DONumber,
 		&do.Status, &exp, &trk, &drv, &veh, &rec, &recDate,
 		&cID, &cName,
-		&uCr, &uCrName, &uCf, &uCfName, &uPk, &uPkName, &uDs, &uDsName,
+		&uCr, &uCrName, &uCf, &uCfName, &uPk, &uPkName,
+		&uQc, &uQcName, &qcAt, &qcNotes,
+		&uDs, &uDsName,
 		&pWeight, &pLength, &pWidth, &pHeight,
 		&pkgType, &do.OrderType,
 		&do.CreatedAt, &do.UpdatedAt,
@@ -2268,6 +2273,10 @@ func (r *WMSRepo) GetDeliveryOrderByID(ctx context.Context, tenantID, id uuid.UU
 	do.ConfirmedByName = nullStringToPtr(uCfName)
 	do.PackedBy = nullUUIDToPtr(uPk)
 	do.PackedByName = nullStringToPtr(uPkName)
+	do.QCBy = nullUUIDToPtr(uQc)
+	do.QCByName = nullStringToPtr(uQcName)
+	do.QCAt = nullTimeToPtr(qcAt)
+	do.QCNotes = nullStringToPtr(qcNotes)
 	do.DispatchedBy = nullUUIDToPtr(uDs)
 	do.DispatchedByName = nullStringToPtr(uDsName)
 	do.PackageWeightKg = nullDecimalToPtr(pWeight)
@@ -2482,6 +2491,8 @@ SELECT d.id, d.tenant_id, d.sales_order_id, d.warehouse_id, d.do_number, d.statu
        d.created_by, COALESCE(u_cr.full_name, u_cr.email, ''),
        d.confirmed_by, COALESCE(u_cf.full_name, u_cf.email, ''),
        d.packed_by, COALESCE(u_pk.full_name, u_pk.email, ''),
+       d.qc_by, COALESCE(u_qc.full_name, u_qc.email, ''),
+       d.qc_at, d.qc_notes,
        d.dispatched_by, COALESCE(u_ds.full_name, u_ds.email, ''),
        d.package_weight_kg, d.package_length_cm, d.package_width_cm, d.package_height_cm,
        d.packaging_type, COALESCE(d.order_type, 'DIRECT_DO'),
@@ -2491,6 +2502,7 @@ LEFT JOIN customers c ON c.id = d.customer_id AND c.tenant_id = d.tenant_id
 LEFT JOIN users u_cr ON u_cr.id = d.created_by AND u_cr.tenant_id = d.tenant_id
 LEFT JOIN users u_cf ON u_cf.id = d.confirmed_by AND u_cf.tenant_id = d.tenant_id
 LEFT JOIN users u_pk ON u_pk.id = d.packed_by AND u_pk.tenant_id = d.tenant_id
+LEFT JOIN users u_qc ON u_qc.id = d.qc_by AND u_qc.tenant_id = d.tenant_id
 LEFT JOIN users u_ds ON u_ds.id = d.dispatched_by AND u_ds.tenant_id = d.tenant_id
 WHERE d.tenant_id = $1
   AND ($2::uuid IS NULL OR d.warehouse_id = $2)
@@ -2506,16 +2518,18 @@ ORDER BY d.created_at DESC`
 	for rows.Next() {
 		var do domain.DeliveryOrder
 		var soID, exp, trk, drv, veh, rec, cID, cName sql.NullString
-		var uCr, uCrName, uCf, uCfName, uPk, uPkName, uDs, uDsName sql.NullString
-		var pkgType sql.NullString
-		var recDate sql.NullTime
+		var uCr, uCrName, uCf, uCfName, uPk, uPkName, uQc, uQcName, uDs, uDsName sql.NullString
+		var pkgType, qcNotes sql.NullString
+		var recDate, qcAt sql.NullTime
 		var pWeight, pLength, pWidth, pHeight decimal.NullDecimal
 
 		if err := rows.Scan(
 			&do.ID, &do.TenantID, &soID, &do.WarehouseID, &do.DONumber,
 			&do.Status, &exp, &trk, &drv, &veh, &rec, &recDate,
 			&cID, &cName,
-			&uCr, &uCrName, &uCf, &uCfName, &uPk, &uPkName, &uDs, &uDsName,
+			&uCr, &uCrName, &uCf, &uCfName, &uPk, &uPkName,
+			&uQc, &uQcName, &qcAt, &qcNotes,
+			&uDs, &uDsName,
 			&pWeight, &pLength, &pWidth, &pHeight,
 			&pkgType, &do.OrderType,
 			&do.CreatedAt, &do.UpdatedAt,
@@ -2532,6 +2546,17 @@ ORDER BY d.created_at DESC`
 		do.CustomerID = nullUUIDToPtr(cID)
 		do.CustomerName = nullStringToPtr(cName)
 		do.CreatedBy = nullUUIDToPtr(uCr)
+		do.CreatedByName = nullStringToPtr(uCrName)
+		do.ConfirmedBy = nullUUIDToPtr(uCf)
+		do.ConfirmedByName = nullStringToPtr(uCfName)
+		do.PackedBy = nullUUIDToPtr(uPk)
+		do.PackedByName = nullStringToPtr(uPkName)
+		do.QCBy = nullUUIDToPtr(uQc)
+		do.QCByName = nullStringToPtr(uQcName)
+		do.QCAt = nullTimeToPtr(qcAt)
+		do.QCNotes = nullStringToPtr(qcNotes)
+		do.DispatchedBy = nullUUIDToPtr(uDs)
+		do.DispatchedByName = nullStringToPtr(uDsName)
 		do.CreatedByName = nullStringToPtr(uCrName)
 		do.ConfirmedBy = nullUUIDToPtr(uCf)
 		do.ConfirmedByName = nullStringToPtr(uCfName)

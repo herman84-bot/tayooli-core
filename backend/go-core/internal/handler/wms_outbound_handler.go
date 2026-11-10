@@ -327,3 +327,96 @@ func (h *WMSHandler) ReleasePickWave(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"data": wave})
 }
+
+func (h *WMSHandler) PassOutboundQC(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	doID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid delivery order id")
+		return
+	}
+
+	var req domain.PassOutboundQCRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err.Error() != "EOF" {
+		RespondError(w, r, http.StatusBadRequest, "invalid json body")
+		return
+	}
+
+	do, err := h.uc.PassDeliveryOrderQC(r.Context(), tenantID, userID, role, doID, req)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"data": do})
+}
+
+func (h *WMSHandler) RejectOutboundQC(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	doID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid delivery order id")
+		return
+	}
+
+	var req domain.RejectOutboundQCRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondError(w, r, http.StatusBadRequest, "invalid json body")
+		return
+	}
+
+	do, err := h.uc.RejectDeliveryOrderQC(r.Context(), tenantID, userID, role, doID, req)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"data": do})
+}
+
+func (h *WMSHandler) ListOutboundQCInspections(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := appMiddleware.GetTenantID(r.Context())
+	if !ok {
+		RespondError(w, r, http.StatusUnauthorized, "missing tenant context")
+		return
+	}
+	userID, _ := appMiddleware.GetUserID(r.Context())
+	role := appMiddleware.GetRole(r.Context())
+
+	var whID *uuid.UUID
+	if rawWH := r.URL.Query().Get("warehouse_id"); rawWH != "" {
+		if parsed, err := uuid.Parse(rawWH); err == nil {
+			whID = &parsed
+		}
+	}
+
+	var doID *uuid.UUID
+	if rawDO := chi.URLParam(r, "id"); rawDO != "" {
+		if parsed, err := uuid.Parse(rawDO); err == nil {
+			doID = &parsed
+		}
+	} else if rawDOQ := r.URL.Query().Get("delivery_order_id"); rawDOQ != "" {
+		if parsed, err := uuid.Parse(rawDOQ); err == nil {
+			doID = &parsed
+		}
+	}
+
+	list, err := h.uc.ListOutboundQCInspections(r.Context(), tenantID, userID, role, whID, doID)
+	if err != nil {
+		handleWMSError(w, r, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"data": list})
+}

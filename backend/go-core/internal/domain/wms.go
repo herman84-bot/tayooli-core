@@ -59,10 +59,15 @@ var (
 	ErrBatchOnHold          = errors.New("batch is on hold")
 
 	// Outbound DO & Fraud Controls
-	ErrDeliveryOrderIncompleteShip = errors.New("delivery order missing driver, vehicle plate, or expedition for shipment")
-	ErrDeliveryOrderNotPacked      = errors.New("delivery order must be in PACKED status before dispatch")
-	ErrOpnamePendingApproval       = errors.New("stock opname requires approval")
-	ErrScrapApprovalRequired       = errors.New("stock scrap exceeds threshold and requires approval")
+	ErrDeliveryOrderIncompleteShip  = errors.New("delivery order missing driver, vehicle plate, or expedition for shipment")
+	ErrDeliveryOrderNotPacked       = errors.New("delivery order must be in PACKED status before dispatch")
+	ErrDeliveryOrderNotQCPassed     = errors.New("Surat Jalan harus lolos QC (QC_PASSED) sebelum masuk ke area staging atau manifes")
+	ErrQCAWBMismatch                = errors.New("No. Resi AWB yang dipindai tidak cocok dengan Surat Jalan ini")
+	ErrDeliveryOrderQCAlreadyPassed = errors.New("Surat Jalan ini sudah lolos QC")
+	ErrQCRejectionReasonRequired    = errors.New("alasan penolakan QC wajib diisi")
+	ErrQCSameActorForbidden         = errors.New("petugas QC harus orang yang berbeda dari petugas packing")
+	ErrOpnamePendingApproval        = errors.New("stock opname requires approval")
+	ErrScrapApprovalRequired        = errors.New("stock scrap exceeds threshold and requires approval")
 )
 
 // StockBatchStatus controls whether a batch may be allocated to sales.
@@ -204,6 +209,9 @@ const (
 	DeliveryOrderStatusConfirmed DeliveryOrderStatus = "CONFIRMED"
 	DeliveryOrderStatusPicked    DeliveryOrderStatus = "PICKED"
 	DeliveryOrderStatusPacked    DeliveryOrderStatus = "PACKED"
+	DeliveryOrderStatusQCPassed  DeliveryOrderStatus = "QC_PASSED"
+	DeliveryOrderStatusQCFailed  DeliveryOrderStatus = "QC_FAILED"
+	DeliveryOrderStatusStaged    DeliveryOrderStatus = "STAGED"
 	DeliveryOrderStatusShipped   DeliveryOrderStatus = "SHIPPED"
 	DeliveryOrderStatusDelivered DeliveryOrderStatus = "DELIVERED"
 	DeliveryOrderStatusReturned  DeliveryOrderStatus = "RETURNED"
@@ -469,6 +477,10 @@ type DeliveryOrder struct {
 	ConfirmedByName  *string             `json:"confirmed_by_name,omitempty"`
 	PackedBy         *uuid.UUID          `json:"packed_by,omitempty"`
 	PackedByName     *string             `json:"packed_by_name,omitempty"`
+	QCBy             *uuid.UUID          `json:"qc_by,omitempty"`
+	QCByName         *string             `json:"qc_by_name,omitempty"`
+	QCAt             *time.Time          `json:"qc_at,omitempty"`
+	QCNotes          *string             `json:"qc_notes,omitempty"`
 	DispatchedBy     *uuid.UUID          `json:"dispatched_by,omitempty"`
 	DispatchedByName *string             `json:"dispatched_by_name,omitempty"`
 	PackageWeightKg  *decimal.Decimal    `json:"package_weight_kg,omitempty"`
