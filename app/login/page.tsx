@@ -30,7 +30,7 @@ export default function LoginPage() {
             Masuk ke akun Anda
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            Kelola stok multi-gudang, transaksi kasir POS, dan pengiriman barang dalam satu sistem.
+            Masukkan email dan kata sandi Anda untuk melanjutkan.
           </p>
 
           <div className="mt-6">
