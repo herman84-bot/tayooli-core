@@ -1773,10 +1773,10 @@ export default function POSPage() {
 
               {/* Rincian Transaksi */}
               <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Daftar Transaksi Hari Ini</h4>
+                <h4 className="text-xs font-bold text-slate-800">Daftar Transaksi Hari Ini</h4>
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
                   <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] text-slate-500 uppercase font-semibold">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] text-slate-500 font-semibold">
                       <tr>
                         <th className="px-3 py-2">No. Pesanan</th>
                         <th className="px-3 py-2">Metode</th>

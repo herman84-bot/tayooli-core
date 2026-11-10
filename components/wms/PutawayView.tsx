@@ -160,7 +160,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600 border-b border-slate-200 uppercase tracking-wider">
+            <thead className="bg-slate-50/80 text-xs font-semibold text-slate-600 border-b border-slate-200">
               <tr>
                 <th className="px-4 py-3">Produk & SKU</th>
                 <th className="px-4 py-3">Batch / Lot</th>
@@ -175,7 +175,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                    Memuat antrean penataan rak...
+                    Memuat antrean penataan rak…
                   </td>
                 </tr>
               ) : filteredPending.length === 0 ? (
@@ -232,7 +232,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                               {line.suggested_location_code}
                             </span>
                             <span
-                              className={`text-[10px] uppercase font-bold px-1.5 py-0.2 rounded ${
+                              className={`text-[10px] font-semibold px-1.5 py-0.2 rounded ${
                                 isDefaultRack
                                   ? "bg-blue-50 text-blue-600 border border-blue-200"
                                   : isReceiptDest
@@ -250,7 +250,7 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => openPutawayModal(line)}
-                          className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors shadow-sm"
+                          className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 active:scale-98 rounded-md transition-colors shadow-sm"
                         >
                           <ArrowDownToLine className="h-3.5 w-3.5" />
                           Tata ke Rak
@@ -267,8 +267,8 @@ export function PutawayView({ warehouseId, onRefresh }: PutawayViewProps) {
 
       {/* Confirmation Modal */}
       {selectedLine && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl border border-slate-100 space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 motion-safe:animate-in motion-safe:fade-in">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg border border-slate-100 space-y-5">
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Konfirmasi Penataan ke Rak Internal</h3>
               <p className="text-xs text-slate-500 mt-1">

@@ -244,8 +244,8 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden border border-slate-200">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/60">
           <div className="flex items-center gap-3">
@@ -255,7 +255,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
             <div>
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 Manajemen Palet & Kontainer LPN
-                <span className="text-[11px] font-mono px-2 py-0.5 bg-slate-200 text-slate-700 rounded-md font-normal">
+                <span className="text-[11px] px-2 py-0.5 bg-slate-200 text-slate-700 rounded-md font-normal">
                   Nomor Identitas Palet
                 </span>
               </h2>
@@ -307,7 +307,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Cari kode LPN atau kode lokasi..."
+                    placeholder="Cari kode LPN atau kode lokasi…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
@@ -334,7 +334,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
 
                   <button
                     onClick={handleOpenCreate}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     Buat Palet LPN Baru
@@ -345,7 +345,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
               {/* LPN List Table */}
               <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
                     <tr>
                       <th className="px-4 py-3">Kode LPN</th>
                       <th className="px-4 py-3">Tipe Palet</th>
@@ -359,7 +359,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                     {isLoadingLPNs ? (
                       <tr>
                         <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
-                          Memuat data palet LPN...
+                          Memuat data palet LPN…
                         </td>
                       </tr>
                     ) : filteredLPNs.length === 0 ? (
@@ -412,8 +412,8 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <span className="font-mono font-bold text-slate-900">{totWeight}</span>
-                              <span className="text-slate-400 font-mono text-[11px]"> / {maxWeight} kg</span>
+                              <span className="tabular-nums font-bold text-slate-900">{totWeight}</span>
+                              <span className="text-slate-400 tabular-nums text-[11px]"> / {maxWeight} kg</span>
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
@@ -484,7 +484,7 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
               </div>
 
               {isLoadingDetail ? (
-                <div className="py-12 text-center text-slate-400 text-xs">Memuat rincian palet LPN...</div>
+                <div className="py-12 text-center text-slate-400 text-xs">Memuat rincian palet LPN…</div>
               ) : !selectedLpnDetail ? (
                 <div className="py-12 text-center text-rose-500 text-xs">Detail palet tidak ditemukan.</div>
               ) : (
@@ -492,13 +492,13 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                   {/* LPN Overview Header */}
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Kode Kontainer LPN</span>
+                      <span className="text-slate-500 block text-[10px] font-semibold">Kode Kontainer LPN</span>
                       <span className="font-mono font-black text-sm text-slate-900">
                         {selectedLpnDetail.lpn.lpn_code}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Tipe & Status</span>
+                      <span className="text-slate-500 block text-[10px] font-semibold">Tipe & Status</span>
                       <span className="font-semibold text-slate-800 block">
                         {PALLET_TYPE_CONFIG[selectedLpnDetail.lpn.pallet_type]?.label ?? selectedLpnDetail.lpn.pallet_type}
                       </span>
@@ -507,14 +507,14 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Lokasi Rak</span>
+                      <span className="text-slate-500 block text-[10px] font-semibold">Lokasi Rak</span>
                       <span className="font-mono font-bold text-slate-800">
                         {selectedLpnDetail.lpn.location_code || selectedLpnDetail.lpn.location_name || "-"}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Muatan</span>
-                      <span className="font-mono font-bold text-slate-900">
+                      <span className="text-slate-500 block text-[10px] font-semibold">Total Muatan</span>
+                      <span className="tabular-nums font-bold text-slate-900">
                         {selectedLpnDetail.lpn.total_weight_kg} / {selectedLpnDetail.lpn.max_weight_kg} kg
                       </span>
                     </div>
@@ -524,14 +524,14 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                   <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 font-semibold text-xs text-slate-700 flex justify-between">
                       <span>Daftar Item Batch Dalam Palet ({selectedLpnDetail.items.length} Batch)</span>
-                      <span className="font-mono">
+                      <span className="tabular-nums">
                         Total:{" "}
                         {selectedLpnDetail.items.reduce((s, it) => s + parseNum(it.quantity), 0)}{" "}
                         unit
                       </span>
                     </div>
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                      <thead className="bg-slate-50/50 border-b border-slate-200 text-slate-500 font-semibold text-[10px]">
                         <tr>
                           <th className="px-4 py-2.5">Produk</th>
                           <th className="px-4 py-2.5">Batch / Lot</th>
@@ -733,11 +733,11 @@ export function LPNManagementModal({ isOpen, onClose, warehouseId }: LPNManageme
                       >
                         <div>
                           <span className="font-semibold text-slate-900">{line.product_name}</span>
-                          <span className="ml-2 font-mono text-[10px] text-slate-500">
-                            Batch: {line.batch_number}
+                          <span className="ml-2 text-[10px] text-slate-500">
+                            Batch: <span className="font-mono">{line.batch_number}</span>
                           </span>
                         </div>
-                        <span className="font-mono font-bold text-emerald-700">
+                        <span className="tabular-nums font-bold text-emerald-700">
                           {line.quantity} unit
                         </span>
                       </button>

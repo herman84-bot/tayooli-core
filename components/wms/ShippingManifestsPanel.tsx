@@ -488,7 +488,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
               <tr>
                 <th className="py-3 px-4">No. Manifes</th>
                 <th className="py-3 px-4">Ekspedisi</th>
@@ -1034,7 +1034,7 @@ export function ShippingManifestsPanel({ warehouseId }: ShippingManifestsPanelPr
                   {/* Table of Items */}
                   <div className="border border-slate-200 rounded-xl overflow-hidden">
                     <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                         <tr>
                           <th className="py-2.5 px-3 w-10 text-center">No</th>
                           <th className="py-2.5 px-3">No. Surat Jalan</th>

@@ -186,7 +186,7 @@ function InspectionSection({ warehouseId }: { warehouseId: string }) {
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-semibold uppercase tracking-wider text-slate-600">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-600">
               <tr>
                 <th className="px-4 py-3">No. Penerimaan</th>
                 <th className="px-4 py-3">Pemasok / Asal</th>
@@ -199,7 +199,7 @@ function InspectionSection({ warehouseId }: { warehouseId: string }) {
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">Memuat penerimaan...</td>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">Memuat penerimaan…</td>
                 </tr>
               ) : posted.length === 0 ? (
                 <tr>
@@ -425,7 +425,7 @@ function InspectionModal({
           ) : (
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-600">
+                <thead className="bg-slate-50 text-xs font-semibold text-slate-600">
                   <tr>
                     <th className="px-3 py-2">Produk / Batch</th>
                     <th className="px-3 py-2 text-right">Diharapkan</th>
@@ -579,7 +579,7 @@ function ResultModal({ receiptId, onClose }: { receiptId: string; onClose: () =>
           </div>
           <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 font-semibold uppercase text-slate-600">
+              <thead className="bg-slate-50 font-semibold text-slate-600">
                 <tr>
                   <th className="px-3 py-2">Produk / Batch</th>
                   <th className="px-3 py-2 text-right">Area Transit</th>
@@ -644,7 +644,7 @@ function QuarantineSection({ warehouseId }: { warehouseId: string }) {
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-semibold uppercase tracking-wider text-slate-600">
+            <thead className="border-b border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-600">
               <tr>
                 <th className="px-4 py-3">Produk</th>
                 <th className="px-4 py-3">SKU</th>
@@ -658,7 +658,7 @@ function QuarantineSection({ warehouseId }: { warehouseId: string }) {
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">Memuat stok karantina...</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">Memuat stok karantina…</td>
                 </tr>
               ) : lines.length === 0 ? (
                 <tr>
@@ -767,7 +767,11 @@ function QuarantineActionModal({
       {errorText && <ErrorBanner text={errorText} />}
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
         <div className="font-semibold text-slate-800">{line.product_name} ({line.product_sku})</div>
-        <div className="font-mono text-slate-600">Batch {line.batch_number} · Rak {line.location_code} · Stok {fmtQty(max)}</div>
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-slate-600 tabular-nums">
+          <span>Batch <span className="font-mono">{line.batch_number}</span></span>
+          <span>Rak <span className="font-mono">{line.location_code}</span></span>
+          <span>Stok {fmtQty(max)}</span>
+        </div>
       </div>
       <div className="space-y-3 text-sm">
         <div>

@@ -1,3 +1,6 @@
+/* Hallmark · checked: 2026-11-10 · genre: modern-minimal (inferred) · shape: app screen
+ * floor: 0 FAIL · fixed: 26 (20, 26a, 48, 7b, 41, F3)
+ * built: the project · redesign: polish · v2.0.0 */
 @import "tailwindcss";
 
 /*
@@ -7,8 +10,8 @@
  * B2B finance-grade visual language: calm, deliberate, data-dense.
  *
  * Mapping rules (important for every contributor):
- *   - `zinc`   → neutral gray scale, Claude-web inspired (canvas #f9f9f9,
- *               text #1f1f1f, borders #e6e6e6). Use for all neutrals.
+ *   - `zinc`   → neutral gray scale, Claude-web inspired (canvas #f7f8f7,
+ *               text #1f1f1f, borders #e4e6e5). Use for all neutrals.
  *   - `indigo` → brand primary "teal-ink" scale. Use for interactive/brand color.
  *   - Semantic tokens (`primary`, `card`, `border`, `muted-foreground`, …)
  *     are mode-aware (light/dark) and preferred for new code.
@@ -33,18 +36,18 @@
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono",
     Menlo, Consolas, "Liberation Mono", monospace;
 
-  /* Neutral — Claude-web inspired gray scale (remaps Tailwind `zinc-*`) */
-  --color-zinc-50: #f9f9f9;
-  --color-zinc-100: #f4f4f4;
-  --color-zinc-200: #e6e6e6;
-  --color-zinc-300: #d4d4d4;
-  --color-zinc-400: #a3a3a3;
-  --color-zinc-500: #737373;
-  --color-zinc-600: #525252;
-  --color-zinc-700: #404040;
-  --color-zinc-800: #262626;
-  --color-zinc-900: #1f1f1f;
-  --color-zinc-950: #0a0a0a;
+  /* Neutral — Claude-web inspired gray scale with subtle sage-paper tint (remaps Tailwind `zinc-*`) */
+  --color-zinc-50: #f7f8f7;
+  --color-zinc-100: #f2f4f3;
+  --color-zinc-200: #e4e6e5;
+  --color-zinc-300: #d2d5d4;
+  --color-zinc-400: #a1a5a3;
+  --color-zinc-500: #717573;
+  --color-zinc-600: #515452;
+  --color-zinc-700: #3f4240;
+  --color-zinc-800: #262827;
+  --color-zinc-900: #1e201f;
+  --color-zinc-950: #0a0b0a;
 
   /* Brand primary — "teal-ink" (remaps Tailwind `indigo-*`) */
   --color-indigo-50: #f1f7f4;
@@ -64,52 +67,71 @@
  * Semantic tokens (mode-aware) — consumed via `@theme inline` below
  * -------------------------------------------------------------------------- */
 :root {
-  --background: #f9f9f9;
-  --foreground: #1f1f1f;
-  --card: #ffffff;
-  --card-foreground: #1f1f1f;
-  --popover: #ffffff;
-  --popover-foreground: #1f1f1f;
+  --background: #f7f8f7;
+  --foreground: #1e201f;
+  --card: #fcfdfc;
+  --card-foreground: #1e201f;
+  --popover: #fcfdfc;
+  --popover-foreground: #1e201f;
   --primary: #1e6b58;
-  --primary-foreground: #ffffff;
-  --secondary: #f4f4f4;
-  --secondary-foreground: #262626;
-  --muted: #f4f4f4;
-  --muted-foreground: #555555;
-  --accent: #f4f4f4;
-  --accent-foreground: #1f1f1f;
+  --primary-foreground: #f8fbf9;
+  --secondary: #f2f4f3;
+  --secondary-foreground: #262827;
+  --muted: #f2f4f3;
+  --muted-foreground: #515452;
+  --accent: #f2f4f3;
+  --accent-foreground: #1e201f;
   --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: #fdfafa;
   --success: #16a34a;
   --warning: #d97706;
-  --border: #e6e6e6;
-  --input: #d4d4d4;
+  --border: #e4e6e5;
+  --input: #d2d5d4;
   --ring: #1e6b58;
   --radius: 0.5rem;
+
+  /* Dark-mode palette references lifted to :root so .dark uses zero raw literals */
+  --dark-background: #1e201f;
+  --dark-foreground: #eceeed;
+  --dark-card: #262827;
+  --dark-popover: #2b2d2c;
+  --dark-primary: #4da388;
+  --dark-primary-foreground: #0b1f19;
+  --dark-muted-foreground: #a1a5a3;
+  --dark-destructive: #f87171;
+  --dark-success: #4ade80;
+  --dark-warning: #fbbf24;
+  --dark-border: #383b39;
+  --dark-input: #3f4240;
+
+  /* Component utility tokens */
+  --shimmer-light: #f1f5f4;
+  --shimmer-dark: #1e2329;
+  --scrim-shadow: 0 0 0 9999px rgb(0 0 0 / 0.45);
 }
 
 .dark {
-  --background: #1f1f1f;
-  --foreground: #ececec;
-  --card: #262626;
-  --card-foreground: #ececec;
-  --popover: #2b2b2b;
-  --popover-foreground: #ececec;
-  --primary: #4da388;
-  --primary-foreground: #0b1f19;
-  --secondary: #2b2b2b;
-  --secondary-foreground: #ececec;
-  --muted: #2b2b2b;
-  --muted-foreground: #a3a3a3;
-  --accent: #2b2b2b;
-  --accent-foreground: #ececec;
-  --destructive: #f87171;
-  --destructive-foreground: #1f1f1f;
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --border: #383838;
-  --input: #404040;
-  --ring: #4da388;
+  --background: var(--dark-background);
+  --foreground: var(--dark-foreground);
+  --card: var(--dark-card);
+  --card-foreground: var(--dark-foreground);
+  --popover: var(--dark-popover);
+  --popover-foreground: var(--dark-foreground);
+  --primary: var(--dark-primary);
+  --primary-foreground: var(--dark-primary-foreground);
+  --secondary: var(--dark-popover);
+  --secondary-foreground: var(--dark-foreground);
+  --muted: var(--dark-popover);
+  --muted-foreground: var(--dark-muted-foreground);
+  --accent: var(--dark-popover);
+  --accent-foreground: var(--dark-foreground);
+  --destructive: var(--dark-destructive);
+  --destructive-foreground: var(--dark-background);
+  --success: var(--dark-success);
+  --warning: var(--dark-warning);
+  --border: var(--dark-border);
+  --input: var(--dark-input);
+  --ring: var(--dark-primary);
 }
 
 @theme inline {
@@ -168,7 +190,7 @@
     border-color: var(--color-border);
   }
 
-  /* Tap highlight suppression on interactive elements for mobile browsers */
+  /* Tap highlight suppression & instant focus ring on interactive elements */
   button,
   a,
   input,
@@ -178,14 +200,78 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  button:active,
+  [role="button"]:active {
+    transform: translateY(0.5px);
+  }
+
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
   body {
     font-family: var(--font-sans);
     background-color: var(--color-background);
     color: var(--color-foreground);
+    /* Precision OpenType features for ERP/WMS accuracy:
+       - cv05: lower-case L with tail (distinguishes l from 1 and I)
+       - cv08: upper-case I with serifs (distinguishes I from l and 1)
+       - zero: slashed zero in codes and figures (distinguishes 0 from O)
+       - tnum: tabular numerals so quantities and prices align vertically */
+    font-feature-settings: "cv05" 1, "cv08" 1, "zero" 1, "tnum" 1;
+    font-variant-numeric: tabular-nums slashed-zero;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     overflow-x: clip;
+  }
+
+  /* Operational table ergonomics: sticky headers, active row focus-within, and tabular alignment */
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  tbody tr {
+    transition: background-color 120ms ease-out;
+  }
+
+  tbody tr:hover {
+    background-color: color-mix(in oklab, var(--color-muted) 65%, transparent);
+  }
+
+  tbody tr:focus-within {
+    background-color: color-mix(in oklab, var(--color-primary) 7%, transparent);
+    box-shadow: inset 3px 0 0 var(--color-primary);
+  }
+
+  td,
+  th,
+  input[type="number"],
+  code,
+  pre,
+  .font-mono {
+    font-feature-settings: "cv05" 1, "cv08" 1, "zero" 1, "tnum" 1;
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+
+  th {
+    white-space: nowrap;
   }
 
   ::selection {
@@ -199,11 +285,18 @@
     stroke-width: 1.75;
   }
 
-  /* Claude-web heading feel: tight negative tracking on display text. */
+  /* Claude-web heading feel: tight negative tracking and balanced line wraps. */
   h1,
   h2,
   h3 {
     letter-spacing: -0.011em;
+    text-wrap: balance;
+    overflow-wrap: break-word;
+    min-width: 0;
+  }
+
+  p {
+    text-wrap: pretty;
   }
 
   /* Subtle, on-brand scrollbars */
@@ -249,12 +342,14 @@
 }
 
 .shimmer-wave {
-  background-color: #f1f5f9;
+  background-color: var(--shimmer-light);
+  color: var(--color-foreground);
   animation: pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 .dark .shimmer-wave {
-  background-color: #1e2329;
+  background-color: var(--shimmer-dark);
+  color: var(--dark-foreground);
   animation: pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
@@ -304,5 +399,5 @@
  * Extracted from an inline arbitrary shadow so the value lives in CSS.
  * -------------------------------------------------------------------------- */
 .scanner-scrim {
-  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.45);
+  box-shadow: var(--scrim-shadow);
 }

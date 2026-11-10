@@ -802,7 +802,7 @@ export default function MarketplacePage() {
           <div className="flex border-b border-slate-200 mt-8 gap-2 overflow-x-auto pb-px">
             <button
               onClick={() => setActiveTab("import")}
-              className={`min-h-[48px] px-5 py-2.5 font-semibold text-sm rounded-t-lg transition-colors flex items-center gap-2 border-b-2 shrink-0 ${
+              className={`min-h-[48px] px-5 py-2.5 font-semibold text-sm transition-colors flex items-center gap-2 border-b-2 shrink-0 ${
                 activeTab === "import"
                   ? "border-blue-600 text-blue-600 bg-blue-50/50"
                   : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50"
@@ -814,7 +814,7 @@ export default function MarketplacePage() {
 
             <button
               onClick={() => setActiveTab("orders")}
-              className={`min-h-[48px] px-5 py-2.5 font-semibold text-sm rounded-t-lg transition-colors flex items-center gap-2 border-b-2 shrink-0 ${
+              className={`min-h-[48px] px-5 py-2.5 font-semibold text-sm transition-colors flex items-center gap-2 border-b-2 shrink-0 ${
                 activeTab === "orders"
                   ? "border-blue-600 text-blue-600 bg-blue-50/50"
                   : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50"
@@ -829,7 +829,7 @@ export default function MarketplacePage() {
 
             <button
               onClick={() => setActiveTab("mappings")}
-              className={`min-h-[48px] px-5 py-2.5 font-semibold text-sm rounded-t-lg transition-colors flex items-center gap-2 border-b-2 shrink-0 ${
+              className={`min-h-[48px] px-5 py-2.5 font-semibold text-sm transition-colors flex items-center gap-2 border-b-2 shrink-0 ${
                 activeTab === "mappings"
                   ? "border-blue-600 text-blue-600 bg-blue-50/50"
                   : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50"
@@ -1191,7 +1191,7 @@ export default function MarketplacePage() {
                 {/* Preview Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider border-b border-slate-200">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold text-xs border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3">ID Pesanan Marketplace</th>
                         <th className="px-4 py-3">Pembeli & Kontak</th>
@@ -1545,7 +1545,7 @@ export default function MarketplacePage() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider border-b border-slate-200">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold text-xs border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3">Kanal & ID Pesanan</th>
                         <th className="px-4 py-3">Pembeli</th>
@@ -1777,7 +1777,7 @@ export default function MarketplacePage() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider border-b border-slate-200">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold text-xs border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3">Kanal</th>
                         <th className="px-4 py-3">SKU Marketplace</th>

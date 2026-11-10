@@ -484,7 +484,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                 <ShieldCheck className="h-4 w-4 text-blue-600" />
                 <span>Antrean Paket ({filteredOrders.length})</span>
               </h3>
-              <span className="text-[11px] text-slate-500 font-mono">
+              <span className="text-[11px] text-slate-500 tabular-nums">
                 {readyCount} menunggu
               </span>
             </div>
@@ -492,7 +492,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
               <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Cari No. SJ, resi, penerima..."
+                placeholder="Cari No. SJ, resi, penerima…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -502,7 +502,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
 
           <div className="divide-y divide-slate-100 max-h-[640px] overflow-y-auto">
             {loadingOrders ? (
-              <div className="p-8 text-center text-xs text-slate-400">Memuat paket...</div>
+              <div className="p-8 text-center text-xs text-slate-400">Memuat paket…</div>
             ) : ordersError ? (
               <div className="p-6 text-center text-xs text-rose-600 space-y-2">
                 <AlertCircle className="h-6 w-6 mx-auto text-rose-500" />
@@ -535,10 +535,10 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                   <div
                     key={order.id}
                     onClick={() => handleSelectOrder(order)}
-                    className={`p-3.5 cursor-pointer transition border-l-4 ${
+                    className={`p-3.5 cursor-pointer transition-colors ${
                       isSelected
-                        ? "bg-blue-50/70 border-blue-600"
-                        : "hover:bg-slate-50 border-transparent"
+                        ? "bg-blue-50/70 ring-1 ring-inset ring-blue-600/30"
+                        : "hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -548,7 +548,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                             {order.do_number}
                           </span>
                           <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase border ${conf.cls}`}
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${conf.cls}`}
                           >
                             {conf.label}
                           </span>
@@ -562,7 +562,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                           {order.expedition_name || "Internal"}
                         </span>
                         {order.package_weight_kg && (
-                          <span className="text-[10px] font-mono text-slate-700 block">
+                          <span className="text-[10px] tabular-nums text-slate-700 block">
                             {order.package_weight_kg} kg
                           </span>
                         )}
@@ -572,7 +572,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                     <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-1.5">
                       <div>
                         {order.tracking_number ? (
-                          <span className="font-mono text-slate-700 font-medium">
+                          <span className="tabular-nums text-slate-700 font-medium">
                             Resi: {order.tracking_number}
                           </span>
                         ) : (
@@ -592,8 +592,9 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                     </div>
 
                     {isMyPack && (
-                      <div className="mt-1 text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                        ⚠️ Dikemas oleh Anda (Segregation of Duties)
+                      <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        <span>Dikemas oleh Anda (Segregation of Duties)</span>
                       </div>
                     )}
                   </div>
@@ -627,7 +628,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                       {selectedOrder.do_number}
                     </span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                         QC_STATUS_CONFIG[selectedOrder.status]?.cls ||
                         "bg-slate-100 text-slate-700 border-slate-200"
                       }`}
@@ -757,7 +758,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
 
               {/* ── SECTION 2: Verifikasi Dimensi, Kemasan & Checklist Fisik ── */}
               <div className="space-y-4">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <CheckSquare className="h-4 w-4 text-indigo-600" />
                   <span>Langkah 2: Pemeriksaan Fisik & Kemasan Paket</span>
                 </h4>
@@ -765,25 +766,25 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                 {/* Packaging Details Summary */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3.5 rounded-lg border border-slate-200 text-xs">
                   <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">Berat Paket</span>
-                    <span className="font-mono font-bold text-slate-900 text-sm">
+                    <span className="text-[10px] text-slate-500 block">Berat Paket</span>
+                    <span className="tabular-nums font-bold text-slate-900 text-sm">
                       {selectedOrder.package_weight_kg ? `${selectedOrder.package_weight_kg} kg` : "1.0 kg"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">Dimensi (P x L x T)</span>
-                    <span className="font-mono font-bold text-slate-900 text-sm">
+                    <span className="text-[10px] text-slate-500 block">Dimensi (P x L x T)</span>
+                    <span className="tabular-nums font-bold text-slate-900 text-sm">
                       {selectedOrder.package_length_cm || 30} x {selectedOrder.package_width_cm || 20} x {selectedOrder.package_height_cm || 15} cm
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">Jenis Kemasan</span>
+                    <span className="text-[10px] text-slate-500 block">Jenis Kemasan</span>
                     <span className="font-bold text-slate-900 text-sm">
                       {selectedOrder.packaging_type || "KARTON"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">Petugas Kemas</span>
+                    <span className="text-[10px] text-slate-500 block">Petugas Kemas</span>
                     <span className="font-bold text-indigo-700 text-sm">
                       {selectedOrder.packed_by_name || "Petugas Packing"}
                     </span>
@@ -819,12 +820,12 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                     <span className="text-[11px] text-slate-500">100% Terkemas di Stasiun Kemas</span>
                   </div>
                   {loadingItems ? (
-                    <div className="p-4 text-center text-xs text-slate-400">Memuat rincian item...</div>
+                    <div className="p-4 text-center text-xs text-slate-400">Memuat rincian item…</div>
                   ) : orderItems.length === 0 ? (
                     <div className="p-4 text-center text-xs text-slate-400">Tidak ada data item</div>
                   ) : (
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50/50 text-[10px] text-slate-500 uppercase border-b border-slate-100">
+                      <thead className="bg-slate-50/50 text-[10px] text-slate-500 font-semibold border-b border-slate-100">
                         <tr>
                           <th className="py-2 px-3">Nama Produk / SKU</th>
                           <th className="py-2 px-3">Batch & Lokasi</th>
@@ -843,7 +844,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                                 {it.batch_number || "BATCH-DEFAULT"}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                            <td className="py-2.5 px-3 text-right tabular-nums font-bold text-slate-900">
                               {Number(it.packed_qty || it.quantity).toLocaleString("id-ID")} unit
                             </td>
                           </tr>
@@ -1010,14 +1011,14 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
 
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
               {loadingHistory ? (
-                <div className="p-8 text-center text-xs text-slate-400">Memuat riwayat...</div>
+                <div className="p-8 text-center text-xs text-slate-400">Memuat riwayat…</div>
               ) : historyList.length === 0 ? (
                 <div className="p-8 text-center text-xs text-slate-400">
                   Belum ada catatan inspeksi QC outbound di gudang ini.
                 </div>
               ) : (
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-[10px] text-slate-500 uppercase sticky top-0 border-b border-slate-200">
+                  <thead className="bg-slate-50 text-[10px] text-slate-500 font-semibold sticky top-0 border-b border-slate-200">
                     <tr>
                       <th className="py-2 px-3">Tanggal & Waktu</th>
                       <th className="py-2 px-3">No. Surat Jalan</th>
@@ -1030,7 +1031,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                   <tbody className="divide-y divide-slate-100">
                     {historyList.map((h) => (
                       <tr key={h.id} className="hover:bg-slate-50">
-                        <td className="py-2.5 px-3 text-slate-600 font-mono text-[11px]">
+                        <td className="py-2.5 px-3 text-slate-600 tabular-nums text-[11px]">
                           {new Date(h.created_at).toLocaleString("id-ID")}
                         </td>
                         <td className="py-2.5 px-3 font-mono font-bold text-slate-900">
@@ -1041,7 +1042,7 @@ export function OutboundQCSubView({ warehouseId }: OutboundQCSubViewProps) {
                         </td>
                         <td className="py-2.5 px-3">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               h.status === "QC_PASSED"
                                 ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                 : "bg-rose-50 text-rose-700 border border-rose-200"
