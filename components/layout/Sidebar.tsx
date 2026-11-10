@@ -28,6 +28,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/brand/Logo'
 import { canAccessRoute, ROLE_LABELS } from '@/lib/rbac'
+import { useBoop, BoopIcon } from '@/components/ui/boop-icon'
 
 interface NavItem {
   href: string
@@ -35,6 +36,86 @@ interface NavItem {
   icon: React.ElementType
   exact?: boolean
   tutorial?: string
+}
+
+function MobileSidebarNavItem({
+  item,
+  active,
+}: {
+  item: NavItem
+  active: boolean
+}) {
+  const { href, label, icon: Icon } = item
+  const [animateState, transition, triggerBoop] = useBoop({ rotate: 35 })
+
+  return (
+    <Link
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      onMouseEnter={triggerBoop}
+      className={cn(
+        'group flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm transition-colors active:scale-98 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        active
+          ? 'bg-primary/10 text-primary font-medium'
+          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+      )}
+    >
+      <BoopIcon
+        icon={Icon}
+        animateState={animateState}
+        transition={transition}
+        className={cn(
+          'h-4.5 w-4.5 shrink-0 transition-colors',
+          active ? 'text-primary' : 'text-muted-foreground/70 group-hover:text-foreground',
+        )}
+      />
+      {label}
+    </Link>
+  )
+}
+
+function DesktopSidebarNavItem({
+  item,
+  active,
+  collapsed,
+}: {
+  item: NavItem
+  active: boolean
+  collapsed: boolean
+}) {
+  const { href, label, icon: Icon, tutorial } = item
+  const [animateState, transition, triggerBoop] = useBoop({ rotate: 35 })
+
+  return (
+    <Link
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      title={collapsed ? label : undefined}
+      data-tutorial={tutorial}
+      onMouseEnter={triggerBoop}
+      className={cn(
+        'group/item flex items-center rounded-md transition-colors active:scale-98 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        collapsed
+          ? 'justify-center px-0 py-2 mx-auto w-10'
+          : 'gap-2 px-2.5 py-1.5',
+        active
+          ? 'bg-primary/8 text-primary font-medium'
+          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+      )}
+    >
+      <BoopIcon
+        icon={Icon}
+        animateState={animateState}
+        transition={transition}
+        className={cn(
+          'shrink-0 transition-colors',
+          collapsed ? 'h-[18px] w-[18px]' : 'h-[15px] w-[15px]',
+          active ? 'text-primary' : 'text-muted-foreground/70 group-hover/item:text-foreground',
+        )}
+      />
+      {!collapsed && <span className="text-[13px] truncate">{label}</span>}
+    </Link>
+  )
 }
 
 interface NavGroup {
@@ -145,7 +226,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
         <aside
           className={cn(
             'fixed inset-y-0 left-0 z-50 w-64 bg-background border-r border-border flex flex-col',
-            'transition-transform duration-200 ease-in-out shadow-xl',
+            'transition-transform motion-reduce:transition-none duration-200 ease-in-out shadow-xl',
             mobileOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >
@@ -162,7 +243,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
             </div>
             <button
               onClick={onMobileClose}
-              className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-95"
+              className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               aria-label="Tutup menu"
             >
               <X className="h-5 w-5" />
@@ -173,29 +254,20 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
           <nav className="flex-1 px-2.5 py-3 overflow-y-auto">
             {visibleGroups.map((group, gi) => (
               <div key={group.label} className={gi > 0 ? 'mt-4' : undefined}>
-                <p className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+                <p className="px-2.5 mb-1.5 text-xs font-medium text-muted-foreground/70">
                   {group.label}
                 </p>
                 <div className="space-y-1">
-                  {group.items.map(({ href, label, icon: Icon, exact }) => {
-                    const active = exact
-                      ? pathname === href
-                      : pathname === href || pathname.startsWith(href + '/')
+                  {group.items.map((item) => {
+                    const active = item.exact
+                      ? pathname === item.href
+                      : pathname === item.href || pathname.startsWith(item.href + '/')
                     return (
-                      <Link
-                        key={href}
-                        href={href}
-                        aria-current={active ? 'page' : undefined}
-                        className={cn(
-                          'flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm transition-colors active:scale-98',
-                          active
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                        )}
-                      >
-                        <Icon className={cn('h-4.5 w-4.5 shrink-0', active ? 'text-primary' : 'text-muted-foreground/70')} />
-                        {label}
-                      </Link>
+                      <MobileSidebarNavItem
+                        key={item.href}
+                        item={item}
+                        active={active}
+                      />
                     )
                   })}
                 </div>
@@ -218,7 +290,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
                       window.location.replace('/login')
                     })()
                   }}
-                  className="ml-2 shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-95"
+                  className="ml-2 shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                   aria-label="Keluar"
                 >
                   <LogOut className="h-4 w-4" />
@@ -235,7 +307,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   return (
     <aside
       className={cn(
-        'hidden md:flex shrink-0 border-r border-border bg-background flex-col transition-all duration-200 ease-in-out',
+        'hidden md:flex shrink-0 border-r border-border bg-background flex-col transition-colors',
         collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_EXPANDED_W,
       )}
     >
@@ -262,7 +334,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
         <button
           onClick={toggleCollapsed}
           className={cn(
-            'shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors',
+            'shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50',
             collapsed ? 'p-1.5' : 'p-1',
           )}
           aria-label={collapsed ? 'Bentangkan sidebar' : 'Ciutkan sidebar'}
@@ -281,7 +353,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
         {visibleGroups.map((group, gi) => (
           <div key={group.label} className={gi > 0 ? 'mt-4' : undefined}>
             {!collapsed && (
-              <p className="px-2.5 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/60">
+              <p className="px-2.5 mb-1 text-xs font-medium text-muted-foreground/70">
                 {group.label}
               </p>
             )}
@@ -290,36 +362,16 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
             )}
             <div className={collapsed ? 'space-y-1' : 'space-y-px'}>
               {group.items.map((item) => {
-                const { href, label, icon: Icon, exact, tutorial } = item
-                const active = exact
-                  ? pathname === href
-                  : pathname === href || pathname.startsWith(href + '/')
+                const active = item.exact
+                  ? pathname === item.href
+                  : pathname === item.href || pathname.startsWith(item.href + '/')
                 return (
-                  <Link
-                    key={href}
-                    href={href}
-                    aria-current={active ? 'page' : undefined}
-                    title={collapsed ? label : undefined}
-                    data-tutorial={tutorial}
-                    className={cn(
-                      'group/item flex items-center rounded-md transition-colors',
-                      collapsed
-                        ? 'justify-center px-0 py-2 mx-auto w-10'
-                        : 'gap-2 px-2.5 py-1.5',
-                      active
-                        ? 'bg-primary/8 text-primary font-medium'
-                        : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        'shrink-0',
-                        collapsed ? 'h-[18px] w-[18px]' : 'h-[15px] w-[15px]',
-                        active ? 'text-primary' : 'text-muted-foreground/70',
-                      )}
-                    />
-                    {!collapsed && <span className="text-[13px] truncate">{label}</span>}
-                  </Link>
+                  <DesktopSidebarNavItem
+                    key={item.href}
+                    item={item}
+                    active={active}
+                    collapsed={collapsed}
+                  />
                 )
               })}
             </div>

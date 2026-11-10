@@ -1,7 +1,8 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import Sidebar from '@/components/layout/Sidebar'
+import { useBoop } from '@/components/ui/boop-icon'
 
 jest.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
@@ -67,5 +68,42 @@ describe('Sidebar Navigation - 12 Clean Core Modules Hierarchy', () => {
     expect(screen.queryByRole('link', { name: /Jurnal Umum/i })).toBeNull()
     expect(screen.queryByRole('link', { name: /Chart of Accounts/i })).toBeNull()
     expect(screen.queryByRole('link', { name: /^Invoices$/i })).toBeNull()
+  })
+
+  it('triggers Railway-style spring boop rotation (rotate: 35, stiffness: 300, damping: 10) on mouseEnter and resets after 150ms', () => {
+    jest.useFakeTimers()
+
+    function TestHarness() {
+      const [animateState, transition, trigger] = useBoop({ rotate: 35 })
+      return (
+        <button
+          type="button"
+          onMouseEnter={trigger}
+          data-testid="boop-btn"
+          data-rotate={animateState.rotate}
+          data-stiffness={transition.stiffness}
+          data-damping={transition.damping}
+        >
+           Pengaturan
+        </button>
+      )
+    }
+
+    render(<TestHarness />)
+    const btn = screen.getByTestId('boop-btn')
+
+    expect(btn).toHaveAttribute('data-rotate', '0')
+    expect(btn).toHaveAttribute('data-stiffness', '300')
+    expect(btn).toHaveAttribute('data-damping', '10')
+
+    fireEvent.mouseEnter(btn)
+    expect(btn).toHaveAttribute('data-rotate', '35')
+
+    act(() => {
+      jest.advanceTimersByTime(150)
+    })
+    expect(btn).toHaveAttribute('data-rotate', '0')
+
+    jest.useRealTimers()
   })
 })

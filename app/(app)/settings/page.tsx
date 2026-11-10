@@ -31,6 +31,7 @@ import {
   Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useBoop, BoopIcon } from '@/components/ui/boop-icon'
 
 type Tab = 'team' | 'profile' | 'payments'
 
@@ -39,6 +40,46 @@ const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'profile', label: 'Perusahaan', icon: Building2 },
   { id: 'payments', label: 'Metode Pembayaran', icon: CreditCard },
 ]
+
+function SettingsTabButton({
+  id,
+  label,
+  icon: Icon,
+  active,
+  onSelect,
+}: {
+  id: Tab
+  label: string
+  icon: React.ElementType
+  active: boolean
+  onSelect: (id: Tab) => void
+}) {
+  const [animateState, transition, triggerBoop] = useBoop({ rotate: 35 })
+
+  return (
+    <button
+      onClick={() => onSelect(id)}
+      onMouseEnter={triggerBoop}
+      className={cn(
+        'group flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px active:scale-98 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50',
+        active
+          ? 'border-primary text-primary'
+          : 'border-transparent text-muted-foreground hover:text-foreground',
+      )}
+    >
+      <BoopIcon
+        icon={Icon}
+        animateState={animateState}
+        transition={transition}
+        className={cn(
+          'h-4 w-4 transition-colors',
+          active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
+        )}
+      />
+      {label}
+    </button>
+  )
+}
 
 function WarehousePicker({ warehouses, selected, onChange, loading }: {
   warehouses: Warehouse[]
@@ -618,20 +659,15 @@ export default function SettingsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border mb-5">
-        {tabs.map(({ id, label, icon: Icon }) => (
-          <button
+        {tabs.map(({ id, label, icon }) => (
+          <SettingsTabButton
             key={id}
-            onClick={() => setActiveTab(id)}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
-              activeTab === id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
+            id={id}
+            label={label}
+            icon={icon}
+            active={activeTab === id}
+            onSelect={setActiveTab}
+          />
         ))}
       </div>
 
