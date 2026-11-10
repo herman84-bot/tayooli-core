@@ -105,7 +105,7 @@ export function LoginForm() {
             type="button"
             tabIndex={-1}
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-sm text-muted-foreground transition-colors hover:text-foreground active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -120,7 +120,7 @@ export function LoginForm() {
       <div className="flex justify-end">
         <a
           href="/forgot-password"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="rounded-sm text-sm text-muted-foreground transition-colors hover:text-foreground active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Lupa kata sandi?
         </a>

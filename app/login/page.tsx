@@ -44,8 +44,8 @@ export default function LoginPage() {
 
         {process.env.NODE_ENV === "development" && (
           <div className="mt-5 text-center">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground/70">Demo</p>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">admin@test.com / password123</p>
+            <p className="text-xs text-muted-foreground/70">Demo</p>
+            <p className="mt-1 tabular-nums text-xs text-muted-foreground">admin@test.com / password123</p>
           </div>
         )}
 

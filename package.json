@@ -24,6 +24,7 @@
     "@supabase/supabase-js": "^2.112.2",
     "@tanstack/react-query": "^5.101.1",
     "@tanstack/react-table": "^8.21.3",
+    "@types/three": "^0.187.0",
     "autoprefixer": "^10.4.21",
     "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
@@ -38,6 +39,7 @@
     "react-hook-form": "^7.55.0",
     "recharts": "^3.9.2",
     "tailwind-merge": "^3.3.1",
+    "three": "^0.187.0",
     "write-excel-file": "^2.3.10",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
